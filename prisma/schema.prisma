@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Player {
+  id          Int           @id @default(autoincrement())
+  name        String
+  email       String?       @unique
+  handicapIdx Float         @default(0)
+  createdAt   DateTime      @default(now())
+  rounds      RoundPlayer[]
+  scores      Score[]
+}
+
+model Course {
+  id       Int          @id @default(autoincrement())
+  name     String
+  location String?
+  holes    CourseHole[]
+  rounds   Round[]
+}
+
+model CourseHole {
+  id       Int    @id @default(autoincrement())
+  courseId Int
+  number   Int
+  par      Int
+  index    Int
+  course   Course @relation(fields: [courseId], references: [id])
+}
+
+model Round {
+  id         Int           @id @default(autoincrement())
+  courseId   Int
+  holesCount Int           @default(18)
+  playedAt   DateTime      @default(now())
+  tee        String        @default("blue")
+  createdAt  DateTime      @default(now())
+  games      Game[]
+  course     Course        @relation(fields: [courseId], references: [id])
+  players    RoundPlayer[]
+  scores     Score[]
+  sideBets   SideBet[]
+}
+
+model RoundPlayer {
+  id          Int     @id @default(autoincrement())
+  roundId     Int
+  playerId    Int
+  tee         String  @default("blue")
+  handicapIdx Float
+  courseHcp   Int
+  isCourseHcp Boolean @default(false)
+  betting     Boolean @default(true)
+  player      Player  @relation(fields: [playerId], references: [id])
+  round       Round   @relation(fields: [roundId], references: [id])
+}
+
+model Score {
+  id         Int     @id @default(autoincrement())
+  roundId    Int
+  playerId   Int
+  hole       Int
+  gross      Int
+  putts      Int?
+  fromBunker Boolean @default(false)
+  player     Player  @relation(fields: [playerId], references: [id])
+  round      Round   @relation(fields: [roundId], references: [id])
+}
+
+model Game {
+  id        Int          @id @default(autoincrement())
+  roundId   Int
+  type      String
+  stake     Float
+  playerIds Int[]
+  round     Round        @relation(fields: [roundId], references: [id])
+  results   GameResult[]
+}
+
+model GameResult {
+  id       Int  @id @default(autoincrement())
+  gameId   Int
+  hole     Int?
+  winnerId Int?
+  detail   Json
+  game     Game @relation(fields: [gameId], references: [id])
+}
+
+model SideBet {
+  id        Int             @id @default(autoincrement())
+  roundId   Int
+  type      String
+  stake     Float           @default(0)
+  playerIds Int[]
+  round     Round           @relation(fields: [roundId], references: [id])
+  results   SideBetResult[]
+}
+
+model SideBetResult {
+  id        Int     @id @default(autoincrement())
+  sideBetId Int
+  hole      Int?
+  winnerIds Int[]
+  amount    Float
+  detail    Json?
+  sideBet   SideBet @relation(fields: [sideBetId], references: [id])
+}

@@ -7,3 +7,5 @@ HH:MM | NNN_<slug> | <item> | <summary> | <tag>
 22:36 | 048_survey-revision-round4 | meta | turn 12 split 12a/12b (additive migration; compile stays green); variance source = one; 13-turn baseline; ~12–14 range | ⏸
 22:36 | 049_session-log | meta | survey accepted; session logged; stash commit-6-gate-test still in place; commit 7 + EOD-FINAL pending | ⏸
 23:30 | 050_housekeeping-stash-resolve | meta | stash resolved (Option B reclassified); 015–041 recovered; Phase 2 tracker synced (d4bddb3/5716120); commit 7 landed | ✓
+23:45 | 051_audit-sweep-already-applied | meta | AUDIT.md items 13+19 task surfaced as already done in e3ec368; no edits needed | ✓
+17:49 | 052_junk-turn1-ctp | #7 | isCTP red+green; junk.ts + junk.test.ts created; 129/8 green; tsc clean | ✓

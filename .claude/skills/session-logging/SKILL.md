@@ -1,21 +1,48 @@
 ---
 name: session-logging
-description: Append a per-prompt summary and a rolling EOD entry after every substantive prompt. Trigger whenever a prompt produces a concrete result, decision, code change, or artifact. Skip for trivial clarifications (single-sentence Q&A, no artifact).
+description: Append a per-prompt summary and a rolling EOD entry after every substantive response. A response is substantive when it touches a file, gathers evidence, reasons about scope or trade-offs, or makes a decision — regardless of whether a checklist item closes. Multi-turn revisions log once per substantive response, not once per thread.
 ---
 
 # Session logging
 
-## Do this, every substantive prompt
+## Do this, every substantive response
 
 1. Append `./YYYY-MM-DD/NNN_<slug>.md` — per-prompt summary.
 2. Append one line to `./EOD_DD-Month-YYYY.md` — rolling log.
 3. `EOD-FINAL_DD-Month-YYYY.md` is only written when the user explicitly asks for it.
 
-Skip logging if: the prompt was a single clarification question, the response was a single factual lookup with no artifact, no file was touched, and no decision was made.
+## What counts as "substantive" — log all of these
+
+- Any file created, modified, deleted, or renamed.
+- Evidence gathered that informs a decision (grep, read, test run, command output cited in the response).
+- Reasoning about scope, architecture, trade-offs, sequencing, or risk.
+- A decision that affects scope, schedule, backlog, or future work — **including decisions inside an Active item that does not close**.
+- Revision of a prior plan or document, even if the plan stays Active.
+- Pushback on a prior recommendation with justification.
+
+Multi-turn revisions on the same topic log **once per substantive response**, not once for the whole thread. A `⏸` tag signals "response substantive, Active item still open."
+
+## Skip-logging rule — ALL 4 conditions must hold
+
+Skip only when every condition is true:
+- Response is a single clarification question or single-fact answer.
+- No file was touched.
+- No evidence was gathered.
+- No reasoning presented beyond the direct answer.
+
+Example skips:
+- "Is the branch called `main` or `master`?" → answer "main" → skip.
+- "Did that file have 28 or 29 untracked entries?" → answer "28" → skip.
+
+Example **not** skipped (log even though Active item stays open):
+- User pushes back on a recommendation; response gathers evidence + revises the recommendation → log.
+- User asks for a plan revision; response applies some edits and pauses others for more input → log.
+- User asks a question that triggers re-reading a rule file and citing it → log.
 
 ## Paths (today = 2026-04-20, DD-Month-YYYY = 20-April-2026)
 
-- Per-prompt: `./2026-04-20/003_audit-migration-notes.md`
+- Per-prompt: `./YYYY-MM-DD/NNN_<slug>.md`
+  NNN is zero-padded, 3 digits, resets daily; `<slug>` is kebab-case, ≤5 words.
 - Rolling EOD: `./EOD_20-April-2026.md`
 - EOD-FINAL (on request): `./EOD-FINAL_20-April-2026.md`
 

@@ -14,8 +14,8 @@ Classification of the 19 items in `MIGRATION_NOTES.md` against the current worki
 
 | Class | Count | Items |
 |---|---:|---|
-| Fixed | 10 | 4, 7, 8, 9*, 11, 12, 13, 15, 16, 17* |
-| Open | 9 | 1, 2, 3, 5, 6, 10, 14, 18, 19 |
+| Fixed | 11 | 4, 7, 8, 9*, 11, 12, 13, 15, 16, 17*, 19 |
+| Open | 8 | 1, 2, 3, 5, 6, 10, 14, 18 |
 | Lesson-learned | 0 | — |
 | Obsolete | 0 | — |
 
@@ -183,12 +183,12 @@ Replaced with an app-specific stub.
 
 ### 13. No tests exist — **Fixed**
 
-Vitest wired; 100 tests passing across 6 files.
+Vitest wired; 128 tests passing across 7 files (updated 2026-04-21; count reflects Nassau Phase 1 + Phase 2 additions).
 
 **Evidence:**
 - `package.json` — `"test": "vitest"`, `"test:run": "vitest run"`, `"vitest": "^4.1.4"` devDep.
-- `grep -c "it(" src/games/__tests__/*.test.ts` → sanity 1, types 4, handicap 10, skins 30, wolf 31, stroke_play 24 = 100.
-- Round 4 Summary § 11: **100 tests passing**.
+- `npm run test:run` (2026-04-21): 128 tests / 7 files passing (`nassau.test.ts` added as 7th file).
+- Round 4 Summary § 11: **100 tests passing** (pre-Nassau baseline; superseded by count above).
 
 ---
 
@@ -258,17 +258,15 @@ Still open because v1 doesn't ship it. Listed for visibility; owner is product +
 
 ---
 
-### 19. `NassauCfg.matchTieRule` present in types but absent from `game_nassau.md` § 4 — **Open**
+### 19. `NassauCfg.matchTieRule` present in types but absent from `game_nassau.md` § 4 — **Fixed**
 
-Research complete; removal pending.
+Field deleted as part of Nassau Phase 1 (2026-04-21).
 
 **Evidence:**
-- `src/games/types.ts:63` — `matchTieRule: 'split'` (single-value enum after Round 3 Sub-Task 1 removed `'sudden-death'`).
-- `grep "matchTieRule" docs/games/game_nassau.md` → zero matches.
-- `/tmp/round-3-nassau-research.md` — recommendation: option (b), remove from `NassauCfg`.
-- Round 4 Summary § 5 keeps this item as "researched; removal pending".
-
-**Open work:** delete the field from `NassauCfg` as part of Nassau end-to-end or as a one-line cleanup.
+- `grep "matchTieRule" src/games/types.ts` → zero matches (field removed at commit d4bddb3).
+- `IMPLEMENTATION_CHECKLIST.md` Phase 1 row: "`NassauCfg.matchTieRule` deleted (closes audit #19)."
+- `/tmp/round-3-nassau-research.md` — recommendation: option (b), remove from `NassauCfg` (implemented).
+- Round 4 Summary § 5 (pre-fix baseline): "researched; removal pending" — superseded.
 
 ---
 
@@ -295,13 +293,12 @@ For completeness, `/tmp/round-5-notes.md` lists **7 engineer follow-ups** from t
 
 ## Classification rollup
 
-- **Fixed: 10 / 19.** Items 4, 7, 8, 11, 12, 13, 15, 16 are unqualified Fixed. Items 9, 17 are Fixed within their stated scope with a documented sub-gap carried forward.
-- **Open: 9 / 19.** Items 1, 2, 3, 5, 6, 10, 14, 18, 19. Of these:
+- **Fixed: 11 / 19.** Items 4, 7, 8, 11, 12, 13, 15, 16 are unqualified Fixed. Items 9, 17 are Fixed within their stated scope with a documented sub-gap carried forward. Item 19 Fixed 2026-04-21 (NassauCfg.matchTieRule deleted at d4bddb3).
+- **Open: 8 / 19.** Items 1, 2, 3, 5, 6, 10, 14, 18. Of these:
   - #1 and #10 are partial (3 of 5 games landed; 2 remain).
   - #2, #3, #5, #6 are rebuild targets (Nassau, Match Play, Prisma, UI scope).
   - #14 is engine-side of a documented rule.
   - #18 is an explicit v2 deferral.
-  - #19 is a one-line type change after research.
 - **Lesson-learned: 0 / 19.** No item fits the rubric cleanly — every closed item either materially affected code (Fixed) or is a live gap (Open).
 - **Obsolete: 0 / 19.** No item is unambiguously obsolete. #18 is the closest candidate (v2-deferred), but the variant exists in the union and so remains a live gap rather than obsolete.
 

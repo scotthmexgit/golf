@@ -1,0 +1,9 @@
+HH:MM | NNN_<slug> | <item> | <summary> | <tag>
+
+22:36 | 044_survey-initial-draft | meta | pickup from summary; ran matchFormat grep; initial loop-candidate survey produced | ⏸
+22:36 | 045_survey-revision-round1 | meta | six items: dropped recommendation, Option A/B equivalent, Nassau plan turn, Junk one-kind-per-turn, iteration counts, D1 reason | ⏸
+22:36 | 046_survey-revision-round2 | meta | read game_match_play.md + AUDIT.md; Nassau ~5–6, Junk ~9, Match Play ~9–11, Aggregate follow-up, noticed section restored | ⏸
+22:36 | 047_survey-revision-round3 | meta | Match Play: alt-shot/foursomes merge defended; concession split (hole+stroke vs match); TeamSizeReduced split; 12-turn table | ⏸
+22:36 | 048_survey-revision-round4 | meta | turn 12 split 12a/12b (additive migration; compile stays green); variance source = one; 13-turn baseline; ~12–14 range | ⏸
+22:36 | 049_session-log | meta | survey accepted; session logged; stash commit-6-gate-test still in place; commit 7 + EOD-FINAL pending | ⏸
+23:30 | 050_housekeeping-stash-resolve | meta | stash resolved (Option B reclassified); 015–041 recovered; Phase 2 tracker synced (d4bddb3/5716120); commit 7 landed | ✓

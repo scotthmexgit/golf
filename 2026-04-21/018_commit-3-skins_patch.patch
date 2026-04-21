@@ -1,0 +1,13 @@
+diff --git a/src/games/skins.ts b/src/games/skins.ts
+index 77cc415..ee6c50f 100644
+--- a/src/games/skins.ts
++++ b/src/games/skins.ts
+@@ -100,7 +100,7 @@ function assertValidRoundCfgForSkins(roundCfg: RoundConfig): void {
+ }
+ 
+ function findBetId(cfg: SkinsCfg, roundCfg: RoundConfig): BetId {
+-  const bet = roundCfg.bets.find((b) => b.type === 'skins' && b.config === cfg)
++  const bet = roundCfg.bets.find((b) => b.type === 'skins' && b.id === cfg.id)
+   if (bet === undefined) throw new SkinsBetNotFoundError()
+   return bet.id
+ }

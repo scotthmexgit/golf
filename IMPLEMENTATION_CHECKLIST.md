@@ -40,11 +40,11 @@ Updated at EOD-FINAL.
 
 **Phase tracking**:
 - [x] Phase 1 — Types + `MatchState` + per-hole scoring (singles, no presses) — closed 2026-04-20 at prompt 013. `NassauCfg.matchTieRule` deleted (closes audit #19); `nassau.ts` skeleton with pair-wise USGA `holeResult` per I1/I4; `settleNassauHole` signature `(hole, cfg, roundCfg, matches) => { events, matches }` per I2; 10 tests added; 107 total pass.
-- [ ] Phase 2 — Press handling — not started (2 turns pre-approved at prompt 012).
+- [x] Phase 2 — Press handling — closed 2026-04-21. Turn 1 (offerPress, openPress, settleNassauHole MatchState[] iteration; engine-only, no tests) at d4bddb3; 13 tests added, 120 total. Turn 2 (§ 10 integration, manual-press negative case, unit proof; test-additive only) at 5716120; 8 tests added, 128 total.
 - [ ] Phase 3 — End-of-round settlement + closeout — not started.
 - [ ] Phase 4 — Edge cases + `allPairs` + Round Handicap integration — not started; Phase 4 gate re-runs `b.config === cfg` and `b.id === cfg.id` greps per prompt 012.
 
-**Status**: #5 **Active**, Phase 1 **complete**. Phase 2 is the next sub-step; user approval required to begin. #5 does not close until all 4 phases land.
+**Status**: #5 **Active**, Phase 2 **complete**. Phase 3 (end-of-round settlement + closeout) is the next sub-step; user approval required to begin. #5 does not close until all 4 phases land.
 
 ## Backlog
 
@@ -73,6 +73,8 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 - [ ] On the Closest to the Pin screens, all players are shown for Bingo Bango Bongo. Unclear whether other bet types have the same issue. Investigate. — 2026-04-21 — prompt 001
 - [ ] `makeRoundCfg` helpers in `skins.test.ts` (line 51), `stroke_play.test.ts` (line 55), and `wolf.test.ts` (line 55) all retain unused `betId` defaults after commit 3 drops their sole non-default callers; parameters are now dead code — cosmetic cleanup, not bundled into commit 3 — 2026-04-21 — prompt 021
 - [ ] Stress-test the refactored engines (Skins, Wolf, Stroke Play, Nassau once Phase 2 Turn 2 lands) with end-to-end sample data to surface integration issues unit tests don't catch — particularly around serialization boundaries and the bet-id string-lookup refactor's assumptions — 2026-04-21 — prompt 033
+- [ ] Per-prompt NNN_slug.md session log entries were not produced for the prior context-window session; artifact files 015–041 in 2026-04-21/ are raw gate artifacts and diffs, not structured log entries. Structured per-prompt logging resumed in the post-reset session at 044. Skill is silent on context-reset and extended-session handling; amendment is a deferred item — 2026-04-21 — prompt 027
+- [ ] Session-logging skill should be reviewed for (i) long-session exception clause with prompt-count threshold, and (ii) integration with EOD-FINAL routine for handling days where per-prompt logs are absent or deferred. Today's deviation (prompt 027 above) is the trigger. Amendment belongs in a session focused on skill maintenance, not inline during engineering work — 2026-04-21 — prompt 027
 
 ## Done
 

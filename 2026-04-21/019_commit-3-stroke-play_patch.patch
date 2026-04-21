@@ -1,0 +1,13 @@
+diff --git a/src/games/stroke_play.ts b/src/games/stroke_play.ts
+index dd592ae..9adc1a1 100644
+--- a/src/games/stroke_play.ts
++++ b/src/games/stroke_play.ts
+@@ -133,7 +133,7 @@ function assertValidStrokePlayCfg(cfg: StrokePlayCfg): void {
+ }
+ 
+ function findBetId(cfg: StrokePlayCfg, roundCfg: RoundConfig): BetId {
+-  const bet = roundCfg.bets.find((b) => b.type === 'strokePlay' && b.config === cfg)
++  const bet = roundCfg.bets.find((b) => b.type === 'strokePlay' && b.id === cfg.id)
+   if (bet === undefined) throw new StrokePlayBetNotFoundError()
+   return bet.id
+ }

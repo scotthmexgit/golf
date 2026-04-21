@@ -61,7 +61,6 @@ export interface NassauCfg {
   pressScope: 'nine' | 'match'
   appliesHandicap: boolean
   pairingMode: 'singles' | 'allPairs'
-  matchTieRule: 'split'
   playerIds: PlayerId[]
   junkItems: JunkKind[]
   junkMultiplier: number

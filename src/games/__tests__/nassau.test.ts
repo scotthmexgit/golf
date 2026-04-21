@@ -465,3 +465,193 @@ describe('press composition (press-of-press)', () => {
     ).toThrow(NassauConfigError)
   })
 })
+
+// ─── Phase 2 Turn 2 — § 10 full 18-hole integration (auto-2-down press) ─────
+//
+// Runs the complete § 10 worked example: front 9, holes 10-11, auto-2-down
+// press injected after hole 11 (back A 2-0), then holes 12-18 with press-1
+// active alongside the back and overall matches.
+
+describe('§ 10 Worked Example — full 18-hole integration (auto-2-down press)', () => {
+  const cfg = makeNassauCfg({ pressRule: 'auto-2-down', pressScope: 'nine', appliesHandicap: true })
+  const round = makeRoundCfg(cfg)
+  const strokes = { A: 0, B: 5 }
+
+  const front9rows = [
+    { hole: 1,  idx: 7,  gross: { A: 5, B: 4 } },
+    { hole: 2,  idx: 3,  gross: { A: 3, B: 4 } },
+    { hole: 3,  idx: 15, gross: { A: 3, B: 4 } },
+    { hole: 4,  idx: 1,  gross: { A: 5, B: 5 } },
+    { hole: 5,  idx: 11, gross: { A: 4, B: 5 } },
+    { hole: 6,  idx: 17, gross: { A: 3, B: 4 } },
+    { hole: 7,  idx: 5,  gross: { A: 5, B: 4 } },
+    { hole: 8,  idx: 9,  gross: { A: 5, B: 6 } },
+    { hole: 9,  idx: 13, gross: { A: 5, B: 5 } },
+  ].map((r) => ({ ...r, strokes }))
+
+  const back9rows = [
+    { hole: 10, idx: 8,  gross: { A: 4, B: 5 } },
+    { hole: 11, idx: 16, gross: { A: 3, B: 4 } },
+    { hole: 12, idx: 2,  gross: { A: 4, B: 5 } },
+    { hole: 13, idx: 6,  gross: { A: 5, B: 4 } },
+    { hole: 14, idx: 12, gross: { A: 5, B: 4 } },
+    { hole: 15, idx: 18, gross: { A: 4, B: 3 } },
+    { hole: 16, idx: 4,  gross: { A: 3, B: 5 } },
+    { hole: 17, idx: 10, gross: { A: 5, B: 6 } },
+    { hole: 18, idx: 14, gross: { A: 4, B: 4 } },
+  ].map((r) => ({ ...r, strokes }))
+
+  const { events: exampleEvents, matches: exampleMatches } = (() => {
+    let matches = initialMatches(cfg)
+    const events: ScoringEvent[] = []
+
+    for (const row of front9rows) {
+      const h = makeHole(row.hole, row.idx, row.gross, { strokes: row.strokes })
+      const out = settleNassauHole(h, cfg, round, matches)
+      events.push(...out.events)
+      matches = out.matches
+    }
+    for (const row of back9rows.slice(0, 2)) {
+      const h = makeHole(row.hole, row.idx, row.gross, { strokes: row.strokes })
+      const out = settleNassauHole(h, cfg, round, matches)
+      events.push(...out.events)
+      matches = out.matches
+    }
+    // After hole 11: back match A 2–0; auto-2-down threshold met; B confirms press
+    const backAfter11 = matches.find((m) => m.id === 'back')!
+    events.push(...offerPress(11, backAfter11, cfg, 'B'))
+    const pressResult = openPress(
+      { hole: 11, parentMatchId: 'back', openingPlayer: 'B' },
+      cfg, round, matches,
+    )
+    events.push(...pressResult.events)
+    matches = pressResult.matches
+    for (const row of back9rows.slice(2)) {
+      const h = makeHole(row.hole, row.idx, row.gross, { strokes: row.strokes })
+      const out = settleNassauHole(h, cfg, round, matches)
+      events.push(...out.events)
+      matches = out.matches
+    }
+
+    return { events, matches }
+  })()
+
+  it('back match ends at A 4–3 per § 10 table', () => {
+    const back = exampleMatches.find((m) => m.id === 'back')
+    expect(back?.holesWonA).toBe(4)
+    expect(back?.holesWonB).toBe(3)
+  })
+
+  it('press-1 ends at B 3–2 per § 10 table', () => {
+    const press = exampleMatches.find((m) => m.id === 'press-1')
+    expect(press).toBeDefined()
+    expect(press?.holesWonA).toBe(2)
+    expect(press?.holesWonB).toBe(3)
+  })
+
+  it('overall match ends at A 8–6 per § 10 table', () => {
+    const overall = exampleMatches.find((m) => m.id === 'overall')
+    expect(overall?.holesWonA).toBe(8)
+    expect(overall?.holesWonB).toBe(6)
+  })
+
+  it('exactly one PressOpened event, actor B, hole 11, parentMatchId = back', () => {
+    const opened = exampleEvents.filter(
+      (e): e is ScoringEvent & { kind: 'PressOpened' } => e.kind === 'PressOpened',
+    )
+    expect(opened).toHaveLength(1)
+    expect(opened[0].actor).toBe('B')
+    expect(opened[0].hole).toBe(11)
+    expect(opened[0].parentMatchId).toBe('back')
+  })
+
+  it('zero PressOpened events on front or overall match', () => {
+    const opened = exampleEvents.filter(
+      (e): e is ScoringEvent & { kind: 'PressOpened' } => e.kind === 'PressOpened',
+    )
+    for (const e of opened) {
+      expect(e.parentMatchId).not.toBe('front')
+      expect(e.parentMatchId).not.toBe('overall')
+    }
+  })
+})
+
+// ─── Phase 2 Turn 2 — § 12 Test 2 manual press refused ───────────────────────
+//
+// Same gross scores as § 10. pressRule = 'manual'; test driver never calls
+// openPress — simulating the down player declining. Key invariant: no press
+// MatchState is created. PressOpened event count is the binding assertion;
+// PressOffered count is not asserted (manual mode may emit it for any lead).
+
+describe('§ 12 Test 2 — manual press refused (openPress never called)', () => {
+  const cfg = makeNassauCfg({ pressRule: 'manual', pressScope: 'nine', appliesHandicap: true })
+  const round = makeRoundCfg(cfg)
+  const strokes = { A: 0, B: 5 }
+
+  const allRows = [
+    { hole: 1,  idx: 7,  gross: { A: 5, B: 4 } },
+    { hole: 2,  idx: 3,  gross: { A: 3, B: 4 } },
+    { hole: 3,  idx: 15, gross: { A: 3, B: 4 } },
+    { hole: 4,  idx: 1,  gross: { A: 5, B: 5 } },
+    { hole: 5,  idx: 11, gross: { A: 4, B: 5 } },
+    { hole: 6,  idx: 17, gross: { A: 3, B: 4 } },
+    { hole: 7,  idx: 5,  gross: { A: 5, B: 4 } },
+    { hole: 8,  idx: 9,  gross: { A: 5, B: 6 } },
+    { hole: 9,  idx: 13, gross: { A: 5, B: 5 } },
+    { hole: 10, idx: 8,  gross: { A: 4, B: 5 } },
+    { hole: 11, idx: 16, gross: { A: 3, B: 4 } },
+    { hole: 12, idx: 2,  gross: { A: 4, B: 5 } },
+    { hole: 13, idx: 6,  gross: { A: 5, B: 4 } },
+    { hole: 14, idx: 12, gross: { A: 5, B: 4 } },
+    { hole: 15, idx: 18, gross: { A: 4, B: 3 } },
+    { hole: 16, idx: 4,  gross: { A: 3, B: 5 } },
+    { hole: 17, idx: 10, gross: { A: 5, B: 6 } },
+    { hole: 18, idx: 14, gross: { A: 4, B: 4 } },
+  ].map((r) => ({ ...r, strokes }))
+
+  const { events, matches } = runHoles(allRows, cfg, round)
+
+  it('three MatchStates only — no press MatchState created, zero PressOpened events', () => {
+    expect(matches).toHaveLength(3)
+    expect(matches.every((m) => !m.id.startsWith('press-'))).toBe(true)
+    expect(events.filter((e) => e.kind === 'PressOpened')).toHaveLength(0)
+  })
+
+  it('back match A 4–3 — base match unaffected by absent press', () => {
+    const back = matches.find((m) => m.id === 'back')
+    expect(back?.holesWonA).toBe(4)
+    expect(back?.holesWonB).toBe(3)
+  })
+})
+
+// ─── Phase 2 Turn 2 — press scoring unit proof ───────────────────────────────
+//
+// Unit-level proof that settleNassauHole increments press-1 alongside its
+// parent when both windows cover the same hole. Two holes (A wins, B wins)
+// confirm both increment directions. Integration-level proof is Block A above.
+
+describe('press match increments alongside parent through settleNassauHole', () => {
+  const cfg = makeNassauCfg({ pressScope: 'nine' })
+  const round = makeRoundCfg(cfg)
+
+  it('press-1 and back match both increment for A-win and B-win holes in their shared window', () => {
+    // press-1 opened on hole 12 (nine scope, back parent): startHole=13, endHole=18
+    const { matches: withPress } = openPress(
+      { hole: 12, parentMatchId: 'back', openingPlayer: 'B' },
+      cfg, round, initialMatches(cfg),
+    )
+
+    // Hole 13: A wins (gross 3 vs 4, no handicap)
+    const out13 = settleNassauHole(makeHole(13, 6, { A: 3, B: 4 }), cfg, round, withPress)
+    // Hole 14: B wins (gross 5 vs 4, no handicap)
+    const out14 = settleNassauHole(makeHole(14, 12, { A: 5, B: 4 }), cfg, round, out13.matches)
+
+    const back = out14.matches.find((m) => m.id === 'back')
+    const press = out14.matches.find((m) => m.id === 'press-1')
+
+    expect(back?.holesWonA).toBe(1)   // A wins hole 13
+    expect(back?.holesWonB).toBe(1)   // B wins hole 14
+    expect(press?.holesWonA).toBe(1)  // press-1 window covers 13 and 14
+    expect(press?.holesWonB).toBe(1)
+  })
+})

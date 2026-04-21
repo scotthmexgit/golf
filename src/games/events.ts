@@ -95,6 +95,8 @@ type WolfCaptainReassigned = EventBase & WithBet & {
   from: PlayerId
   to: PlayerId
 }
+// Reserved for future captain-selection rules; not emitted under the generic
+// rotation introduced in Round 5 / #3 (see REBUILD_PLAN.md).
 type WolfCaptainTiebreak = EventBase & WithBet & {
   kind: 'WolfCaptainTiebreak'
   hole: number

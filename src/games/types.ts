@@ -45,10 +45,8 @@ export interface WolfCfg {
   loneMultiplier: number
   blindLoneEnabled: boolean
   blindLoneMultiplier: number
-  lastTwoHolesRule: 'rotation' | 'lowest-money-first' | 'captain-choice-by-vote'
   tieRule: 'no-points' | 'carryover'
   playerIds: PlayerId[]
-  teeOrder: PlayerId[]
   appliesHandicap: boolean
   junkItems: JunkKind[]
   junkMultiplier: number

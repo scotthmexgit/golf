@@ -85,10 +85,6 @@ function assertValidWolfCfg(cfg: WolfCfg): void {
   ) {
     throw new WolfConfigError('blindLoneMultiplier', 'must be an integer ≥ 3')
   }
-  const validLastTwo = ['rotation', 'lowest-money-first', 'captain-choice-by-vote'] as const
-  if (!validLastTwo.includes(cfg.lastTwoHolesRule)) {
-    throw new WolfConfigError('lastTwoHolesRule')
-  }
   const validTieRules = ['no-points', 'carryover'] as const
   if (!validTieRules.includes(cfg.tieRule)) {
     throw new WolfConfigError('tieRule')
@@ -98,13 +94,6 @@ function assertValidWolfCfg(cfg: WolfCfg): void {
   }
   if (!Array.isArray(cfg.playerIds) || cfg.playerIds.length < 4 || cfg.playerIds.length > 5) {
     throw new WolfConfigError('playerIds', 'length must be 4 or 5')
-  }
-  if (
-    !Array.isArray(cfg.teeOrder) ||
-    cfg.teeOrder.length !== cfg.playerIds.length ||
-    !cfg.teeOrder.every((p) => cfg.playerIds.includes(p))
-  ) {
-    throw new WolfConfigError('teeOrder', 'must permute playerIds')
   }
   if (!Array.isArray(cfg.junkItems)) {
     throw new WolfConfigError('junkItems')
@@ -173,7 +162,7 @@ export function settleWolfHole(
       ...base,
       actor: 'system',
       hole: hole.hole,
-      captain: config.teeOrder[(hole.hole - 1) % config.playerIds.length],
+      captain: roundCfg.players[(hole.hole - 1) % roundCfg.players.length].id,
     }]
   }
 
@@ -393,15 +382,16 @@ export function applyWolfCaptainRotation(
 ): { captain: PlayerId; events: ScoringEvent[] } {
   assertValidWolfCfg(config)
   const betId = findBetId(config, roundCfg)
+  const players = roundCfg.players.map((p) => p.id)
 
   const withdrawn = withdrawnPlayersFromEvents(eventsSoFar ?? [])
   const events: ScoringEvent[] = []
 
   function shiftForWithdrawals(initial: PlayerId): PlayerId {
     if (!withdrawn.has(initial)) return initial
-    const startIdx = config.teeOrder.indexOf(initial)
-    for (let step = 1; step < config.teeOrder.length; step += 1) {
-      const candidate = config.teeOrder[(startIdx + step) % config.teeOrder.length]
+    const startIdx = players.indexOf(initial)
+    for (let step = 1; step < players.length; step += 1) {
+      const candidate = players[(startIdx + step) % players.length]
       if (!withdrawn.has(candidate)) {
         events.push({
           kind: 'WolfCaptainReassigned',
@@ -419,52 +409,8 @@ export function applyWolfCaptainRotation(
     return initial
   }
 
-  // Holes 1–16: straight rotation per § 4.
-  if (hole < 17) {
-    const rotationCaptain = config.teeOrder[(hole - 1) % config.playerIds.length]
-    return { captain: shiftForWithdrawals(rotationCaptain), events }
-  }
-
-  // Holes 17–18: depends on lastTwoHolesRule.
-  if (config.lastTwoHolesRule === 'rotation' || config.lastTwoHolesRule === 'captain-choice-by-vote') {
-    // Vote is a UI concern; the scoring function cannot resolve it alone.
-    // Fall back to straight rotation; UI may override via a prior event.
-    const rotationCaptain = config.teeOrder[(hole - 1) % config.playerIds.length]
-    return { captain: shiftForWithdrawals(rotationCaptain), events }
-  }
-
-  // 'lowest-money-first': compute money totals within this Wolf bet only.
-  // Cross-bet totals would conflate other games' deltas into Wolf's captain
-  // rotation; the rule is a Wolf-internal running score.
-  const totals = moneyTotalsFromEvents(eventsSoFar ?? [], config, betId)
-  // Exclude withdrawn players from lowest-money ranking.
-  const eligible = config.playerIds.filter((p) => !withdrawn.has(p))
-
-  // § 9: two-player tie for lowest money → ascending playerIds[i] wins tiebreak.
-  const ranked = [...eligible].sort((a, b) => {
-    const diff = totals[a] - totals[b]
-    if (diff !== 0) return diff
-    return config.playerIds.indexOf(a) - config.playerIds.indexOf(b)
-  })
-
-  const targetIndex = hole === 17 ? 0 : 1
-  const captain = ranked[targetIndex] ?? ranked[0] ?? config.teeOrder[0]
-
-  const targetMoney = totals[captain]
-  const tied = eligible.filter((p) => totals[p] === targetMoney)
-  if (tied.length > 1) {
-    events.push({
-      kind: 'WolfCaptainTiebreak',
-      timestamp: String(hole),
-      actor: 'system',
-      declaringBet: betId,
-      hole,
-      candidates: tied,
-      chosen: captain,
-    })
-  }
-
-  return { captain, events }
+  const rotationCaptain = players[(hole - 1) % players.length]
+  return { captain: shiftForWithdrawals(rotationCaptain), events }
 }
 
 function withdrawnPlayersFromEvents(events: ScoringEvent[]): Set<PlayerId> {
@@ -473,18 +419,4 @@ function withdrawnPlayersFromEvents(events: ScoringEvent[]): Set<PlayerId> {
     if (e.kind === 'PlayerWithdrew') out.add(e.player)
   }
   return out
-}
-
-function moneyTotalsFromEvents(
-  events: ScoringEvent[],
-  config: WolfCfg,
-  betId: BetId,
-): Record<PlayerId, number> {
-  const totals = zeroPoints(config.playerIds)
-  for (const e of events) {
-    if ('points' in e && 'declaringBet' in e && e.declaringBet === betId) {
-      for (const p of config.playerIds) totals[p] += e.points[p] ?? 0
-    }
-  }
-  return totals
 }

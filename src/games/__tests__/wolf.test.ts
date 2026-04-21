@@ -38,6 +38,7 @@ const defaultJunkCfg: JunkRoundConfig = {
 
 function makeWolfCfg(overrides: Partial<WolfCfg> = {}): WolfCfg {
   return {
+    id: 'wolf-1',
     stake: 1,
     loneMultiplier: 3,
     blindLoneEnabled: false,
@@ -687,7 +688,7 @@ describe('typed errors: throw on invalid or missing config', () => {
   })
 
   it('throws WolfBetNotFoundError when config is not referenced in roundCfg.bets', () => {
-    const stray = makeWolfCfg()
+    const stray = makeWolfCfg({ id: 'not-registered' })
     expect(() => settleWolfHole(hole, stray, round, decision)).toThrow(WolfBetNotFoundError)
   })
 })

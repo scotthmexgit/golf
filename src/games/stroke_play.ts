@@ -133,7 +133,7 @@ function assertValidStrokePlayCfg(cfg: StrokePlayCfg): void {
 }
 
 function findBetId(cfg: StrokePlayCfg, roundCfg: RoundConfig): BetId {
-  const bet = roundCfg.bets.find((b) => b.type === 'strokePlay' && b.config === cfg)
+  const bet = roundCfg.bets.find((b) => b.type === 'strokePlay' && b.id === cfg.id)
   if (bet === undefined) throw new StrokePlayBetNotFoundError()
   return bet.id
 }

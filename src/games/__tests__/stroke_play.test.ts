@@ -37,6 +37,7 @@ const defaultJunkCfg: JunkRoundConfig = {
 
 function makeSPCfg(overrides: Partial<StrokePlayCfg> = {}): StrokePlayCfg {
   return {
+    id: 'sp-1',
     stake: 10,
     settlementMode: 'winner-takes-pot',
     stakePerStroke: 1,
@@ -597,7 +598,7 @@ describe('typed errors: throw on invalid or missing config', () => {
   })
 
   it('throws StrokePlayBetNotFoundError when config is not referenced in roundCfg.bets', () => {
-    const stray = makeSPCfg()
+    const stray = makeSPCfg({ id: 'not-registered' })
     expect(() => settleStrokePlayHole(hole, stray, round)).toThrow(StrokePlayBetNotFoundError)
   })
 })

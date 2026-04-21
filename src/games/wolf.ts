@@ -108,7 +108,7 @@ function assertValidWolfCfg(cfg: WolfCfg): void {
 }
 
 function findBetId(cfg: WolfCfg, roundCfg: RoundConfig): BetId {
-  const bet = roundCfg.bets.find((b) => b.type === 'wolf' && b.config === cfg)
+  const bet = roundCfg.bets.find((b) => b.type === 'wolf' && b.id === cfg.id)
   if (bet === undefined) throw new WolfBetNotFoundError()
   return bet.id
 }

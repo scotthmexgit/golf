@@ -83,6 +83,27 @@ function makeCtpBet(id: string, participants: PlayerId[]): BetSelection {
   }
 }
 
+function makeLongestDriveBet(id: string, participants: PlayerId[]): BetSelection {
+  return {
+    id,
+    type: 'skins',
+    stake: 1,
+    participants,
+    config: {
+      id,
+      stake: 1,
+      escalating: false,
+      tieRuleFinalHole: 'carryover',
+      appliesHandicap: false,
+      playerIds: participants,
+      junkItems: ['longestDrive'],
+      junkMultiplier: 1,
+    },
+    junkItems: ['longestDrive'],
+    junkMultiplier: 1,
+  }
+}
+
 function makeRoundCfg(bets: BetSelection[], players: PlayerId[]): RoundConfig {
   return {
     roundId: 'r1',
@@ -135,6 +156,41 @@ function makeHole({
     withdrew: [],
   }
 }
+
+// ─── isLongestDrive ──────────────────────────────────────────────────────────
+
+describe('settleJunkHole — isLongestDrive', () => {
+  it('awards one JunkAwarded(longestDrive) when longestDriveWinner is set on a designated par-4 hole', () => {
+    const players: PlayerId[] = ['p1', 'p2', 'p3']
+    const bet = makeLongestDriveBet('junk-ld1', players)
+    const round = makeRoundCfg([bet], players)
+    const ldCfg = { ...defaultJunkCfg, longestDriveHoles: [5] }
+    // Scores are arbitrary — LD is not score-dependent
+    const hole = makeHole({ hole: 5, par: 4, gross: { p1: 5, p2: 5, p3: 5 }, longestDriveWinner: 'p1' })
+
+    const events = settleJunkHole(hole, round, ldCfg)
+
+    expect(events).toHaveLength(1)
+
+    const [event] = events
+    expect(event.kind).toBe('JunkAwarded')
+    expect(event.junk).toBe('longestDrive')
+    expect(event.winner).toBe('p1')
+
+    // Zero-sum: N=3, winner +2, others −1 each
+    const pointSum = Object.values(event.points).reduce((acc, v) => acc + v, 0)
+    expect(pointSum).toBe(0)
+
+    // Integer-unit invariant
+    for (const delta of Object.values(event.points)) {
+      expect(Number.isInteger(delta)).toBe(true)
+    }
+
+    // Bet declares only 'longestDrive' — no ctp or greenie events fire
+    expect(events.filter(e => e.junk === 'ctp')).toHaveLength(0)
+    expect(events.filter(e => e.junk === 'greenie')).toHaveLength(0)
+  })
+})
 
 // ─── isGreenie ───────────────────────────────────────────────────────────────
 

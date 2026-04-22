@@ -8,6 +8,13 @@ function isCTP(hole: HoleState, cfg: JunkRoundConfig): PlayerId | null {
   return hole.ctpWinner ?? null
 }
 
+function isLongestDrive(hole: HoleState, cfg: JunkRoundConfig): PlayerId | null {
+  if (!cfg.longestDriveEnabled) return null
+  if (hole.par < 4) return null
+  if (!cfg.longestDriveHoles.includes(hole.hole)) return null
+  return hole.longestDriveWinner ?? null
+}
+
 export function settleJunkHole(
   hole: HoleState,
   roundCfg: RoundConfig,
@@ -41,6 +48,25 @@ export function settleJunkHole(
         const winner = isCTP(hole, junkCfg)
         if (winner === null) continue
         if (hole.gross[winner] > hole.par) continue
+        if (!bet.participants.includes(winner)) continue
+        const N = bet.participants.length
+        const points: Record<PlayerId, number> = {}
+        for (const p of bet.participants) points[p] = p === winner ? N - 1 : -1
+        events.push({
+          kind: 'JunkAwarded',
+          hole: hole.hole,
+          junk: kind,
+          winner,
+          declaringBet: bet.id,
+          points,
+          actor: 'system',
+          timestamp: hole.timestamp,
+        })
+      }
+
+      if (kind === 'longestDrive') {
+        const winner = isLongestDrive(hole, junkCfg)
+        if (winner === null) continue
         if (!bet.participants.includes(winner)) continue
         const N = bet.participants.length
         const points: Record<PlayerId, number> = {}

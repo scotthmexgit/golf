@@ -50,3 +50,24 @@ At start of session / after a break / after `/clear`:
 - Does not veto the user's scope-change decisions. The user can always switch Active item.
 - Does not silently re-prioritize. Backlog reordering requires an explicit prompt.
 - Does not delete Parking Lot entries. Triage happens at EOD-FINAL or on explicit user request.
+
+## Commit-split discipline
+
+When producing a staging plan and an entanglement is found — changes A and B cannot be
+hunk-selected apart from the working tree without one intermediate state failing tests or
+tsc — follow this procedure:
+
+1. Name the entanglement specifically: state which lines of change B depend on change A
+   being present, and why staging B without A fails.
+2. Present two options explicitly:
+   - **Construct intermediate state**: write the file to an A-only disk state, stage and
+     commit A, then apply B on top and commit B. Preserves the original grouping.
+   - **Bundle**: accept A+B in one commit. State the reason.
+3. **Do not proceed until the user picks one.** "Continue" is not a choice when two
+   options are on the table. If the response is ambiguous, ask again before staging.
+
+This rule applies regardless of whether the entanglement was reported in the staging plan.
+Reporting an entanglement in the plan and then receiving any non-explicit-choice response
+does not constitute approval to bundle.
+
+Retroactive splitting is harder, slower, and requires constructing a state that was never committed. Pay the discipline cost at commit time.

@@ -11,3 +11,4 @@ HH:MM | NNN_<slug> | <item> | <summary> | <tag>
 17:49 | 052_junk-turn1-ctp | #7 | isCTP red+green; junk.ts + junk.test.ts created; 129/8 green; tsc clean | ✓
 18:08 | 053_junk-turn2-greenie | #7 | isGreenie red+green; CTP-conditional par-or-better; parallel branch; 130/8 green; tsc clean | ✓
 18:51 | 054_junk-turn3-ld-refactor | #7 | isLongestDrive red+green; makeHole object-arg fixture; pushAward+isGreenie refactor (shape b); 131/8 green; tsc clean | ✓
+01:26 | 055_focus-discipline-skill-commit-split-discipline | meta | commit-split discipline added to focus-discipline/SKILL.md; approved verbatim + retroactive-cost sentence appended | ✓

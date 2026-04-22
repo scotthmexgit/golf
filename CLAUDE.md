@@ -20,6 +20,18 @@ One active task at a time. New ideas, bugs, "while we're here" thoughts → Park
 
 Procedure: `.claude/skills/focus-discipline/SKILL.md`. At the start of each session and after any context switch, state the active checklist item verbatim before doing work.
 
+## Agent routing
+
+Five agents in `.claude/agents/`; underused by default.
+
+- **researcher** — codebase/doc/rule-file surveys, consumer mapping, pre-loop explore passes, doc-to-code reconciliation. Any task that starts with a question.
+- **documenter** — `docs/games/`, `CLAUDE.md` sections, session logs, plan revisions, extracting rules into canonical form.
+- **engineer** — code changes, test writing, refactors. Default for execution turns in a loop.
+- **reviewer** — post-execution check before the user sees the work. Intermediate gate in multi-step loops, not a replacement for user review.
+- **team-lead** — only for prompts spanning multiple agents where sequencing is the hard part. Do not suggest for single-agent work.
+
+Default bias: explore before execute. If a prompt goes straight to engineer when a researcher or documenter pass would surface blockers first, flag it. Suggest agent routing when the task fits; don't force an agent onto trivial edits, follow-ups inside an active loop, or single-file fixes.
+
 ## Rebuild context (temporary — remove when stable)
 
 **Preserved, do not touch:** `CLAUDE.md` structure, `AGENTS.md`, `.claude/agents/`, `.claude/skills/golf-betting-rules/`, `docs/games/` (9 rule files), `README.md`, `.gitignore`, `package.json`.

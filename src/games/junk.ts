@@ -1,4 +1,4 @@
-import type { HoleState, JunkRoundConfig, PlayerId, RoundConfig, ScoringEvent } from './types'
+import type { BetSelection, HoleState, JunkKind, JunkRoundConfig, PlayerId, RoundConfig, ScoringEvent } from './types'
 
 type JunkAwarded = Extract<ScoringEvent, { kind: 'JunkAwarded' }>
 
@@ -15,6 +15,38 @@ function isLongestDrive(hole: HoleState, cfg: JunkRoundConfig): PlayerId | null 
   return hole.longestDriveWinner ?? null
 }
 
+function isGreenie(hole: HoleState, cfg: JunkRoundConfig): PlayerId | null {
+  if (!cfg.greenieEnabled) return null
+  if (!cfg.girEnabled) return null
+  const winner = isCTP(hole, cfg)
+  if (winner === null) return null
+  if (hole.gross[winner] > hole.par) return null
+  return winner
+}
+
+function pushAward(
+  events: JunkAwarded[],
+  hole: HoleState,
+  bet: BetSelection,
+  kind: JunkKind,
+  winner: PlayerId,
+): void {
+  if (!bet.participants.includes(winner)) return
+  const N = bet.participants.length
+  const points: Record<PlayerId, number> = {}
+  for (const p of bet.participants) points[p] = p === winner ? N - 1 : -1
+  events.push({
+    kind: 'JunkAwarded',
+    hole: hole.hole,
+    junk: kind,
+    winner,
+    declaringBet: bet.id,
+    points,
+    actor: 'system',
+    timestamp: hole.timestamp,
+  })
+}
+
 export function settleJunkHole(
   hole: HoleState,
   roundCfg: RoundConfig,
@@ -25,62 +57,17 @@ export function settleJunkHole(
     for (const kind of bet.junkItems) {
       if (kind === 'ctp') {
         const winner = isCTP(hole, junkCfg)
-        if (winner === null) continue
-        if (!bet.participants.includes(winner)) continue
-        const N = bet.participants.length
-        const points: Record<PlayerId, number> = {}
-        for (const p of bet.participants) points[p] = p === winner ? N - 1 : -1
-        events.push({
-          kind: 'JunkAwarded',
-          hole: hole.hole,
-          junk: kind,
-          winner,
-          declaringBet: bet.id,
-          points,
-          actor: 'system',
-          timestamp: hole.timestamp,
-        })
+        if (winner !== null) pushAward(events, hole, bet, kind, winner)
       }
 
       if (kind === 'greenie') {
-        if (!junkCfg.greenieEnabled) continue
-        if (!junkCfg.girEnabled) continue
-        const winner = isCTP(hole, junkCfg)
-        if (winner === null) continue
-        if (hole.gross[winner] > hole.par) continue
-        if (!bet.participants.includes(winner)) continue
-        const N = bet.participants.length
-        const points: Record<PlayerId, number> = {}
-        for (const p of bet.participants) points[p] = p === winner ? N - 1 : -1
-        events.push({
-          kind: 'JunkAwarded',
-          hole: hole.hole,
-          junk: kind,
-          winner,
-          declaringBet: bet.id,
-          points,
-          actor: 'system',
-          timestamp: hole.timestamp,
-        })
+        const winner = isGreenie(hole, junkCfg)
+        if (winner !== null) pushAward(events, hole, bet, kind, winner)
       }
 
       if (kind === 'longestDrive') {
         const winner = isLongestDrive(hole, junkCfg)
-        if (winner === null) continue
-        if (!bet.participants.includes(winner)) continue
-        const N = bet.participants.length
-        const points: Record<PlayerId, number> = {}
-        for (const p of bet.participants) points[p] = p === winner ? N - 1 : -1
-        events.push({
-          kind: 'JunkAwarded',
-          hole: hole.hole,
-          junk: kind,
-          winner,
-          declaringBet: bet.id,
-          points,
-          actor: 'system',
-          timestamp: hole.timestamp,
-        })
+        if (winner !== null) pushAward(events, hole, bet, kind, winner)
       }
     }
   }

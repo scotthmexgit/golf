@@ -16,23 +16,46 @@ export function settleJunkHole(
   const events: JunkAwarded[] = []
   for (const bet of roundCfg.bets) {
     for (const kind of bet.junkItems) {
-      if (kind !== 'ctp') continue
-      const winner = isCTP(hole, junkCfg)
-      if (winner === null) continue
-      if (!bet.participants.includes(winner)) continue
-      const N = bet.participants.length
-      const points: Record<PlayerId, number> = {}
-      for (const p of bet.participants) points[p] = p === winner ? N - 1 : -1
-      events.push({
-        kind: 'JunkAwarded',
-        hole: hole.hole,
-        junk: kind,
-        winner,
-        declaringBet: bet.id,
-        points,
-        actor: 'system',
-        timestamp: hole.timestamp,
-      })
+      if (kind === 'ctp') {
+        const winner = isCTP(hole, junkCfg)
+        if (winner === null) continue
+        if (!bet.participants.includes(winner)) continue
+        const N = bet.participants.length
+        const points: Record<PlayerId, number> = {}
+        for (const p of bet.participants) points[p] = p === winner ? N - 1 : -1
+        events.push({
+          kind: 'JunkAwarded',
+          hole: hole.hole,
+          junk: kind,
+          winner,
+          declaringBet: bet.id,
+          points,
+          actor: 'system',
+          timestamp: hole.timestamp,
+        })
+      }
+
+      if (kind === 'greenie') {
+        if (!junkCfg.greenieEnabled) continue
+        if (!junkCfg.girEnabled) continue
+        const winner = isCTP(hole, junkCfg)
+        if (winner === null) continue
+        if (hole.gross[winner] > hole.par) continue
+        if (!bet.participants.includes(winner)) continue
+        const N = bet.participants.length
+        const points: Record<PlayerId, number> = {}
+        for (const p of bet.participants) points[p] = p === winner ? N - 1 : -1
+        events.push({
+          kind: 'JunkAwarded',
+          hole: hole.hole,
+          junk: kind,
+          winner,
+          declaringBet: bet.id,
+          points,
+          actor: 'system',
+          timestamp: hole.timestamp,
+        })
+      }
     }
   }
   return events

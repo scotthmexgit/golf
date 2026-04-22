@@ -41,6 +41,27 @@ function makePlayers(ids: PlayerId[]): PlayerSetup[] {
   }))
 }
 
+function makeGreenieBet(id: string, participants: PlayerId[]): BetSelection {
+  return {
+    id,
+    type: 'skins',
+    stake: 1,
+    participants,
+    config: {
+      id,
+      stake: 1,
+      escalating: false,
+      tieRuleFinalHole: 'carryover',
+      appliesHandicap: false,
+      playerIds: participants,
+      junkItems: ['greenie'],
+      junkMultiplier: 1,
+    },
+    junkItems: ['greenie'],
+    junkMultiplier: 1,
+  }
+}
+
 function makeCtpBet(id: string, participants: PlayerId[]): BetSelection {
   return {
     id,
@@ -107,6 +128,39 @@ function makeHole(
     withdrew: [],
   }
 }
+
+// ─── isGreenie ───────────────────────────────────────────────────────────────
+
+describe('settleJunkHole — isGreenie', () => {
+  it('awards one JunkAwarded(greenie) when ctpWinner makes par; no ctp event emitted when bet declares only greenie', () => {
+    const players: PlayerId[] = ['p1', 'p2', 'p3']
+    const bet = makeGreenieBet('junk-g1', players)
+    const round = makeRoundCfg([bet], players)
+    // p1 wins CTP and makes par (3); p2/p3 bogey (4); girEnabled: true
+    const hole = makeHole(5, 3, { p1: 3, p2: 4, p3: 4 }, 'p1')
+
+    const events = settleJunkHole(hole, round, defaultJunkCfg)
+
+    expect(events).toHaveLength(1)
+
+    const [event] = events
+    expect(event.kind).toBe('JunkAwarded')
+    expect(event.junk).toBe('greenie')
+    expect(event.winner).toBe('p1')
+
+    // Zero-sum: N=3, winner +2, others −1 each
+    const pointSum = Object.values(event.points).reduce((acc, v) => acc + v, 0)
+    expect(pointSum).toBe(0)
+
+    // Integer-unit invariant
+    for (const delta of Object.values(event.points)) {
+      expect(Number.isInteger(delta)).toBe(true)
+    }
+
+    // Bet declares only 'greenie' — no CTP JunkAwarded fires even though ctpWinner is set
+    expect(events.filter(e => e.junk === 'ctp')).toHaveLength(0)
+  })
+})
 
 // ─── isCTP ───────────────────────────────────────────────────────────────────
 

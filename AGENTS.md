@@ -12,24 +12,32 @@ Next.js 16.2 (App Router) + React 19 + TypeScript strict + Prisma 7 (PostgreSQL)
 
 Next.js 16 has breaking changes from what appears in model training data. Before calling any Next.js API, open `node_modules/next/dist/docs/` and read the relevant guide. Heed every deprecation notice. Do not invent APIs from memory.
 
-## Five implemented betting games
+## Five betting games in scope
 
-Skins, Wolf, Nassau, Match Play, Stroke Play. Canonical rules: `docs/games/game_<name>.md`. No agent may restate rules inline — link to the game file.
+Skins, Wolf, Nassau, Match Play, Stroke Play. Junk is the side-bet engine (not a game). Canonical rules: `docs/games/game_<name>.md`. No agent may restate rules inline — link to the game file.
+
+Current status (live scope in `IMPLEMENTATION_CHECKLIST.md`):
+- Skins, Wolf, Stroke Play: landed under `src/games/`.
+- Nassau: in progress (see Active item in `IMPLEMENTATION_CHECKLIST.md`).
+- Match Play, Junk: pending per `REBUILD_PLAN.md`.
+- Old scoring in `src/lib/*` remains live via parallel-path until cutover (REBUILD_PLAN #11).
 
 ## Source of truth
 
-- **Rules:** `docs/games/game_<name>.md`
-- **Types:** `src/types/index.ts` and Prisma `schema.prisma`
-- **Scoring (target path):** `src/games/<name>.ts` (migration tracked in `MIGRATION_NOTES.md`)
-- **Current scoring (pre-migration):** `src/lib/scoring.ts`, `src/lib/payouts.ts`, `src/lib/handicap.ts`, `src/lib/junk.ts`
-- **Skill entry point for rule questions:** `.claude/skills/golf-betting-rules/SKILL.md`
+- **Rules:** `docs/games/game_<name>.md` plus the two cross-cutting files below.
+- **Types:** `src/types/index.ts` and Prisma `schema.prisma`.
+- **Scoring (target path):** `src/games/<name>.ts`.
+- **Scoring (pre-cutover parallel path):** `src/lib/scoring.ts`, `payouts.ts`, `handicap.ts`, `junk.ts`.
+- **Active scope:** `IMPLEMENTATION_CHECKLIST.md` Active item → `REBUILD_PLAN.md` for that item's AC.
+- **History (not a todo list):** `MIGRATION_NOTES.md`, `AUDIT.md`.
+- **Skill entry point for rule questions:** `.claude/skills/golf-betting-rules/SKILL.md`.
 
-## Cross-cutting docs
+## Cross-cutting rule docs
 
-Two rule files apply to every game and override no game-specific logic. They live alongside `docs/games/game_<name>.md` and are read before, or in addition to, the per-game file whenever their concern is touched.
+Apply to every game; override no game-specific logic.
 
-- `docs/games/_ROUND_HANDICAP.md` — per-player, per-round handicap adjustment layered onto `courseHcp` before `strokesOnHole`. No game restates the math; every handicap-aware game inherits it at the handicap-computation boundary.
-- `docs/games/_FINAL_ADJUSTMENT.md` — post-hole-18 human-arbitration screen for tie and dispute resolution. Every game defers tie resolution beyond its own rules to this screen.
+- `docs/games/_ROUND_HANDICAP.md` — per-player, per-round handicap adjustment layered onto `courseHcp` before `strokesOnHole`. Inherited at the handicap-computation boundary.
+- `docs/games/_FINAL_ADJUSTMENT.md` — post-hole-18 human-arbitration screen. Every game defers tie/dispute resolution beyond its own rules to this screen.
 
 ## User intent → agent routing
 
@@ -49,26 +57,27 @@ Two rule files apply to every game and override no game-specific logic. They liv
 | "Plan end-to-end feature (scoring + UI + docs)" | `team-lead` | every role |
 | "Ship this / declare done" | `team-lead` | `reviewer` (mandatory gate) |
 
-Unclear or multi-role intents route to `team-lead`. A single-role intent routes directly.
+Unclear or multi-role intents route to `team-lead`. A single-role intent routes directly. Default bias: explore before execute — if a task starts with a question about the codebase or docs, route `researcher` before `engineer`.
 
 ## Ground rules every agent follows
 
-Seven rules apply to every action in this repo. A change that violates any of them fails `reviewer`.
+A change that violates any of these fails `reviewer`.
 
-1. **Rules come from docs.** For every rule question, the answer lives in `docs/games/game_<name>.md` or `.claude/skills/golf-betting-rules/SKILL.md`. No agent answers rule questions from training data when a rule file exists. No agent restates a rule file's content inline — link to the file.
-2. **Integer-unit math only.** Stakes are integers in the app's minor unit (cents). No `Float` in Prisma (see `MIGRATION_NOTES.md` item 2 for the pending migration). No `toFixed` in scoring. No floating-point arithmetic anywhere in `src/games/`. Tests assert `Number.isInteger` on every delta.
-3. **Settlement is zero-sum.** For every round, `Σ delta == 0` across all betting players, per game and in total. A tie that cannot settle without a rounding remainder emits a `RoundingAdjustment` event that restores zero-sum. A silent zero-pay on a tied hole is a correctness bug.
-4. **Portability.** Scoring code under `src/games/` imports zero of: `next/*`, `react`, `react-dom`, `fs`, `path`, `window`, `document`, `localStorage`. The scoring engine targets a future React Native / Expo port.
-5. **Handicap-in-one-place.** Every course-handicap computation and every strokes-on-hole lookup goes through `src/games/handicap.ts`. No other file reimplements USGA allocation. Gross and net are explicit in every function signature and variable name.
-6. **Audit trail.** Every delta-producing action emits a typed variant of the `ScoringEvent` discriminated union in `src/games/events.ts`, carrying `{ timestamp, hole, actor, delta, kind }`. The event log is the settlement record — no delta exists outside it.
-7. **No silent defaults.** Every tie, carryover, press, closeout, withdrawal, missing card, and rounding adjustment emits an explicit event. A scoring function that returns a zero delta without a corresponding event is a bug. A press that opens without a `PressOpened` event whose `actor` is the confirming player is a bug.
+1. **Rules come from docs.** Rule answers live in `docs/games/game_<name>.md` or the `golf-betting-rules` skill. No agent answers rule questions from training data when a rule file exists. No agent restates rule content inline — link to the file.
+2. **Integer-unit math only.** Stakes are integers in minor units (cents). No `Float` in Prisma (pending migration #10). No `toFixed` in scoring. No floating-point arithmetic anywhere in `src/games/`. Tests assert `Number.isInteger` on every delta.
+3. **Settlement is zero-sum.** Per round, `Σ delta == 0` across all betting players, per game and in total. Unresolvable rounding emits a `RoundingAdjustment` event. Silent zero-pay on a tied hole is a correctness bug.
+4. **Portability.** Scoring code under `src/games/` imports zero of: `next/*`, `react`, `react-dom`, `fs`, `path`, `window`, `document`, `localStorage`. Targets a future React Native / Expo port.
+5. **Handicap-in-one-place.** Every course-handicap computation and every strokes-on-hole lookup goes through `src/games/handicap.ts`. No other file reimplements USGA allocation. Gross and net are explicit in every signature and variable name.
+6. **Audit trail.** Every delta-producing action emits a typed variant of the `ScoringEvent` union in `src/games/events.ts`, carrying `{ timestamp, hole, actor, delta, kind }`. The event log is the settlement record — no delta exists outside it.
+7. **No silent defaults.** Every tie, carryover, press, closeout, withdrawal, missing card, and rounding adjustment emits an explicit event. A scoring function that returns a zero delta without a corresponding event is a bug.
+8. **Bet-id lookup is string-equality.** `b.id === cfg.id`. Reference-identity comparisons (`b.config === cfg`) are the known anti-pattern closed by REBUILD_PLAN #4 — any new code that reintroduces it fails review.
 
 ## Session checklist
 
 Before the first tool call, every agent:
 
 - [ ] Reads this file.
+- [ ] Reads the Active item in `IMPLEMENTATION_CHECKLIST.md` and the matching AC in `REBUILD_PLAN.md`.
 - [ ] Reads the relevant `docs/games/game_<name>.md` before writing scoring code.
 - [ ] Reads `.claude/skills/golf-betting-rules/SKILL.md` before answering a rule or settlement question.
-- [ ] Checks `MIGRATION_NOTES.md` for known contradictions before editing `src/lib/payouts.ts` or `prisma/schema.prisma`.
 <!-- END:nextjs-agent-rules -->

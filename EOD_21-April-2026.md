@@ -12,3 +12,5 @@ HH:MM | NNN_<slug> | <item> | <summary> | <tag>
 18:08 | 053_junk-turn2-greenie | #7 | isGreenie red+green; CTP-conditional par-or-better; parallel branch; 130/8 green; tsc clean | ✓
 18:51 | 054_junk-turn3-ld-refactor | #7 | isLongestDrive red+green; makeHole object-arg fixture; pushAward+isGreenie refactor (shape b); 131/8 green; tsc clean | ✓
 01:26 | 055_focus-discipline-skill-commit-split-discipline | meta | commit-split discipline added to focus-discipline/SKILL.md; approved verbatim + retroactive-cost sentence appended | ✓
+01:38 | 056_claude-md-junk-strip-commit-i | meta | Commit I (4a79b9d) strips 78-line junk from Commit H scope violation; path fix preserved | ✓
+01:38 | 057_claude-md-agent-routing | meta | agent routing section added to CLAUDE.md (researcher/documenter/engineer/reviewer/team-lead + default bias) | ✓

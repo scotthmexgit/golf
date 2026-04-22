@@ -96,26 +96,33 @@ function makeRoundCfg(bets: BetSelection[], players: PlayerId[]): RoundConfig {
   }
 }
 
-function makeHole(
-  holeNum: number,
-  par: number,
-  gross: Record<PlayerId, number>,
-  ctpWinner: PlayerId | null = null,
-): HoleState {
+function makeHole({
+  hole,
+  par,
+  gross,
+  ctpWinner = null,
+  longestDriveWinner = null,
+}: {
+  hole: number
+  par: number
+  gross: Record<PlayerId, number>
+  ctpWinner?: PlayerId | null
+  longestDriveWinner?: PlayerId | null
+}): HoleState {
   const ids = Object.keys(gross) as PlayerId[]
   const zeroBool: Record<PlayerId, boolean> = {}
   const zeroInt: Record<PlayerId, number> = {}
   for (const p of ids) { zeroBool[p] = false; zeroInt[p] = 0 }
   return {
-    hole: holeNum,
+    hole,
     par,
     holeIndex: 1,
-    timestamp: `ts-${holeNum}`,
+    timestamp: `ts-${hole}`,
     gross,
     strokes: { ...zeroInt },
     status: 'Confirmed',
     ctpWinner,
-    longestDriveWinner: null,
+    longestDriveWinner,
     bunkerVisited: { ...zeroBool },
     treeSolidHit: { ...zeroBool },
     treeAnyHit: { ...zeroBool },
@@ -137,7 +144,7 @@ describe('settleJunkHole — isGreenie', () => {
     const bet = makeGreenieBet('junk-g1', players)
     const round = makeRoundCfg([bet], players)
     // p1 wins CTP and makes par (3); p2/p3 bogey (4); girEnabled: true
-    const hole = makeHole(5, 3, { p1: 3, p2: 4, p3: 4 }, 'p1')
+    const hole = makeHole({ hole: 5, par: 3, gross: { p1: 3, p2: 4, p3: 4 }, ctpWinner: 'p1' })
 
     const events = settleJunkHole(hole, round, defaultJunkCfg)
 
@@ -170,7 +177,7 @@ describe('settleJunkHole — isCTP', () => {
     const players: PlayerId[] = ['p1', 'p2', 'p3']
     const bet = makeCtpBet('junk-1', players)
     const round = makeRoundCfg([bet], players)
-    const hole = makeHole(5, 3, { p1: 4, p2: 4, p3: 4 }, 'p1')
+    const hole = makeHole({ hole: 5, par: 3, gross: { p1: 4, p2: 4, p3: 4 }, ctpWinner: 'p1' })
 
     const events = settleJunkHole(hole, round, defaultJunkCfg)
 

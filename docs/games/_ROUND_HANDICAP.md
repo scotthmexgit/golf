@@ -67,7 +67,7 @@ Every game that reads `strokesOnHole` from `src/games/handicap.ts` sees Round Ha
 - **Skins**: `netFor` in `src/games/skins.ts` reads `state.strokes[pid]`, which the hole-state builder populates from `effectiveCourseHcp`. Round Handicap feeds in through the builder, not through `skins.ts`.
 - **Wolf**: team-score computation calls `strokesOnHole` per player with `effectiveCourseHcp`. Same path.
 - **Nassau**: match-play per-hole net score uses `effectiveCourseHcp`. Same path.
-- **Match Play**: singles uses `effectiveCourseHcp`. Best-ball uses `effectiveCourseHcp` per player. Alternate-shot and foursomes compute team handicap via `teamCourseHandicap(effectiveCourseHcp[p1], effectiveCourseHcp[p2])` — the 50%-combined rule layers on top of the already-adjusted per-player values.
+- **Match Play**: singles uses `effectiveCourseHcp`. Best-ball uses `effectiveCourseHcp` per player.
 - **Stroke Play**: `recordStrokePlayHole` reads `effectiveCourseHcp` through `state.strokes[pid]`. Same path.
 
 No game implements a Round-Handicap-specific branch. A new game type inherits Round Handicap support by calling `strokesOnHole` with `effectiveCourseHcp`.

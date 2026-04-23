@@ -66,9 +66,9 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
           <div>
             <label className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Format</label>
             <div className="flex gap-1.5 mt-1">
-              <Pill label="Individual" active={game.matchFormat !== 'teams'} onClick={() => updateGame(game.id, { matchFormat: 'individual' })} />
+              <Pill label="Individual" active={game.matchFormat !== 'best-ball'} onClick={() => updateGame(game.id, { matchFormat: 'singles' })} />
               {game.playerIds.length === 4 && (
-                <Pill label="Teams 2v2" active={game.matchFormat === 'teams'} onClick={() => updateGame(game.id, { matchFormat: 'teams' })} />
+                <Pill label="Teams 2v2" active={game.matchFormat === 'best-ball'} onClick={() => updateGame(game.id, { matchFormat: 'best-ball' })} />
               )}
             </div>
           </div>

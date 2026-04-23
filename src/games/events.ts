@@ -133,11 +133,13 @@ type PressVoided = EventBase & WithBet & {
 type NassauHoleForfeited = EventBase & WithBet & {
   kind: 'NassauHoleForfeited'
   hole: number
+  matchId: string
   forfeiter: PlayerId
 }
 type NassauWithdrawalSettled = EventBase & WithPoints & WithBet & {
   kind: 'NassauWithdrawalSettled'
   hole: number
+  matchId: string
   withdrawer: PlayerId
 }
 
@@ -173,6 +175,7 @@ type MatchConfigInvalid = EventBase & WithBet & {
   kind: 'MatchConfigInvalid'
   reason: string
 }
+// Extra-holes format deferred to post-v1; type retained for exhaustive-switch coverage.
 type ExtraHoleResolved = EventBase & WithPoints & WithBet & {
   kind: 'ExtraHoleResolved'
   hole: number

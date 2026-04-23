@@ -157,6 +157,320 @@ Each entry: title + audit references, acceptance criteria with fence sentence, f
 - **Type-widening `matchFormat` is breaking**. Three consumer files must compile under the new union. Legacy-value mapping (`'individual'→'singles'`, `'teams'→'best-ball'`) avoids runtime breakage in `src/app/round/new/page.tsx` and `GameInstanceCard` during the transition. UI rewrite post-cutover (deferred) removes the shim.
 - If `game_match_play.md` § 5 or § 6 has spec gaps (e.g., how handicap applies in best-ball vs. alternate-shot), expect engineer to log divergences.
 
+### Phase breakdown — #6 Match Play engine
+
+> Drafted 2026-04-22 (prompt 014). All 10 rule-doc gaps resolved prior to this breakdown (prompt 013). Evidence gates below verified before Phase 1 was drafted.
+
+---
+
+#### Evidence gates (pre-Phase-1)
+
+**`GameInstance.matchFormat`** — `src/types/index.ts` line 71:
+```ts
+matchFormat?: 'individual' | 'teams'
+```
+This is the breaking type change target. The current union admits only two legacy values; the engine needs four.
+
+**`MatchPlayCfg`** — `src/games/types.ts` lines 69–81:
+```ts
+export interface MatchPlayCfg {
+  id: BetId
+  stake: number
+  format: 'singles' | 'best-ball' | 'alternate-shot' | 'foursomes'
+  appliesHandicap: boolean
+  holesToPlay: 9 | 18
+  tieRule: 'halved'
+  playerIds: PlayerId[]
+  teams?: [[PlayerId, PlayerId], [PlayerId, PlayerId]]
+  junkItems: JunkKind[]
+  junkMultiplier: number
+}
+```
+The four-format union is **already correct in `src/games/types.ts`**. The only widening needed is in `src/types/index.ts`'s `GameInstance.matchFormat` field.
+
+**Match Play event `matchId` fields** — `src/games/events.ts`:
+- `HoleResolved` (lines 148–152): **no `matchId` field**
+- `HoleHalved` (lines 153–156): **no `matchId` field**
+- `MatchClosedOut` (lines 157–163): **has `matchId: string`**
+- `MatchTied` (lines 164–168): **has `matchId: string`**
+- `MatchHalved` (lines 169–173): **has `matchId: string`**
+
+This constrains Q3: per-hole events (`HoleResolved`, `HoleHalved`) do not carry `matchId`; terminal-settlement events do.
+
+---
+
+#### Design question answers (all 8)
+
+**Q1 — Does `settleMatchPlayHole` return `{ events, match }` or events only?**
+
+Answer: **`{ events, match }`** — the updated `MatchState` is returned alongside events. This is consistent with Nassau's signature `(hole, cfg, roundCfg, matches) => { events, matches }` and with § 11 of the rule doc: "`match_play.ts` is stateful at the `MatchState` level — threaded by `aggregate.ts`. The per-hole settle function is pure." The caller must thread the updated `MatchState` into the next hole call; returning events only would force callers to reconstruct state from the event log on every call, which is the wrong abstraction.
+
+The § 5 pseudocode shows `advanceMatch(match, winner): MatchState` returning a new `MatchState`. The settle function composes `holeWinner` → `advanceMatch` → emit events, so the caller needs both the emitted events and the new state. Signature: `(hole: HoleState, cfg: MatchPlayCfg, roundCfg: RoundConfig, match: MatchState) => { events: ScoringEvent[], match: MatchState }`.
+
+No rule-doc update required; § 5 and § 11 are consistent and this is confirmed.
+
+**Q2 — `MatchState` singular object or array?**
+
+Answer: **singular object**. Match Play has exactly one match per bet. § 7 explicitly: "Match Play has no press mechanic." Nassau required `MatchState[]` because presses introduced new matches mid-round. Match Play has no mechanism that creates additional `MatchState` entries. The function signature is `(..., match: MatchState) => { ..., match: MatchState }` — scalar in, scalar out.
+
+No rule-doc update required.
+
+**Q3 — `matchId` on single-match events?**
+
+Answer: **Match Play does not add `matchId` to `HoleResolved` or `HoleHalved`**. Evidence from `events.ts`:
+- `HoleResolved` (line 148) and `HoleHalved` (line 153) have no `matchId` field.
+- `MatchClosedOut` (line 160), `MatchTied` (line 167), and `MatchHalved` (line 172) already carry `matchId: string`.
+
+Nassau emits `matchId` on `NassauHoleResolved` because it manages multiple parallel matches (front/back/overall plus presses) — `matchId` disambiguates which of the concurrent matches produced the event. Match Play has one match per bet; the `declaringBet` field on every event (via `WithBet`) already uniquely identifies the match. No per-hole `matchId` is needed.
+
+The terminal settlement events (`MatchClosedOut`, `MatchHalved`) carry `matchId` because those event types are shared with future multi-match contexts (e.g., Nassau uses analogous settlement events). Match Play supplies `cfg.id` as the `matchId` value in those events.
+
+**Cross-engine consistency:** This is not an inconsistency with Nassau. Match Play's per-hole events use `kind: 'HoleResolved'` and Nassau's use `kind: 'NassauHoleResolved'` — the event kind alone separates them before any further field lookup. Within the `HoleResolved` kind, `declaringBet` identifies the specific Match Play bet (and there is exactly one match per bet), so no additional `matchId` field is needed. Nassau per-hole events require `matchId === 'front' | 'back' | 'overall'` because multiple parallel matches share the same `declaringBet` (front/back/overall all declare under the same Nassau bet ID). That multiplicity doesn't exist in Match Play. Consumers disambiguate correctly: `event.kind === 'HoleResolved' && event.declaringBet === betId` returns all and only the Match Play per-hole events for that bet — no further filter is needed.
+
+No rule-doc update required.
+
+**Q4 — `finalizeMatchPlayRound` separate function vs inline on final hole?**
+
+Answer: **separate exported function**, consistent with Nassau's `finalizeNassauRound`. The finalizer handles the hole-18 (or hole-9) boundary: if the match is still open at `holesToPlay`, emit `MatchClosedOut`; if tied, emit `MatchHalved` with zero deltas. The per-hole `settleMatchPlayHole` cannot know at hole-18 call time whether the round is complete; separating finalization makes the two concerns independently testable.
+
+Signature (analogous to Nassau): `finalizeMatchPlayRound(cfg: MatchPlayCfg, roundCfg: RoundConfig, match: MatchState) => ScoringEvent[]`.
+
+No rule-doc update required.
+
+**Q5 — `closeoutCheck` separate or inline?**
+
+Answer: **inline in `settleMatchPlayHole`**. The REBUILD_PLAN #6 AC names "`closeoutCheck` (or equivalents)" — this AC phrasing anticipates inline satisfaction. The closeout check is a single condition: `Math.abs(holesUp) > holesRemaining`. Extracting it as a standalone exported function adds a public API surface for no test benefit; callers do not call `closeoutCheck` independently. The `advanceMatch` pseudocode in § 5 already shows the check inline. Inline satisfies the AC.
+
+No rule-doc update required.
+
+**Q6 — Round Handicap: caller-applies?**
+
+Answer: **caller-applies**. `docs/games/_ROUND_HANDICAP.md` § 3 states: "Every handicap-aware game computes the player's effective course handicap for stroke allocation as `effectiveCourseHcp = courseHcp + roundHandicap`." Section 6 (Match Play): "Best-ball uses `effectiveCourseHcp` per player. Alternate-shot and foursomes compute team handicap via `teamCourseHandicap(effectiveCourseHcp[p1], effectiveCourseHcp[p2])`." The per-hole gross score passed to `settleMatchPlayHole` has already been adjusted by the caller via `state.strokes[pid]` (populated with `effectiveCourseHcp` by the hole-state builder). `match_play.ts` reads `state.strokes[pid]` and calls `strokesOnHole` — it inherits Round Handicap without any engine-specific code.
+
+No rule-doc update required.
+
+**Q7 — `TeamSizeReduced` in-scope for #6 or deferred?**
+
+Answer: **in-scope for #6**. § 9 documents the behavior explicitly: "partner withdraws → team's score on subsequent holes is the remaining player's net; team course handicap recomputes via `teamCourseHandicap` using only the remaining player. Emit `TeamSizeReduced`." The `TeamSizeReduced` event type already exists in `events.ts` (lines 194–199) with `{ kind, hole, teamId, remainingSize }`. The emission logic is a simple guard on `teams` field when a player in `state.withdrew` is detected. It is needed for correctness in best-ball and alternate-shot/foursomes formats.
+
+**`TeamSizeReduced` belongs in Phase 4d (edge cases)**. It is not needed for the singles happy-path (Phase 1) or team happy-paths (Phase 2). It is an edge case that applies only to non-singles formats with a withdrawing partner — structurally parallel to Nassau's Phase 4b forfeit/withdrawal.
+
+**Event-type status:** `TeamSizeReduced` already exists in `src/games/events.ts` lines 194–199:
+```ts
+type TeamSizeReduced = EventBase & WithBet & {
+  kind: 'TeamSizeReduced'
+  hole: number
+  teamId: string
+  remainingSize: number
+}
+```
+No `events.ts` change is required for Phase 4d. The phase adds emit logic only.
+
+No rule-doc update required.
+
+**Q8 — Junk scoring: Match Play's responsibility or Junk engine?**
+
+Answer: **Junk engine's responsibility** (#7 in backlog). `MatchPlayCfg.junkItems` and `MatchPlayCfg.junkMultiplier` declare which Junk bet kinds are in play for this Match Play bet, but `match_play.ts` does not emit `JunkAwarded` events. The Junk engine (#7) reads those config fields and emits `JunkAwarded` independently, per `docs/games/game_junk.md`. § 7 of the Match Play rule doc confirms: "Every Junk item in `junkItems` pays out at `points × stake × junkMultiplier` for this bet; see `docs/games/game_junk.md` for the points formula." The formula reference points outward to `game_junk.md`, not inward to `match_play.ts`. `match_play.ts` emits no Junk events.
+
+No rule-doc update required.
+
+---
+
+#### Phase count rationale
+
+Match Play's structure is driven by the rule doc, not by Nassau's count. The rule doc identifies four orthogonal concerns that cannot share a phase without creating untestable intermediate states:
+
+1. **Per-hole scoring with `MatchState` threading** — the foundational data model and the singles case (§ 5 pseudocode); can be verified end-to-end for singles before any team logic exists.
+2. **Team formats** — best-ball and alternate-shot/foursomes introduce `teams` config, `teamGross`/`teamStrokes` state fields, and the 50%-combined handicap formula. These are multiplicative on the § 5 `holeWinner` logic and require the `MatchState` interface from Phase 1 to be stable before they are built.
+3. **End-of-round settlement and extra holes** — `finalizeMatchPlayRound`, tie-rule dispatch, sudden-death loop, and the cap-exhausted state transition are structurally separate from per-hole scoring; they trigger only at round boundary and require a complete `MatchState` from prior holes.
+4. **Edge cases** — concession-closeout ordering (Gap 4), best-ball partial miss (Gap 9), `TeamSizeReduced`, `HoleForfeited`, `MatchConfigInvalid` — are correctness requirements for the engine but explicitly should not be scattered across phases. Grouping them in one phase lets them be added together with one focused test suite pass, verified by targeted edge-case tests, and gated by a single review.
+
+The `matchFormat` type widening is a prerequisite that belongs in Phase 1 because every subsequent phase builds on the new type. Four phases total (plus the type-widening grouped into Phase 1) is the minimum that preserves testable intermediate states between phases without over-splitting.
+
+---
+
+#### Phase 1a — Type widening + `MatchState` interface (no new behavior)
+
+**Objective:** Land the breaking `matchFormat` type change and legacy shims, define the engine's `MatchState` shape and typed error classes, and create the `match_play.ts` file — no behavioral functions yet.
+
+**Why split from 1b:** The type widening (`GameInstance.matchFormat`) touches three consumer files and is a behavior-preserving breaking change independently verifiable by tsc + existing test pass. `MatchState` has no dependency on `holeWinner` types (`{ holesUp: number, holesPlayed: number, closedOut: boolean }` per § 5 — plain value object). Keeping type infrastructure separate from first-function behavior mirrors Nassau's Gate 1 / Gate 2 discipline and makes each half individually reviewable.
+
+**Scope:**
+- A. Widen `GameInstance.matchFormat` in `src/types/index.ts` (line 71) from `'individual' | 'teams'` to `'singles' | 'best-ball' | 'alternate-shot' | 'foursomes'`.
+- B. Apply legacy shim in `src/store/roundStore.ts` (line 155): default for new rounds uses `'singles'`; the legacy `'individual'` literal is replaced.
+- C. Apply legacy read shim in `src/components/setup/GameInstanceCard.tsx` (lines 69, 71): render path accepts the two new canonical values in place of the old literals, preserving existing-round display.
+- D. Create `src/games/match_play.ts`. Define `MatchState` (singular: `{ holesUp: number, holesPlayed: number, closedOut: boolean }` per § 5), typed error classes (`MatchPlayConfigError`, `MatchPlayBetNotFoundError`), and `initialMatch(cfg): MatchState`. No `holeWinner`, no `settleMatchPlayHole` — skeleton only.
+- E. Create `src/games/__tests__/match_play.test.ts` — stub file with a single `it('has a test file', () => { expect(true).toBe(true) })` so the suite registers. Real tests land in Phase 1b.
+
+**Fence:** No `holeWinner`, no `settleMatchPlayHole`, no per-hole scoring. No team formats. No `finalizeMatchPlayRound`. No concession, forfeit, or withdrawal. `src/games/types.ts` untouched. No changes to Skins/Wolf/Stroke Play/Nassau engines.
+
+**Stop-artifact:** All 177 existing tests pass, tsc clean, no new runtime behavior — types and interface only. `src/store/roundStore.ts` and `src/components/setup/GameInstanceCard.tsx` compile without errors (confirmed by `tsc` passing). Portability grep on `match_play.ts` → 0.
+
+**Gate to Phase 1b:** `MatchState` interface reviewed and stable. Type widening compiles. Existing test suite still at 177 + 1 stub.
+
+---
+
+#### Phase 1b — Singles `holeWinner` + `settleMatchPlayHole` + § 10 worked example
+
+**Objective:** Implement the singles per-hole scoring path and verify it end-to-end against the § 10 worked example.
+
+**Scope:**
+- A. Implement `holeWinner(state: HoleState, cfg: MatchPlayCfg): 'team1' | 'team2' | 'halved'` for `format: 'singles'` only. Net score = `gross - strokesOnHole(strokes, holeIndex)` per player. Lower net wins; tie halves. Bet-id lookup via `b.id === cfg.id`.
+- B. Implement `settleMatchPlayHole(hole, cfg, roundCfg, match) => { events: ScoringEvent[], match: MatchState }` for `format: 'singles'`. Emits `HoleResolved` (`winner: 'team1' | 'team2'`) or `HoleHalved`; emits `MatchClosedOut` with `matchId: cfg.id` and full-stake points when `Math.abs(match.holesUp) > holesRemaining` (inline closeout check per Q5). Returns updated `MatchState`.
+- C. Tests: § 12 Test 1 (§ 10 worked example verbatim — 14-hole singles sequence with handicap, `MatchClosedOut` after hole 14 with `holesUp = 6`, `holesRemaining = 4`, deltas `{ A: -1, B: +1 }`, Σ = 0, `Number.isInteger` on all deltas, no events for holes 15–18, exactly 6 `HoleHalved` events on holes 2, 5, 7, 10, 13, 14).
+
+**Fence:** No team format paths in `holeWinner`. No `finalizeMatchPlayRound`. No extra-hole logic. No concession, forfeit, withdrawal, `TeamSizeReduced`. Phase 1a files untouched (no further type widening).
+
+**Stop-artifact:** § 12 Test 1 (§ 10 worked example) passes; all singles-mode `it()` pass; 177 + stub + Phase 1b additions total; tsc clean; portability grep → 0; no `any` / `@ts-ignore` / non-null `!` on untrusted input in `match_play.ts`.
+
+**Gate to Phase 2:** `holeWinner` and `settleMatchPlayHole` signatures reviewed and stable (Phase 2 extends them — a signature change after Phase 2 lands breaks team tests). § 12 Test 1 passing.
+
+---
+
+#### Phase 2 — Team formats (best-ball, alternate-shot, foursomes)
+
+**Objective:** Extend `holeWinner` to handle all four formats, implementing team-score computation and 50%-combined handicap for the two team formats.
+
+**Scope:**
+- A. Extend `holeWinner` for `format: 'best-ball'`: per-player net, `Math.min` over team members (handles partial availability per Gap 9 / § 5 clarification; a team forfeits only when all members have missing gross scores).
+- B. Extend `holeWinner` for `format: 'alternate-shot'` and `format: 'foursomes'`: single `teamGross` per team, `teamCourseHandicap(hcp1, hcp2)` via `Math.ceil((hcp1+hcp2)/2)` imported from `src/games/handicap.ts`. Confirm `teamCourseHandicap` exists in `handicap.ts` or add it there (per § 2 and REBUILD_PLAN #6 AC).
+- C. Add `MatchConfigInvalid` emission: validate `teams` field before scoring (§ 4 contract — length 2, each inner length 2, all IDs in `playerIds`, no duplicates). Emit `MatchConfigInvalid` and return early on any failure.
+- D. Extend `settleMatchPlayHole` to route through the team `holeWinner` paths when `format !== 'singles'`.
+- E. Implement per-player delta splitting for team formats (§ 8): team delta split equally; remainder absorbed by lowest `playerId` lexicographically via `RoundingAdjustment` event.
+- F. Tests: § 12 Test 3 (best-ball team win, per-player delta `{ A: +50, B: +50, C: -50, D: -50 }`, Σ = 0); § 12 Test 4 (`teamCourseHandicap` assertion for alternate-shot, AB=6, CD=8, stroke allocation matches USGA). Additional: foursomes path, `MatchConfigInvalid` on missing/invalid teams, rounding adjustment when `stake % teamSize !== 0`.
+
+**Fence:** No `finalizeMatchPlayRound`. No concession, forfeit, or withdrawal. No extra-hole logic. No `TeamSizeReduced`. `src/types/index.ts` and `src/store/roundStore.ts` untouched (Phase 1 changes already landed).
+
+**Stop-artifact:**
+- `npm run test:run` passes. Minimum net-new tests: 8 (Tests 3 + 4 + `MatchConfigInvalid` + rounding).
+- `npx tsc --noEmit --strict` zero errors.
+- Portability grep clean.
+- Zero-sum assertion holds for every point-producing test in the file so far.
+
+**Gate to Phase 3:** All four `format` variants produce correct `holeWinner` results. `MatchConfigInvalid` path verified by test. Team per-player split verified including rounding edge case.
+
+---
+
+#### Phase 3 — End-of-round settlement
+
+**Objective:** Implement `finalizeMatchPlayRound` — Nassau-shaped: settle any still-open match at the round boundary; emit `MatchHalved` with zero deltas on a tied match.
+
+**Scope:**
+- A. Implement `finalizeMatchPlayRound(cfg, roundCfg, match) => ScoringEvent[]`. Post-`holesToPlay` boundary: if `match.closedOut`, return `[]` (idempotent); if `match.holesUp !== 0`, emit `MatchClosedOut` with correct per-player deltas; if `match.holesUp === 0`, emit `MatchHalved` with `matchId: cfg.id`, `hole: holesToPlay`, and zero deltas for all `cfg.playerIds`.
+- B. For team formats, the tied-match `MatchHalved` delta record includes all four player IDs with `0` values (no `RoundingAdjustment` needed; all zeros divide evenly).
+- C. Collapse `tieRule` in `src/games/types.ts` `MatchPlayCfg` from `'halved' | 'extra-holes'` to `'halved'`; remove `extraHolesCap` field. Update callers and test fixtures.
+- D. Tests: § 12 Test 2 (`MatchHalved` emitted on tied match, deltas = `{ A: 0, B: 0 }`, Σ = 0); already-closed match returns `[]`; 9-hole match closes out correctly (`holesRemaining = 9 − holesPlayed`); team format tied at `holesToPlay` emits `MatchHalved` with all-zero per-player deltas.
+
+**Fence:** No extra-hole loop. No `ExtraHoleResolved` emission. No concession, forfeit, withdrawal, or `TeamSizeReduced`. No changes to Phase 1 or Phase 2 function signatures.
+
+**Stop-artifact:**
+- `npm run test:run` passes. Minimum net-new tests: 4 (Test 2 + already-closed idempotent + 9-hole closeout + team tied).
+- `npx tsc --noEmit --strict` zero errors.
+- Portability grep clean.
+- Zero-sum holds for all tests including halved (Σ = 0 on zero deltas).
+
+**Gate to Phase 4:** `finalizeMatchPlayRound` is exported and stable. Tied-match path tested by name ("MatchHalved" in describe label). Every branch produces a terminal event or empty array.
+
+---
+
+#### Phase 2 retrospective (2026-04-23)
+
+<!-- retrospective 2026-04-23: scope items B (alternate-shot/foursomes holeWinner branch) and F (§ 12 Test 4, teamCourseHandicap handicap tests) were completed as planned, then removed by product decision. teamCourseHandicap deleted from handicap.ts; HoleState.teamGross/teamStrokes deleted from types.ts; 12 tests deleted in the Turn 2 subtractive pass (8 from match_play.test.ts + 4 from handicap.test.ts). See IMPLEMENTATION_CHECKLIST.md Deferred/won't-do for the permanent removal record. -->
+
+---
+
+#### Phase 4a — Round Handicap integration (test-only)
+
+**Objective:** Confirm caller-applies Round Handicap for all four formats by adding integration tests; no engine code changes.
+
+**Scope:**
+- A. Integration test (mirrors Nassau Phase 4a / Wolf Test 10 / Stroke Play Test 12): caller passes `state.strokes[pid]` populated from `effectiveCourseHcp = courseHcp + roundHandicap`; engine produces correct net-score outcome. One test for singles, one for best-ball (verifying `effectiveCourseHcp` feeds `teamCourseHandicap` correctly for alternate-shot). Per `docs/games/_ROUND_HANDICAP.md` — no engine change, caller-applies confirmed.
+
+**Fence:** No `match_play.ts` code changes. Test file only.
+
+**Stop-artifact:** Round Handicap integration tests pass, caller-applies confirmed for singles and alternate-shot formats, no engine code changed, tsc clean.
+
+**Gate to Phase 4b:** Round Handicap caller-applies pattern verified and documented in test describe header.
+
+<!-- retrospective 2026-04-23: scope A second test (alternate-shot caller-applies) was completed as planned, then removed by product decision removing alt-shot/foursomes. Only the singles test was retained. Phase 4a net test contribution after subtractive pass: 1 test (not 2). -->
+
+---
+
+#### Phase 4b — Concession handling (Gap 4)
+
+**Objective:** Implement concession at hole/stroke/match level and verify concession-closeout ordering (Gap 4).
+
+**Scope:**
+- A. **Concession-closeout ordering** (Gap 4, § 7): extend `settleMatchPlayHole` to handle `state.concession` signal. When a hole concession causes `holesUp > holesRemaining`, emit `ConcessionRecorded` first, then `MatchClosedOut` second, in the same function return. Test: hole concession when `holesUp === holesRemaining − 1` → two-event sequence, `ConcessionRecorded` at `events[0]` and `MatchClosedOut` at `events[1]`.
+- B. **Conceded match** (§ 9): `ConcessionRecorded` with `unit: 'match'` ends the match immediately; `settleMatchPlayHole` returns `MatchState.closedOut = true`. § 12 Test 5 (B concedes after hole 10 while 3 down; `ConcessionRecorded` with `unit: 'match'`, deltas `{ A: +1, B: -1 }`, holes 11–18 produce no events, Σ = 0).
+
+**No `events.ts` changes**: `ConcessionRecorded` already exists at `src/games/events.ts:183–188`.
+
+**Fence:** No best-ball partial miss, `TeamSizeReduced`, or `HoleForfeited` in this phase.
+
+**Stop-artifact:** Concession-closeout ordering test passes (event index verified, not just membership), § 12 Test 5 passes, Σ = 0 on conceded-match, tsc clean.
+
+**Gate to Phase 4c:** Concession signal path reviewed and stable in `settleMatchPlayHole`.
+
+---
+
+#### Phase 4c — Best-ball partial miss + `HoleForfeited` (Gap 9)
+
+**Objective:** Implement and test the Gap 9 best-ball partial-miss rule and the `HoleForfeited` path for all formats.
+
+**Scope:**
+- A. **Best-ball partial miss** (Gap 9, § 5, § 9): if one team member has a missing gross score and the other has a valid score, the team uses the available player's net (`Math.min` over available entries is vacuously correct). Only if ALL team members have missing scores does the team forfeit. Two tests: (i) one-player missing → `HoleResolved` using remaining player's net; (ii) all missing → `HoleForfeited`.
+- B. **`HoleForfeited` for singles and alternate-shot/foursomes**: missing player score in singles or missing `teamGross` in alt-shot/foursomes → `HoleForfeited` emitted. Test: missing `teamGross` entry in alternate-shot → `HoleForfeited`.
+
+**No `events.ts` changes**: `HoleForfeited` already exists at `src/games/events.ts:189–193`.
+
+**Fence:** No `TeamSizeReduced`. No changes to Phase 4b concession logic.
+
+**Stop-artifact:** Best-ball partial-miss tests pass (one-valid-score and all-missing cases), `HoleForfeited` tests pass for singles and alternate-shot, tsc clean.
+
+**Gate to Phase 4d:** All four format `holeWinner` edge cases covered. `HoleForfeited` path verified.
+
+---
+
+#### Phase 4d — `TeamSizeReduced` (partner withdrawal)
+
+**Objective:** Implement partner-withdrawal handling and emit `TeamSizeReduced` per § 9 Gap 3 resolution.
+
+**Scope:**
+- A. When a player in `state.withdrew` belongs to a non-singles team, emit `TeamSizeReduced` with `{ hole, teamId, remainingSize: 1 }` and recompute team course handicap for subsequent holes using the single remaining player's handicap directly (§ 9 Gap 3: 1-player team returns individual `courseHcp`).
+
+**No `events.ts` changes**: `TeamSizeReduced` already exists at `src/games/events.ts:194–199`:
+```ts
+type TeamSizeReduced = EventBase & WithBet & {
+  kind: 'TeamSizeReduced'
+  hole: number
+  teamId: string
+  remainingSize: number
+}
+```
+Phase 4d is emit-logic only.
+
+**Fence:** No changes to Phase 1a/1b/2/3/4a/4b/4c behavior. No changes to other engine files.
+
+**Stop-artifact:** `TeamSizeReduced` emission test passes (partner withdrawal → `TeamSizeReduced` → subsequent holes use single-player handicap correctly); tsc clean; portability grep → 0; no `any` / `@ts-ignore` / non-null `!` on untrusted input anywhere in `match_play.ts`; zero-sum on every point-producing test in the full file; final gate greps: `b.config === cfg` → 0, `b.id === cfg.id` → exactly N (string-id native), portability grep → 0.
+
+**Gate to Junk engine (#7):** #6 CLOSED. `match_play.ts` fully implemented and tested. All AC in REBUILD_PLAN.md #6 satisfied. `matchFormat` widening stable and no consumer broken. Junk engine (#7) may now proceed — it reads `cfg.junkItems` and `cfg.junkMultiplier` from `MatchPlayCfg`, stable from Phase 1a.
+
+---
+
+#### Phase dependencies
+
+| Phase | Depends on |
+|-------|------------|
+| Phase 1a | #3 (types.ts churn) + #4 (string-id pattern) landed. `MatchPlayCfg.format` already correct in `src/games/types.ts`. |
+| Phase 1b | Phase 1a: `MatchState` interface stable. `holeWinner` signature established here — Phase 2 extends it, so it must not change after 1b gate. |
+| Phase 2 | Phase 1b: `MatchState` interface and `settleMatchPlayHole`/`holeWinner` signatures frozen. `teamCourseHandicap` must exist in `src/games/handicap.ts` — verify before starting; add if absent. |
+| Phase 3 | Phase 2: all four `holeWinner` format paths pass tests; `MatchConfigInvalid` path verified. `finalizeMatchPlayRound` shares the same `MatchState` threading — team-format paths must be correct before the finalize boundary is tested. |
+| Phase 4a | Phase 3: `finalizeMatchPlayRound` stable. Tests only — no engine code change. |
+| Phase 4b | Phase 3: `settleMatchPlayHole` stable (concession extends it). Phase 4a: round-handicap tests pass. |
+| Phase 4c | Phase 2: best-ball `holeWinner` path stable (partial-miss modifies it). Phase 4b: concession path reviewed. |
+| Phase 4d | Phase 4c: all four format edge-cases covered. Phase 2: `teams` field handling stable (`TeamSizeReduced` depends on it). |
+
 ---
 
 ### #7 — Junk engine

@@ -67,7 +67,7 @@ export interface GameInstance {
   pressAmount?: number
   escalating?: boolean
   loneWolfMultiplier?: number
-  matchFormat?: 'individual' | 'teams'
+  matchFormat?: 'singles' | 'best-ball'
   maxExposure?: number
   settlePer9?: boolean
   partnerIds?: [string, string][]

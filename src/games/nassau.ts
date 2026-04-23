@@ -63,7 +63,9 @@ export interface MatchState {
   endHole: number
   holesWonA: number
   holesWonB: number
+  pair: [PlayerId, PlayerId]   // the two players this match is between
   parentId: string | null
+  closed?: boolean             // undefined or false = open; true = settled (closeout or finalization)
 }
 
 // ─── Validation ─────────────────────────────────────────────────────────────
@@ -116,15 +118,32 @@ function findBetId(cfg: NassauCfg, roundCfg: RoundConfig): BetId {
 
 // ─── Initial matches ────────────────────────────────────────────────────────
 //
-// Singles mode: three base matches (front / back / overall). allPairs mode
-// (Phase 4) will expand this to three matches per distinct pair.
+// Singles: three base matches (front / back / overall).
+// allPairs: C(n,2) pairs × three matches; IDs keyed <base>-<pA>-<pB>.
 
-export function initialMatches(_cfg: NassauCfg): MatchState[] {
-  return [
-    { id: 'front', startHole: 1, endHole: 9, holesWonA: 0, holesWonB: 0, parentId: null },
-    { id: 'back', startHole: 10, endHole: 18, holesWonA: 0, holesWonB: 0, parentId: null },
-    { id: 'overall', startHole: 1, endHole: 18, holesWonA: 0, holesWonB: 0, parentId: null },
-  ]
+export function initialMatches(cfg: NassauCfg): MatchState[] {
+  if (cfg.pairingMode === 'singles') {
+    const pair = [cfg.playerIds[0], cfg.playerIds[1]] as [PlayerId, PlayerId]
+    return [
+      { id: 'front', startHole: 1, endHole: 9, holesWonA: 0, holesWonB: 0, pair, parentId: null },
+      { id: 'back', startHole: 10, endHole: 18, holesWonA: 0, holesWonB: 0, pair, parentId: null },
+      { id: 'overall', startHole: 1, endHole: 18, holesWonA: 0, holesWonB: 0, pair, parentId: null },
+    ]
+  }
+  const result: MatchState[] = []
+  const ids = cfg.playerIds
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      const pair = [ids[i], ids[j]] as [PlayerId, PlayerId]
+      const suffix = `${ids[i]}-${ids[j]}`
+      result.push(
+        { id: `front-${suffix}`, startHole: 1, endHole: 9, holesWonA: 0, holesWonB: 0, pair, parentId: null },
+        { id: `back-${suffix}`, startHole: 10, endHole: 18, holesWonA: 0, holesWonB: 0, pair, parentId: null },
+        { id: `overall-${suffix}`, startHole: 1, endHole: 18, holesWonA: 0, holesWonB: 0, pair, parentId: null },
+      )
+    }
+  }
+  return result
 }
 
 // ─── Press handling (Phase 2) ───────────────────────────────────────────────
@@ -236,6 +255,7 @@ export function openPress(
     endHole,
     holesWonA: 0,
     holesWonB: 0,
+    pair: parent.pair,
     parentId: parent.id,
   }
 
@@ -287,6 +307,17 @@ function applyHoleToMatch(match: MatchState, winner: 'A' | 'B' | 'tie'): MatchSt
   return match
 }
 
+function matchPoints(
+  match: MatchState,
+  playerA: PlayerId,
+  playerB: PlayerId,
+  stake: number,
+): Record<PlayerId, number> {
+  if (match.holesWonA > match.holesWonB) return { [playerA]: stake, [playerB]: -stake }
+  if (match.holesWonB > match.holesWonA) return { [playerA]: -stake, [playerB]: stake }
+  return { [playerA]: 0, [playerB]: 0 }
+}
+
 // ─── Per-hole settlement ────────────────────────────────────────────────────
 
 export function settleNassauHole(
@@ -298,49 +329,176 @@ export function settleNassauHole(
   assertValidNassauCfg(config)
   const declaringBet = findBetId(config, roundCfg)
 
-  // Phase 1 supports only singles mode. allPairs lands in Phase 4.
-  if (config.pairingMode !== 'singles') {
-    throw new NassauConfigError(
-      'pairingMode',
-      `Phase 1 supports only 'singles'; got '${config.pairingMode}'`,
-    )
-  }
-
-  const [playerA, playerB] = config.playerIds
   const events: ScoringEvent[] = []
   const updatedMatches: MatchState[] = []
 
   for (const match of matches) {
-    if (hole.hole < match.startHole || hole.hole > match.endHole) {
+    // undefined or false = open; true = settled — skip closed matches and out-of-window holes.
+    if (match.closed || hole.hole < match.startHole || hole.hole > match.endHole) {
       updatedMatches.push(match)
       continue
     }
-    const winner = holeResult(hole, config, playerA, playerB)
+
+    const [playerA, playerB] = match.pair
+
+    // § 9 forfeit check per pair (game_nassau.md § 9: "Missing scores propagate per-pair").
+    // Both-missing in a pair is not addressed by the rule — treat as caller contract violation.
+    const grossA = hole.gross[playerA]
+    const grossB = hole.gross[playerB]
+    if (grossA === undefined && grossB === undefined) {
+      throw new NassauConfigError(
+        'gross',
+        `both players (${playerA}, ${playerB}) have missing gross scores on hole ${hole.hole} — ambiguous per game_nassau.md § 9`,
+      )
+    }
+    const forfeitWinner: 'A' | 'B' | null =
+      grossA === undefined ? 'B' : grossB === undefined ? 'A' : null
+    if (forfeitWinner !== null) {
+      events.push({
+        kind: 'NassauHoleForfeited',
+        timestamp: hole.timestamp,
+        actor: 'system',
+        declaringBet,
+        hole: hole.hole,
+        matchId: match.id,
+        forfeiter: forfeitWinner === 'B' ? playerA : playerB,
+      })
+    }
+
+    const winner = forfeitWinner ?? holeResult(hole, config, playerA, playerB)
     const updated = applyHoleToMatch(match, winner)
-    updatedMatches.push(updated)
-    events.push({
-      kind: 'NassauHoleResolved',
-      timestamp: hole.timestamp,
-      actor: 'system',
-      declaringBet,
-      hole: hole.hole,
-      matchId: match.id,
-      winner,
-    })
+
+    const holesUp = Math.abs(updated.holesWonA - updated.holesWonB)
+    const holesRemaining = match.endHole - hole.hole
+    if (holesUp > holesRemaining) {
+      events.push({
+        kind: 'MatchClosedOut',
+        timestamp: hole.timestamp,
+        actor: 'system',
+        declaringBet,
+        hole: hole.hole,
+        matchId: match.id,
+        holesUp,
+        holesRemaining,
+        points: matchPoints(updated, playerA, playerB, config.stake),
+      })
+      updatedMatches.push({ ...updated, closed: true })
+    } else {
+      if (forfeitWinner === null) {
+        events.push({
+          kind: 'NassauHoleResolved',
+          timestamp: hole.timestamp,
+          actor: 'system',
+          declaringBet,
+          hole: hole.hole,
+          matchId: match.id,
+          winner,
+        })
+      }
+      updatedMatches.push(updated)
+    }
   }
 
   return { events, matches: updatedMatches }
 }
 
-// ─── Round finalization (Phase 3 stub) ──────────────────────────────────────
+// ─── Withdrawal settlement ──────────────────────────────────────────────────
+// Rule (game_nassau.md § 9): every open match involving the withdrawing player
+// settles in favor of the opposing player in that pair. Non-participant matches
+// (allPairs mode) pass through open. One NassauWithdrawalSettled per open
+// non-tied participant match.
+
+export function settleNassauWithdrawal(
+  holeNumber: number,
+  withdrawingPlayer: PlayerId,
+  config: NassauCfg,
+  roundCfg: RoundConfig,
+  matches: MatchState[],
+): { events: ScoringEvent[]; matches: MatchState[] } {
+  assertValidNassauCfg(config)
+  if (!config.playerIds.includes(withdrawingPlayer)) {
+    throw new NassauConfigError(
+      'withdrawingPlayer',
+      `${withdrawingPlayer} is not a participant in this Nassau`,
+    )
+  }
+  const declaringBet = findBetId(config, roundCfg)
+
+  const events: ScoringEvent[] = []
+  const updatedMatches: MatchState[] = []
+
+  for (const match of matches) {
+    if (match.closed) {
+      updatedMatches.push(match)
+      continue
+    }
+    if (match.pair[0] !== withdrawingPlayer && match.pair[1] !== withdrawingPlayer) {
+      // Non-participant pair (allPairs mode): A-C continues when B withdraws.
+      updatedMatches.push(match)
+      continue
+    }
+    const opposing = match.pair[0] === withdrawingPlayer ? match.pair[1] : match.pair[0]
+    if (match.holesWonA !== match.holesWonB) {
+      events.push({
+        kind: 'NassauWithdrawalSettled',
+        timestamp: String(holeNumber),
+        actor: 'system',
+        declaringBet,
+        hole: holeNumber,
+        matchId: match.id,
+        withdrawer: withdrawingPlayer,
+        points: { [opposing]: config.stake, [withdrawingPlayer]: -config.stake },
+      })
+    }
+    updatedMatches.push({ ...match, closed: true })
+  }
+
+  return { events, matches: updatedMatches }
+}
+
+// ─── Round finalization ─────────────────────────────────────────────────────
 //
-// Phase 1 stub: no settlement events emitted yet. Phase 3 fills this in with
-// MatchClosedOut, MatchTied, and stake-denominated end-of-round events.
+// Settles every match not already closed by a mid-round or final-hole closeout.
+// In a normal 18-hole round the only open matches reaching finalize are those
+// that ended tied (holesUp === 0 on endHole, so the closeout condition never
+// fired). Won matches close out via settleNassauHole on their final hole.
 
 export function finalizeNassauRound(
-  _events: ScoringEvent[],
-  _config: NassauCfg,
-  _matches: MatchState[],
+  config: NassauCfg,
+  roundCfg: RoundConfig,
+  matches: MatchState[],
 ): ScoringEvent[] {
-  return []
+  assertValidNassauCfg(config)
+  const declaringBet = findBetId(config, roundCfg)
+
+  const events: ScoringEvent[] = []
+  for (const match of matches) {
+    // undefined or false = open; true = settled — same check as settleNassauHole.
+    if (match.closed) continue
+    const [playerA, playerB] = match.pair
+
+    if (match.holesWonA === match.holesWonB) {
+      events.push({
+        kind: 'MatchTied',
+        timestamp: String(match.endHole),
+        actor: 'system',
+        declaringBet,
+        hole: match.endHole,
+        matchId: match.id,
+      })
+    } else {
+      events.push({
+        kind: 'MatchClosedOut',
+        timestamp: String(match.endHole),
+        actor: 'system',
+        declaringBet,
+        hole: match.endHole,
+        matchId: match.id,
+        holesUp: Math.abs(match.holesWonA - match.holesWonB),
+        holesRemaining: 0,
+        points: matchPoints(match, playerA, playerB, config.stake),
+      })
+    }
+  }
+  return events
 }

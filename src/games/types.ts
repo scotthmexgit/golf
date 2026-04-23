@@ -69,11 +69,10 @@ export interface NassauCfg {
 export interface MatchPlayCfg {
   id: BetId
   stake: number
-  format: 'singles' | 'best-ball' | 'alternate-shot' | 'foursomes'
+  format: 'singles' | 'best-ball'
   appliesHandicap: boolean
   holesToPlay: 9 | 18
-  tieRule: 'halved' | 'extra-holes'
-  extraHolesCap: number
+  tieRule: 'halved'
   playerIds: PlayerId[]
   teams?: [[PlayerId, PlayerId], [PlayerId, PlayerId]]
   junkItems: JunkKind[]
@@ -166,8 +165,6 @@ export interface HoleState {
   status: HoleStatus
   ctpWinner: PlayerId | null
   longestDriveWinner: PlayerId | null
-  teamGross?: Record<string, number>
-  teamStrokes?: Record<string, number>
   bunkerVisited: Record<PlayerId, boolean>
   treeSolidHit: Record<PlayerId, boolean>
   treeAnyHit: Record<PlayerId, boolean>

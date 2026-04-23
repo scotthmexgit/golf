@@ -426,35 +426,43 @@ The `matchFormat` type widening is a prerequisite that belongs in Phase 1 becaus
 
 **Fence:** No `TeamSizeReduced`. No changes to Phase 4b concession logic.
 
-**Stop-artifact:** Best-ball partial-miss tests pass (one-valid-score and all-missing cases), `HoleForfeited` tests pass for singles and alternate-shot, tsc clean.
+**Stop-artifact:** Best-ball partial-miss tests pass (one-valid-score and all-missing cases), `HoleForfeited` tests pass for singles and best-ball, tsc clean.
 
-**Gate to Phase 4d:** All four format `holeWinner` edge cases covered. `HoleForfeited` path verified.
+**Gate to Phase 4d:** Singles and best-ball `holeWinner` edge cases covered (alt-shot/foursomes removed 2026-04-23; see Deferred/won't-do). `HoleForfeited` path verified.
+
+---
+
+#### Phase 4c retrospective (2026-04-23)
+
+<!-- retrospective 2026-04-23: scope item B (HoleForfeited for alternate-shot/foursomes) was originally in scope but removed by the 2026-04-23 product decision removing alt-shot/foursomes formats. Phase 4c net-new tests cover singles missing-score (Tests 1–2) and best-ball partial-miss/all-missing (Tests 3–5) only; no alternate-shot HoleForfeited test was retained. Final test count after Phase 4c: 235. Engine-level only: HoleForfeited fires on missing gross (hole.gross[p] === undefined); no UI path currently produces missing gross — withdrew, pickedUp, and blank-entry flows are all absent from HoleData (see #12). -->
 
 ---
 
 #### Phase 4d — `TeamSizeReduced` (partner withdrawal)
 
-**Objective:** Implement partner-withdrawal handling and emit `TeamSizeReduced` per § 9 Gap 3 resolution.
+**Objective:** Implement best-ball partner-withdrawal handling and emit `TeamSizeReduced` per § 9. `best-ball` format only — `singles` has no team to reduce.
+
+**Emit-once: Option (i) — caller-convention v2 (stateless engine).** `withdrew` is a per-hole transition signal, not a persistent flag. `HoleState.withdrew[N] = [A]` means "player A transitions out at hole N." Subsequent holes have `withdrew = []` for player A. The caller (bridge item #12) sets `withdrew` on the single transition hole only. The engine emits `TeamSizeReduced` once, on hole N. Persistent exclusion of A from hole N+1 onward is handled by Phase 4c `bestNet` filtering (A has no gross from N+1 onward per caller convention). No `MatchState` extension is required.
+
+**Caller convention (from #12):** `HoleState.withdrew[N] = [A]` on the transition hole only. Subsequent `HoleState.withdrew` arrays do not include A. `TeamSizeReduced.hole = N` (transition hole = first affected hole) matches § 9's "subsequent holes" phrasing.
 
 **Scope:**
-- A. When a player in `state.withdrew` belongs to a non-singles team, emit `TeamSizeReduced` with `{ hole, teamId, remainingSize: 1 }` and recompute team course handicap for subsequent holes using the single remaining player's handicap directly (§ 9 Gap 3: 1-player team returns individual `courseHcp`).
+- A. When `state.withdrew` on hole N contains a player belonging to a best-ball team, emit `TeamSizeReduced` with `{ hole: hole.hole, teamId, remainingSize: 1 }`. No `teamCourseHandicap` call — that function was deleted 2026-04-23. Post-deletion behavior: the remaining player's individual `courseHcp` is already used by the existing `bestNet` computation; no additional handicap logic required.
 
-**No `events.ts` changes**: `TeamSizeReduced` already exists at `src/games/events.ts:194–199`:
-```ts
-type TeamSizeReduced = EventBase & WithBet & {
-  kind: 'TeamSizeReduced'
-  hole: number
-  teamId: string
-  remainingSize: number
-}
-```
-Phase 4d is emit-logic only.
+The engine excludes `withdrew` players from `bestNet` regardless of gross presence — `withdrew` is the authoritative signal for team composition. In practice the caller sets `withdrew` without a gross for the transitioning player, but the engine does not rely on gross being absent. `TeamSizeReduced` is the only Phase 4d-specific event on hole N; normal scoring events (`HoleResolved` or `HoleHalved`) still fire per hole outcome.
 
-**Fence:** No changes to Phase 1a/1b/2/3/4a/4b/4c behavior. No changes to other engine files.
+**No `events.ts` changes**: `TeamSizeReduced` already exists at `src/games/events.ts:194–199`. Phase 4d is emit-logic only.
 
-**Stop-artifact:** `TeamSizeReduced` emission test passes (partner withdrawal → `TeamSizeReduced` → subsequent holes use single-player handicap correctly); tsc clean; portability grep → 0; no `any` / `@ts-ignore` / non-null `!` on untrusted input anywhere in `match_play.ts`; zero-sum on every point-producing test in the full file; final gate greps: `b.config === cfg` → 0, `b.id === cfg.id` → exactly N (string-id native), portability grep → 0.
+**Fence:** No changes to Phase 1a/1b/2/3/4a/4b/4c behavior. No changes to other engine files. No changes to `MatchState` interface. Caller compliance required: the engine does not deduplicate `TeamSizeReduced` across calls — if the caller sets `withdrew = [A]` on multiple successive holes, `TeamSizeReduced` fires each time. Single-hole transition signal is a caller contract enforced by #12, not the engine.
 
-**Gate to Junk engine (#7):** #6 CLOSED. `match_play.ts` fully implemented and tested. All AC in REBUILD_PLAN.md #6 satisfied. `matchFormat` widening stable and no consumer broken. Junk engine (#7) may now proceed — it reads `cfg.junkItems` and `cfg.junkMultiplier` from `MatchPlayCfg`, stable from Phase 1a.
+**Stop-artifact:** `TeamSizeReduced` emission test passes (best-ball partner withdrawal → `TeamSizeReduced` on hole N → remaining player's score used on hole N and subsequent holes; A absent on N+1+ via Phase 4c `bestNet` filter); tsc clean; no `any` / `@ts-ignore` / non-null `!` on untrusted input anywhere in `match_play.ts`; zero-sum on every point-producing test in the full file.
+
+Final gate greps:
+- `grep 'b\.config === cfg' src/games/match_play.ts` → 0 matches (no reference-identity regression)
+- `grep 'b\.id === cfg\.id' src/games/match_play.ts` → at least 1 match (string-id-native confirmed)
+- Portability grep on `src/games/match_play.ts` → 0
+
+**Gate to Junk engine (#7):** #6 CLOSED (engine-level — `singles` and `best-ball` AC met). `match_play.ts` fully implemented and tested for both formats. `matchFormat` widening stable, no consumer broken. Engine-level only: `HoleState.withdrew` has no UI writer until #12 lands; production wiring is #12 and does not gate #7. Junk engine (#7) may now proceed — it reads `cfg.junkItems` and `cfg.junkMultiplier` from `MatchPlayCfg`, stable from Phase 1a.
 
 ---
 
@@ -469,7 +477,7 @@ Phase 4d is emit-logic only.
 | Phase 4a | Phase 3: `finalizeMatchPlayRound` stable. Tests only — no engine code change. |
 | Phase 4b | Phase 3: `settleMatchPlayHole` stable (concession extends it). Phase 4a: round-handicap tests pass. |
 | Phase 4c | Phase 2: best-ball `holeWinner` path stable (partial-miss modifies it). Phase 4b: concession path reviewed. |
-| Phase 4d | Phase 4c: all four format edge-cases covered. Phase 2: `teams` field handling stable (`TeamSizeReduced` depends on it). |
+| Phase 4d | Phase 4c: singles and best-ball `holeWinner` edge cases covered. Phase 2: `teams` field (best-ball team structure) stable. |
 
 ---
 
@@ -639,6 +647,16 @@ Phase 4d is emit-logic only.
 - `PayoutMap` vs `RunningLedger` shape mismatch handled by adapter — kept one release cycle, removed in UI rewrite phase.
 - **Revert path**: `git revert <commit-N>` returns a single consumer to the old path. The engine files `src/games/*.ts` remain throughout; the only thing that can be lost is the consumer-migration commit itself. No data loss.
 - Divergence-window risk is explicit and acceptable for pre-v1.
+
+---
+
+### #12 — HoleData ↔ HoleState bridge
+
+Wire `withdrew`, `pickedUp`, and `conceded` from `HoleData` into `HoleState`; add covering-score indicator field; guard `setScore(0)` at store boundary; add `PlayerWithdrew` UI writer for Wolf and UI caller for Nassau's `settleNassauWithdrawal`.
+
+**Dependencies**: #6 Phase 4d landed (engine-level `withdrew` consumed), #7 (Junk engine, for complete engine surface before bridge AC is drafted). Full AC drafted after A/B/C decision and Phase 4d close.
+
+**Sizing**: **L** (placeholder — not yet scoped for implementation).
 
 ---
 

@@ -43,11 +43,11 @@ Updated at EOD-FINAL.
 - [x] Phase 2b — teamCourseHandicap in handicap.ts + alternate-shot/foursomes holeWinner — closed 2026-04-23 at prompt 002. teamGross/teamStrokes keyed '0'/'1'; alt-shot and foursomes share branch per § 2; 214 tests, tsc+greps clean.
 - [x] Phase 3 — End-of-round settlement — closed 2026-04-23 at prompt 004. finalizeMatchPlayRound; tieRule collapsed to 'halved'; 218 tests, tsc+greps clean.
 - [x] Phase 4a — Round Handicap integration test — closed 2026-04-23 at prompt 005. 2 tests (singles + alt-shot), caller-applies confirmed, 220 tests, tsc clean. (Alt-shot test removed in subtractive pass prompt 007; 1 test retained; final count 208.)
-- [ ] Phase 4b — Concession-closeout ordering (Gap 4)
-- [ ] Phase 4c — Best-ball partial miss + HoleForfeited (Gap 9)
+- [x] Phase 4b — Concession-closeout ordering (Gap 4) — closed 2026-04-23 at prompt 009. concedeMatch + hole-concession short-circuit; § 12 Tests 4–5; 219 tests, tsc+greps clean. Engine-level only — HoleState.conceded has no UI writer; see #12.
+- [x] Phase 4c — Best-ball partial miss + HoleForfeited (Gap 9) — closed 2026-04-23 at prompt 010. getMissingScoreForfeit + bestNet partial-miss fix; § Phase 4c tests 1–5; 235 tests, tsc+greps clean. Engine-level only — HoleForfeited fires on missing gross; no UI path currently produces missing gross (withdrew, pickedUp, blank-entry flows all absent from HoleData); see #12.
 - [ ] Phase 4d — TeamSizeReduced emit logic
 
-**Status**: Active — Phase 4b next.
+**Status**: Active — Phase 4d next; pending W9-prereq (§ 9 TeamSizeReduced timing decision) then W9 REBUILD_PLAN.md rewrite.
 
 ## Backlog
 
@@ -60,6 +60,7 @@ Ordered; rough sizing in parens. Backlog structure revised after audit and rebui
 - **#9** — `GAME_DEFS` cleanup: mark 4 non-scope games as `disabled: true`. (XS)
 - **#10** — Prisma `Float` → `Int` cents migration; drop-and-recreate per disposable-data baseline. (S)
 - **#11** — Cutover session: parallel-path migration across ~7 commits with grep gates. Depends on #5, #6, #7, #8. (M)
+- **#12** — HoleData ↔ HoleState bridge: wire withdrew/pickedUp/conceded; covering-score field; setScore(0) guard; Wolf PlayerWithdrew writer; Nassau settleNassauWithdrawal caller. (L)
 
 Deferred beyond this rebuild plan (see REBUILD_PLAN.md "Deferred" section): ScoringEvent Prisma model, Final Adjustment engine logic + UI, hole-state builder, UI wiring, Player abandonment, Comeback Multiplier, PlayerDecision generic mechanism.
 
@@ -81,6 +82,14 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 - [x] `makeHole` in `junk.test.ts` uses a positional signature (holeNum, par, gross, ctpWinner). Will become crowded when LD/Sandy/Barkie/Polie/Arnie turns add longestDriveWinner, bunkerVisited, treeSolidHit, etc. Consider switching to an object-argument shape when a second junk kind touches the fixture — 2026-04-21 — prompt 052 — **resolved in commit 31adf21 (turn 3a-prep)**
 - [ ] Match Play mutual forfeit (both sides missing gross) behavior: doc (§ 5, § 9) is silent on the case where both players/teams have no score. Engine currently falls through to holeWinner's Infinity path → halved (no HoleForfeited). Needs documenter rule decision + test before being locked. Parked per Phase 4c stop-condition. — 2026-04-23 — prompt 010
 - [ ] concedeMatch inverted-concession test (conceder was winning): preMatch holesUp=-3 (B leads), B concedes — points should still go to A. buildCloseoutEvent takes winner explicitly so trust-the-type-system holds, but a test locking this decoupling at the assertion level is pending. — 2026-04-23 — prompt 009
+- [ ] Main screen: clicking a recent round should allow resume/view; currently non-functional. Requires authentication system. [FUTURE-UX] — 2026-04-23 — UI walkthrough
+- [ ] User authentication system needed as prerequisite for prior-round access (resume/view) and friends features. [FUTURE-UX] — 2026-04-23 — UI walkthrough
+- [ ] Friends list and auto-add friends to new round player setup. [FUTURE-UX] — 2026-04-23 — UI walkthrough
+- [ ] Hole score entry: default each player's score to par so "Next" is immediately clickable without manual entry; current requirement to change every score before advancing is unnecessary friction. [UI-FLOW] — 2026-04-23 — UI walkthrough
+- [ ] Greenie eligibility hard-restricted to "par or better" — enforced at both layers: engine (`junk.ts:23`: `gross[winner] > hole.par`) and UI (`resolve/[hole]/page.tsx:55`: `vsPar ≤ 0`). Should be user-configurable, not hard-enforced; changing requires both layers. [UI-FLOW] — 2026-04-23 — UI walkthrough
+- [ ] Stroke play greenie resolution shows "nobody" option on hole 6 when all 5 players birdied; match play and skins correctly show all 5 players as eligible. Bet-scope filtering bug specific to stroke play — may be bet-membership mapping, junk-kind filter logic, or HoleData→HoleState translation (5 players assumed; confirm). [BRIDGE-#12] — 2026-04-23 — UI walkthrough
+- [ ] Greenie pop-up: no back-navigation to current hole's score entry from within greenie selection; user must advance to next hole then retreat. Navigation gap. [UI-FLOW] — 2026-04-23 — UI walkthrough
+- [ ] Results screen renders winners/losers correctly but lacks detail; presentationally complete but informationally thin. Low priority. [UI-FLOW] — 2026-04-23 — UI walkthrough
 
 ## Done
 

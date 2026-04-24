@@ -108,7 +108,7 @@ function makeHole(
     strokes: opts.strokes ?? zeroStrokes,
     status: 'Confirmed',
     ctpWinner: null,
-    longestDriveWinner: null,
+    longestDriveWinners: [],
     bunkerVisited: { ...zeroBool },
     treeSolidHit: { ...zeroBool },
     treeAnyHit: { ...zeroBool },

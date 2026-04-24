@@ -34,8 +34,12 @@ function isGreenie(
   return ctpWinner
 }
 
-function isLongestDrive(_hole: HoleState, _junkCfg: JunkRoundConfig): PlayerId | null {
-  return null // Phase 2 Iteration 2 — full implementation per rules-pass Topics 2, 6, 8.
+function isLongestDrive(hole: HoleState, junkCfg: JunkRoundConfig): PlayerId[] | null {
+  if (!junkCfg.longestDriveEnabled) return null
+  if (hole.par < 4) return null
+  if (!junkCfg.longestDriveHoles.includes(hole.hole)) return null
+  if (hole.longestDriveWinners.length === 0) return null
+  return hole.longestDriveWinners
 }
 
 // ─── Dispatch switch ─────────────────────────────────────────────────────────
@@ -49,7 +53,9 @@ export function resolveJunkWinner(
     case 'ctp':
       return isCTP(hole, junkCfg)
     case 'longestDrive':
-      return isLongestDrive(hole, junkCfg)
+      // isLongestDrive returns PlayerId[] | null; dispatch switch surface is
+      // PlayerId | null. LD is settled via the per-bet fan-out in settleJunkHole.
+      return null
     case 'greenie':
       // Greenie is context-dependent on ctpWinner + bet; direct resolution
       // from the switch cannot apply per-bet filtering. The dispatch switch
@@ -79,14 +85,14 @@ function pushAward(
   hole: number,
   timestamp: string,
   bet: { id: string; participants: PlayerId[] },
-  winner: PlayerId,
+  winners: PlayerId[],
   multiplier = 1,
 ): void {
   const N = bet.participants.length
-  const w = 1
+  const w = winners.length
   const points: Record<PlayerId, number> = {}
   for (const p of bet.participants) {
-    points[p] = p === winner ? (N - w) * multiplier : -w * multiplier
+    points[p] = winners.includes(p) ? (N - w) * multiplier : -w * multiplier
   }
   events.push({
     kind: 'JunkAwarded',
@@ -95,7 +101,7 @@ function pushAward(
     actor: 'system',
     declaringBet: bet.id,
     junk: kind,
-    winner,
+    winners,
     points,
   })
 }
@@ -154,7 +160,7 @@ export function settleJunkHole(
     for (const bet of roundCfg.bets) {
       if (!bet.junkItems.includes('ctp')) continue
       if (!bet.participants.includes(ctpWinner)) continue
-      pushAward(events, 'ctp', hole.hole, hole.timestamp, bet, ctpWinner)
+      pushAward(events, 'ctp', hole.hole, hole.timestamp, bet, [ctpWinner])
       events.push(...maybeEmitRoundingAdjustment({}, bet.participants))
     }
   }
@@ -165,7 +171,29 @@ export function settleJunkHole(
     if (!bet.junkItems.includes('greenie')) continue
     const greenieWinner = isGreenie(ctpWinner, hole, junkCfg, bet)
     if (greenieWinner === null) continue
-    pushAward(events, 'greenie', hole.hole, hole.timestamp, bet, greenieWinner)
+    pushAward(events, 'greenie', hole.hole, hole.timestamp, bet, [greenieWinner])
+    events.push(...maybeEmitRoundingAdjustment({}, bet.participants))
+  }
+
+  // ── LD bookkeeping: LongestDriveWinnerSelected fires once per hole ──────
+
+  if (hole.longestDriveWinners.length > 0) {
+    events.push({
+      kind: 'LongestDriveWinnerSelected',
+      timestamp: hole.timestamp,
+      hole: hole.hole,
+      actor: 'system',
+      winners: hole.longestDriveWinners,
+    })
+  }
+
+  // ── LD fan-out: one JunkAwarded per declaring bet in declaration order ──
+
+  for (const bet of roundCfg.bets) {
+    if (!bet.junkItems.includes('longestDrive')) continue
+    const ldWinners = isLongestDrive(hole, junkCfg)
+    if (ldWinners === null) continue
+    pushAward(events, 'longestDrive', hole.hole, hole.timestamp, bet, ldWinners)
     events.push(...maybeEmitRoundingAdjustment({}, bet.participants))
   }
 

@@ -56,7 +56,7 @@ function makeHole(overrides: Partial<HoleState> = {}): HoleState {
     strokes: { alice: 0, bob: 0, carol: 0, dave: 0 },
     status: 'Confirmed',
     ctpWinner: 'alice',
-    longestDriveWinner: null,
+    longestDriveWinners: [],
     bunkerVisited: { alice: false, bob: false, carol: false, dave: false },
     treeSolidHit: { alice: false, bob: false, carol: false, dave: false },
     treeAnyHit: { alice: false, bob: false, carol: false, dave: false },
@@ -405,5 +405,84 @@ describe('Topic 8 — JunkAwarded fan-out respects bets array order', () => {
   it('zero-sum holds for all three awards', () => {
     const events = settleJunkHole(hole, roundCfg, junkCfg)
     assertZeroSum(events)
+  })
+})
+
+// ─── §12 Test 5 — Tied Longest Drive ─────────────────────────────────────────
+
+describe('§12 Test 5 — Tied Longest Drive', () => {
+  // 3 players: alice, bob, carol.
+  // One declaring bet: junkItems=['longestDrive'], stake=100, junkMultiplier=1.
+  // hole.longestDriveWinners = ['alice', 'bob'] (tied).
+  // hole.par = 4, hole.hole = 5.
+  // junkCfg.longestDriveEnabled = true, junkCfg.longestDriveHoles = [5].
+
+  const ldBet = makeBet('ldBet', ['alice', 'bob', 'carol'], 100, 1, ['longestDrive'])
+  const junkCfg = makeJunkCfg({ longestDriveEnabled: true, longestDriveHoles: [5] })
+  const roundCfg = makeRoundCfg([ldBet], junkCfg)
+  const hole = makeHole({
+    hole: 5,
+    par: 4,
+    ctpWinner: null,
+    longestDriveWinners: ['alice', 'bob'],
+    gross: { alice: 4, bob: 4, carol: 5 },
+    gir: { alice: false, bob: false, carol: false },
+  })
+
+  it('emits exactly 1 LongestDriveWinnerSelected with winners: [alice, bob]', () => {
+    const events = settleJunkHole(hole, roundCfg, junkCfg)
+    const ldSel = events.filter((e) => e.kind === 'LongestDriveWinnerSelected')
+    expect(ldSel).toHaveLength(1)
+    const ev = ldSel[0]
+    if (ev.kind === 'LongestDriveWinnerSelected') {
+      expect(ev.winners).toEqual(['alice', 'bob'])
+    }
+  })
+
+  it('emits exactly 1 JunkAwarded with winners: [alice, bob]', () => {
+    const events = settleJunkHole(hole, roundCfg, junkCfg)
+    const awards = events.filter((e) => e.kind === 'JunkAwarded' && e.junk === 'longestDrive')
+    expect(awards).toHaveLength(1)
+    const ev = awards[0]
+    if (ev.kind === 'JunkAwarded') {
+      expect(ev.winners).toEqual(['alice', 'bob'])
+    }
+  })
+
+  it('points: alice +1, bob +1, carol -2 (N=3, w=2: N-w=1 per winner, -w=-2 per loser)', () => {
+    const events = settleJunkHole(hole, roundCfg, junkCfg)
+    const ev = events.find((e) => e.kind === 'JunkAwarded' && e.junk === 'longestDrive')
+    expect(ev).toBeDefined()
+    if (ev && ev.kind === 'JunkAwarded') {
+      expect(ev.points).toEqual({ alice: 1, bob: 1, carol: -2 })
+    }
+  })
+
+  it('zero-sum: sum of all JunkAwarded points = 0', () => {
+    const events = settleJunkHole(hole, roundCfg, junkCfg)
+    const ev = events.find((e) => e.kind === 'JunkAwarded' && e.junk === 'longestDrive')
+    expect(ev).toBeDefined()
+    if (ev && ev.kind === 'JunkAwarded') {
+      const sum = Object.values(ev.points).reduce((a, b) => a + b, 0)
+      expect(sum).toBe(0)
+    }
+  })
+
+  it('integer invariant: all point values are integers', () => {
+    const events = settleJunkHole(hole, roundCfg, junkCfg)
+    for (const ev of events) {
+      if (ev.kind === 'JunkAwarded') {
+        for (const v of Object.values(ev.points)) {
+          expect(Number.isInteger(v)).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('ordering: LongestDriveWinnerSelected at index 0, JunkAwarded after it', () => {
+    const events = settleJunkHole(hole, roundCfg, junkCfg)
+    expect(events[0].kind).toBe('LongestDriveWinnerSelected')
+    const ldAwardIdx = events.findIndex((e) => e.kind === 'JunkAwarded' && e.junk === 'longestDrive')
+    expect(ldAwardIdx).toBeGreaterThan(0)
   })
 })

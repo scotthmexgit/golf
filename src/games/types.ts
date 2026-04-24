@@ -164,7 +164,7 @@ export interface HoleState {
   strokes: Record<PlayerId, number>
   status: HoleStatus
   ctpWinner: PlayerId | null
-  longestDriveWinner: PlayerId | null
+  longestDriveWinners: PlayerId[]
   bunkerVisited: Record<PlayerId, boolean>
   treeSolidHit: Record<PlayerId, boolean>
   treeAnyHit: Record<PlayerId, boolean>

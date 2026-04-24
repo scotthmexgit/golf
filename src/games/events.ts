@@ -254,7 +254,7 @@ type JunkAwarded = EventBase & WithPoints & WithBet & {
   kind: 'JunkAwarded'
   hole: number
   junk: JunkKind
-  winner: PlayerId
+  winners: PlayerId[]
 }
 type CTPWinnerSelected = EventBase & {
   kind: 'CTPWinnerSelected'
@@ -273,7 +273,7 @@ type CTPCarried = EventBase & {
 type LongestDriveWinnerSelected = EventBase & {
   kind: 'LongestDriveWinnerSelected'
   hole: number
-  winner: PlayerId
+  winners: PlayerId[]
   distance?: number
 }
 

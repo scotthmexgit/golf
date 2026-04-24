@@ -915,7 +915,7 @@ Zero-sum is guaranteed for Junk: `Σ points[p] = 0` (enforced by #7 engine), and
 
 **Fence:** No Nassau / Match Play / Wolf / Skins / Stroke Play orchestration. No `MatchState` threading. No finalizer calls. Only `JunkAwarded` and `RoundingAdjustment` events reduced. `junk.ts` deletion is the only change to an existing engine file.
 
-**Stop-artifact:** Phase 1 tests pass. `tsc --noEmit --strict` zero errors. `grep 'maybeEmitRoundingAdjustment' src/games/junk.ts` → 0.
+**Stop-artifact:** Phase 1 tests pass. `tsc --noEmit --strict` zero errors. `grep 'maybeEmitRoundingAdjustment' src/games/junk.ts` → 0. `npm run test:run` → all prior tests (267 from #7 Phase 2 close) still pass after `junk.ts` dead-code deletion.
 
 **Gate to Phase 2:** `aggregateRound` signature stable. Supersession filter path tested. Junk money formula verified against known inputs.
 
@@ -961,10 +961,10 @@ Zero-sum is guaranteed for Junk: `Σ points[p] = 0` (enforced by #7 engine), and
 **Objective:** Add Stroke Play settlement, `aggregate.ts` owns `tieRule` dispatch per `game_stroke_play.md` §11. Complete the all-5-games zero-sum test.
 
 **Scope:**
-- A. Call `recordStrokePlayHole` per hole; call `settleStrokePlay` (round finalizer) at round end. `aggregate.ts` passes the `tieRule` field to the settler, consistent with §11 ownership.
+- A. Call `settleStrokePlayHole` per hole (per `src/games/stroke_play.ts:158`); call `finalizeStrokePlayRound(events, config)` at round end (confirmed at `stroke_play.ts:210`, signature `(events: ScoringEvent[], config: StrokePlayCfg): ScoringEvent[]`). `aggregate.ts` passes the `tieRule` field to the settler, consistent with §11 ownership.
 - B. Reduce `StrokePlaySettled`, `RoundingAdjustment` (from Stroke Play, distinct from Junk `RoundingAdjustment`), `CardBackResolved`, `TieFallthrough`, `FinalAdjustmentApplied`.
 - C. Skins and Wolf stateless orchestration (call per-hole settle functions in declaration order for those bets; no `MatchState` threading needed).
-- D. All-5-games zero-sum integration test: Skins + Wolf + Stroke Play + Nassau + Match Play + Junk events in a single synthetic round. Assert `Σ netByPlayer === 0`. Assert per-bet slices each independently zero-sum.
+- D. All-5-games zero-sum integration test. Fixture: a **synthetic event log** (not an orchestrator run) representing a 3-hole excerpt of an 18-hole round — a minimal complete scenario where every game type contributes at least one monetary event. Event log is constructed by hand in the test, not emitted by the orchestrator (the orchestrator is tested via Phase 3 scenarios; this test exercises the reducer against a complete known input). Games declared: Skins (1 skin won on hole 2), Wolf (1 hole resolved on hole 1), Stroke Play (round settled after hole 3), Nassau (front-9 match resolved), Match Play (match closedout), Junk (1 Greenie awarded on hole 2). Assert: `Σ netByPlayer === 0` across all events. Assert: each bet's `byBet[betId]` slice independently zero-sums. Assert: Junk `JunkAwarded` applies `stake × junkMultiplier` scaling; all other events do not. Fixture stake values chosen to be integer-clean (no `RoundingAdjustment` needed) to keep the fixture readable. `RoundingAdjustment` is tested separately in Phase 1.
 
 **Fence:** No UI wiring. No routing through `src/lib/*`. No changes to any engine file beyond Phase 1's `junk.ts` deletion (already landed).
 
@@ -987,6 +987,7 @@ The following topics are NOT resolved in this scope pass. They must be resolved 
 - **`byBet` key space for Nassau**: Nassau runs three base matches (front/back/overall) plus presses, all under a single `betId`. Does `byBet[betId]` aggregate all Nassau matches together, or does Nassau require a compound key (`betId + matchId`)? The `RunningLedger` type uses `Record<BetId, ...>` which is a flat key space. The resolution affects Phase 3 design. Deferred.
 - **Zero-sum invariant enforcement**: if `Σ netByPlayer !== 0` after a full recompute, should `aggregateRound` throw, emit a diagnostic event, or return silently with a discrepancy? No doc specifies. Deferred.
 - **Nassau press/carry `junkItems` inheritance**: if a press is opened mid-Nassau, does the press match inherit the parent's `junkItems` and `junkMultiplier` for Junk fan-out purposes? Affects `byBet` accumulation for Junk events declared under a Nassau bet. Deferred.
+- **Hole-boundary signal for Phase 3 orchestrator**: when `aggregate.ts` drives the per-hole loop, it needs to know when each hole ends. Three options: (a) orchestrator-driven from `roundCfg.holes` (no event needed — drive the loop index); (b) `StrokePlayHoleRecorded` as boundary signal (problematic if Stroke Play not declared); (c) new game-neutral `HoleConfirmed` event (scope expansion). Requires a **pre-Phase-3 researcher micro-pass** to evaluate and decide before Phase 3 engineer work starts. Not a rules question — design call.
 
 ---
 

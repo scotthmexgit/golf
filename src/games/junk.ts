@@ -1,75 +1,53 @@
-import type { BetSelection, HoleState, JunkKind, JunkRoundConfig, PlayerId, RoundConfig, ScoringEvent } from './types'
+// src/games/junk.ts — Junk scoring engine.
+//
+// Phase 1: dispatch scaffold. resolveJunkWinner switch present with all 7 arms.
+// settleJunkHole signature stable. Phase 2 fills in CTP, Greenie, Longest Drive.
+// #7b fills in Sandy, Barkie, Polie, Arnie after rules-pass 2026-04-24.
 
-type JunkAwarded = Extract<ScoringEvent, { kind: 'JunkAwarded' }>
+import type { HoleState, JunkKind, JunkRoundConfig, PlayerId, RoundConfig, ScoringEvent } from './types'
 
-function isCTP(hole: HoleState, cfg: JunkRoundConfig): PlayerId | null {
-  if (!cfg.ctpEnabled) return null
-  if (hole.par !== 3) return null
-  return hole.ctpWinner ?? null
-}
+// ─── Dispatch switch ─────────────────────────────────────────────────────────
 
-function isLongestDrive(hole: HoleState, cfg: JunkRoundConfig): PlayerId | null {
-  if (!cfg.longestDriveEnabled) return null
-  if (hole.par < 4) return null
-  if (!cfg.longestDriveHoles.includes(hole.hole)) return null
-  return hole.longestDriveWinner ?? null
-}
-
-function isGreenie(hole: HoleState, cfg: JunkRoundConfig): PlayerId | null {
-  if (!cfg.greenieEnabled) return null
-  if (!cfg.girEnabled) return null
-  const winner = isCTP(hole, cfg)
-  if (winner === null) return null
-  if (hole.gross[winner] > hole.par) return null
-  return winner
-}
-
-function pushAward(
-  events: JunkAwarded[],
-  hole: HoleState,
-  bet: BetSelection,
+export function resolveJunkWinner(
   kind: JunkKind,
-  winner: PlayerId,
-): void {
-  if (!bet.participants.includes(winner)) return
-  const N = bet.participants.length
-  const points: Record<PlayerId, number> = {}
-  for (const p of bet.participants) points[p] = p === winner ? N - 1 : -1
-  events.push({
-    kind: 'JunkAwarded',
-    hole: hole.hole,
-    junk: kind,
-    winner,
-    declaringBet: bet.id,
-    points,
-    actor: 'system',
-    timestamp: hole.timestamp,
-  })
+  hole: HoleState,
+  junkCfg: JunkRoundConfig,
+): PlayerId | null {
+  void hole
+  void junkCfg
+  switch (kind) {
+    case 'ctp':
+      return null // Phase 2 — full implementation
+    case 'longestDrive':
+      return null // Phase 2 — full implementation
+    case 'greenie':
+      return null // Phase 2 — full implementation
+    case 'sandy':
+      return null // #7b — rules pass 2026-04-24 pending
+    case 'barkie':
+      return null // #7b — rules pass 2026-04-24 pending
+    case 'polie':
+      return null // #7b — rules pass 2026-04-24 pending
+    case 'arnie':
+      return null // #7b — rules pass 2026-04-24 pending
+    default: {
+      const _exhaustive: never = kind
+      return null
+    }
+  }
 }
+
+// ─── Hole settler ────────────────────────────────────────────────────────────
 
 export function settleJunkHole(
   hole: HoleState,
   roundCfg: RoundConfig,
   junkCfg: JunkRoundConfig,
-): JunkAwarded[] {
-  const events: JunkAwarded[] = []
-  for (const bet of roundCfg.bets) {
-    for (const kind of bet.junkItems) {
-      if (kind === 'ctp') {
-        const winner = isCTP(hole, junkCfg)
-        if (winner !== null) pushAward(events, hole, bet, kind, winner)
-      }
-
-      if (kind === 'greenie') {
-        const winner = isGreenie(hole, junkCfg)
-        if (winner !== null) pushAward(events, hole, bet, kind, winner)
-      }
-
-      if (kind === 'longestDrive') {
-        const winner = isLongestDrive(hole, junkCfg)
-        if (winner !== null) pushAward(events, hole, bet, kind, winner)
-      }
-    }
-  }
-  return events
+): ScoringEvent[] {
+  // Phase 2 will implement CTP, Greenie, Longest Drive with bookkeeping events.
+  // #7b will implement Sandy, Barkie, Polie, Arnie.
+  void hole
+  void roundCfg
+  void junkCfg
+  return []
 }

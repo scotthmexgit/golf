@@ -106,15 +106,6 @@ function pushAward(
   })
 }
 
-// Placeholder: emit RoundingAdjustment when points × stake × junkMultiplier
-// has a per-winner cent remainder. Not triggered by §12 integer-only formulas.
-function maybeEmitRoundingAdjustment(
-  _points: Record<PlayerId, number>,
-  _participants: PlayerId[],
-): ScoringEvent[] {
-  return []
-}
-
 // ─── Hole settler ────────────────────────────────────────────────────────────
 
 export function settleJunkHole(
@@ -161,7 +152,6 @@ export function settleJunkHole(
       if (!bet.junkItems.includes('ctp')) continue
       if (!bet.participants.includes(ctpWinner)) continue
       pushAward(events, 'ctp', hole.hole, hole.timestamp, bet, [ctpWinner])
-      events.push(...maybeEmitRoundingAdjustment({}, bet.participants))
     }
   }
 
@@ -172,7 +162,6 @@ export function settleJunkHole(
     const greenieWinner = isGreenie(ctpWinner, hole, junkCfg, bet)
     if (greenieWinner === null) continue
     pushAward(events, 'greenie', hole.hole, hole.timestamp, bet, [greenieWinner])
-    events.push(...maybeEmitRoundingAdjustment({}, bet.participants))
   }
 
   // ── LD bookkeeping: LongestDriveWinnerSelected fires once per hole ──────
@@ -194,7 +183,6 @@ export function settleJunkHole(
     const ldWinners = isLongestDrive(hole, junkCfg)
     if (ldWinners === null) continue
     pushAward(events, 'longestDrive', hole.hole, hole.timestamp, bet, ldWinners)
-    events.push(...maybeEmitRoundingAdjustment({}, bet.participants))
   }
 
   return events

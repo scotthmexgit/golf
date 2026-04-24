@@ -1010,19 +1010,19 @@ press.junkMultiplier = parentBet.junkMultiplier
 
 ##### Phase 1 — Scaffold + Junk reducer (end-to-end test harness)
 
-**Objective:** Create `aggregate.ts` with the full function signature, supersession filter, the Junk-only monetary reducer (Junk events are the only monetary events requiring the `points × stake × junkMultiplier` formula), and `RoundingAdjustment` computation for Junk. Delete `maybeEmitRoundingAdjustment` from `junk.ts`. Establish the test harness for all later phases.
+**Objective:** Create `aggregate.ts` with the full function signature and Junk-only monetary reducer (Junk events are the only monetary events requiring the `points × stake × junkMultiplier` formula). Delete `maybeEmitRoundingAdjustment` from `junk.ts`. Establish the test harness for all later phases. Supersession filter and `RoundingAdjustment` branch are deferred (see remediation notes below).
 
 **Scope:**
-- A. Create `src/games/aggregate.ts`. Export `aggregateRound(log: ScoringEventLog, roundCfg: RoundConfig): RunningLedger`. Stub: for non-Junk monetary events, return `money[p] = event.points[p]` (correct formula — not a stub for those events). For `JunkAwarded`, apply `event.points[p] × bet.stake × bet.junkMultiplier`. Compute `RoundingAdjustment` when `points × stake × junkMultiplier` has a per-winner cent remainder; assign remainder to the winner with the lowest `playerId` lexicographically.
-- B. Supersession filter: before the reduce loop, build a `Set<EventId>` of superseded event IDs from `Object.keys(log.supersessions)`. Skip any event whose `id` is in that set. (`supersessions` maps `oldEventId → replacementEventId`; the superseded events are the keys.)
+- A. Create `src/games/aggregate.ts`. Export `aggregateRound(log: ScoringEventLog, roundCfg: RoundConfig): RunningLedger`. For non-Junk monetary events, `money[p] = event.points[p]` (correct formula — not a stub for those events). For `JunkAwarded`, apply `event.points[p] × bet.stake × bet.junkMultiplier`. No `RoundingAdjustment` computation (see remediation notes).
+- B. ~~Supersession filter~~ **DEFERRED** (remediation pass 2026-04-24): `EventBase` has no `id` field; `ScoringEventLog.supersessions` has zero writers in the codebase. The filter is a production no-op and cannot be tested without test fixtures that inject runtime properties unavailable to real emitters. Deferred to a dedicated schema pass (parking-lot item: "Supersession schema design, pre-Phase-2 gate"). `log.supersessions` is accepted as input but not consumed.
 - C. Delete `maybeEmitRoundingAdjustment` from `src/games/junk.ts` (lines 109–116) and remove its three call sites (lines 164, 175, 197).
-- D. Create `src/games/__tests__/aggregate.test.ts`. Tests: (1) empty log returns zeroed ledger; (2) `JunkAwarded` with known `points`, `stake`, `junkMultiplier` produces correct `money`; (3) `RoundingAdjustment` emitted when remainder exists; (4) superseded event is excluded from ledger; (5) purity test (same input → same output, two calls).
+- D. Create `src/games/__tests__/aggregate.test.ts`. Tests: (1) empty log returns zeroed ledger; (2) `JunkAwarded` with known `points`, `stake`, `junkMultiplier` produces correct `money`; (3) purity test (same input → same output, two calls). Removed tests: former Test 3 (`RoundingAdjustment` with fractional stake — unreachable under integer-only mandate, Outcome A); former Test 4 (supersession filter — deferred, Option C).
 
 **Fence:** No Nassau / Match Play / Wolf / Skins / Stroke Play orchestration. No `MatchState` threading. No finalizer calls. Only `JunkAwarded` and `RoundingAdjustment` events reduced. `junk.ts` deletion is the only change to an existing engine file.
 
-**Stop-artifact:** Phase 1 tests pass. `tsc --noEmit --strict` zero errors. `grep 'maybeEmitRoundingAdjustment' src/games/junk.ts` → 0. `npm run test:run` → all prior tests (267 from #7 Phase 2 close) still pass after `junk.ts` dead-code deletion.
+**Stop-artifact:** Phase 1 tests pass (3 tests: scaffold, Junk formula, purity). `tsc --noEmit --strict` zero errors. `grep 'maybeEmitRoundingAdjustment' src/games/junk.ts` → 0. `npm run test:run` → all prior tests still pass after `junk.ts` dead-code deletion.
 
-**Gate to Phase 2:** `aggregateRound` signature stable. Supersession filter path tested. Junk money formula verified against known inputs.
+**Gate to Phase 2:** `aggregateRound` signature stable. Junk money formula verified against known inputs. Supersession filter is deferred (pre-Phase-2 schema pass required before it can land).
 
 ---
 
@@ -1086,6 +1086,8 @@ press.junkMultiplier = parentBet.junkMultiplier
 
 The following topics are NOT resolved in this scope pass. They must be resolved before the corresponding phase can close.
 
+- **Supersession schema design (pre-Phase-2 gate)**: `EventBase` has no `id` field; `ScoringEventLog.supersessions` (`Record<EventId, EventId>`) has zero writers. The filter in Phase 1 was removed because it was a production no-op (remediation pass 2026-04-24, Issue 2 / Option C). Before Phase 2 can implement supersession reduction, a schema decision is needed: (A) add `id: EventId` to `EventBase` — breaking change across all emit sites; (B) redesign `supersessions` from `Record<EventId, EventId>` to index-based (no per-event id required); or (C) another approach. Decision belongs with the feature that writes supersessions, not the reducer. Schema decision required before Phase 2 engineer scope is drafted.
+- **RoundingAdjustment existence question**: `RoundingAdjustment` event type exists in `events.ts` as dead schema. The internal computation branch was removed from `aggregate.ts` (remediation pass 2026-04-24, Issue 3 / Outcome A) because `game_junk.md §11` mandates "Integer-unit math only" and `§12` ACs assert `Number.isInteger` on all money values — making the branch unreachable. The event type is retained in `events.ts` for now. Open question: should the event type be removed entirely (schema cleanup), or retained as a forward-compatibility scaffold for a future non-integer-stake scenario? Resolve before #8 Phase 4 if the all-5-games integration test fixture references `RoundingAdjustment`.
 - **CTPCarried accumulation formula**: what does `carryPoints` accumulate across sequential par-3 ties? Phase 2 can stub `carryPoints: 0` from `junk.ts` (already present), but correct reduction of `CTPCarried` in `aggregate.ts` requires this formula. Deferred.
 - **CTPCarried "next eligible par-3" resolution logic**: when a carry resolves, which subsequent par-3 receives the accumulated carry? The reducer needs to know when to apply the carry total and to whom. Deferred.
 - **`FinalAdjustmentApplied.targetBet: 'all-bets'` fan-out semantics**: when `targetBet === 'all-bets'`, the reducer must distribute the delta across all bets' `byBet` slices. The fan-out rule (equal split? proportional? each bet gets the full delta?) is not specified in any doc. Deferred.

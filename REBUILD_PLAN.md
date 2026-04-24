@@ -761,25 +761,238 @@ Sandy, Barkie, Polie, and Arnie implementation. Not in scope for #7 close. Full 
 
 ### #8 — `src/games/aggregate.ts`
 
-**Audit references**: closes #10 remainder (pure-function signature contract names `aggregate.ts` for round-total aggregation).
+> Scope pass completed 2026-04-24. Decisions 1–5 locked; phase breakdown drafted. Rules-documenter pass pending (see "Open" list below).
+
+**Audit references**: closes #10 remainder (pure-function signature contract names `aggregate.ts` for round-total aggregation); partially closes #1 (`aggregate.ts` is one of the four remaining open items under #1's umbrella).
 
 **Acceptance criteria**:
-- `src/games/aggregate.ts` provides `aggregateRound(events: ScoringEvent[], roundCfg: RoundConfig): RunningLedger` that walks the event log and produces the `RunningLedger` shape already defined in `src/games/types.ts`.
-- Idempotent and pure. Identical input → identical output. No dependence on event ordering beyond `hole` ascending; within a hole, the emit order from per-hole `settle*Hole` functions is preserved.
-- Zero-sum assertion holds: `Σ netByPlayer == 0` when every registered game module has settled.
-- Test file `src/games/__tests__/aggregate.test.ts`: purity test, zero-sum test against a multi-game round (Skins + Wolf + Stroke Play + Nassau + Match Play + Junk events), per-bet ledger slice.
+- `src/games/aggregate.ts` exports `aggregateRound(log: ScoringEventLog, roundCfg: RoundConfig): RunningLedger`. Walks the event log, filters out superseded events (see Decision 3), reduces monetary events to produce the `RunningLedger` shape defined in `src/games/types.ts`.
+- Full-recompute on every call. `lastRecomputeTs` is set to `new Date().toISOString()` on each return. No incremental path (see Decision 4).
+- Idempotent and pure. Identical input → identical output. No module-level mutable state.
+- `RoundingAdjustment` for Junk events is computed in `aggregate.ts` (see Decision 2). The `maybeEmitRoundingAdjustment` stub and its three call sites in `src/games/junk.ts` are deleted in this PR (dead code removal only — no engine logic change).
+- Zero-sum assertion holds: `Σ netByPlayer === 0` across all events in a fully-settled round.
+- Test file `src/games/__tests__/aggregate.test.ts`: purity test, zero-sum test against a multi-game round (Skins + Wolf + Stroke Play + Nassau + Match Play + Junk events), per-bet ledger slice, supersession filter test.
 - `tsc --noEmit --strict` passes. Portability grep empty.
-- **No changes to any engine file. No changes to `src/games/types.ts` or `events.ts`. No routing through `src/lib/*`.**
+- **No changes to any other engine file beyond the `junk.ts` dead-code deletion above. No changes to `src/games/types.ts` or `events.ts`. No routing through `src/lib/*`.**
 
 **Files touched**:
 - Create: `src/games/aggregate.ts`.
 - Create: `src/games/__tests__/aggregate.test.ts`.
+- Modify: `src/games/junk.ts` — delete `maybeEmitRoundingAdjustment` function and its three call sites.
 
-**Dependencies**: #5, #6, #7 (for a meaningful multi-game zero-sum test; technically can land with Skins+Wolf+StrokePlay only, but a strong test asks Nassau/Match Play/Junk events to round-trip too).
+**Dependencies**: #5, #6, #7 (for a meaningful multi-game zero-sum test; technically can land with Skins + Wolf + StrokePlay only, but a strong test asks Nassau / Match Play / Junk events to round-trip too).
 
-**Sizing**: **S**. Small module; the complexity is in `RunningLedger` correctness against a realistic event stream.
+**Sizing**: **M**. The per-hole orchestration scope — driving all 5 games per hole, threading `MatchState[]` for Nassau and `MatchState` for Match Play, dispatching finalizers, computing `RoundingAdjustment` for Junk — substantially exceeds the original `S` stub estimate. The pure reducer pass is small; the orchestration surface is not.
 
-**Risk flags**: none significant.
+**Risk flags**:
+- `junk.ts` deletion of `maybeEmitRoundingAdjustment` is scope-bounded (3 call sites all pass `{}` as the points map today — confirmed dead code). Engineer verifies via grep before deleting.
+- Nassau threading requires `MatchState[]` to be stable from #5 before #8 can pass its full multi-game zero-sum test. Match Play threading requires `MatchState` from #6.
+- `byBet` key space for Nassau (front/back/overall keyed by `betId` only — see Open items below) must be resolved before Phase 3 can land.
+
+---
+
+#### Decision 1 — Architecture: Shape A (combined orchestrator + reducer)
+
+**Decision: Shape A.** `aggregate.ts` is a single file that both orchestrates the per-hole drive loop and reduces the event log to `RunningLedger`.
+
+**Reasoning:** `game_stroke_play.md` §11: "`src/games/aggregate.ts` calls the per-hole recorder on every hole, then calls the round settler once at round end. `aggregate.ts` owns the `tieRule` dispatch." `game_nassau.md` §11: "it threads a `MatchState[]` through `aggregate.ts`." Both quotes assign orchestration directly to `aggregate.ts`. No doc references a separate `roundRunner.ts`.
+
+Shape B (split: `roundRunner.ts` as orchestrator + pure reducer in `aggregate.ts`) has a testability advantage — the reducer becomes independently exercisable with a synthetic event log. This advantage is real but is achievable inside Shape A by constructing a synthetic event log in tests without calling the orchestrator. Introducing `roundRunner.ts` without doc support is speculative scope expansion requiring explicit spec sign-off.
+
+Shape C (engine-per-game `runRound`) is rejected: `game_nassau.md` §11 explicitly states "no module-level mutable storage," which rules out a stateful engine object accumulating state across calls.
+
+**Shape A is chosen.** If testability concerns arise during implementation, the orchestrator can be made thin by delegating to per-game settle functions that are already tested independently.
+
+---
+
+#### Decision 2 — RoundingAdjustment: belongs in `aggregate.ts`
+
+**Decision: `RoundingAdjustment` for Junk money is computed in `aggregate.ts`. The `maybeEmitRoundingAdjustment` stub in `junk.ts` is dead code and is deleted in #8.**
+
+The remainder (the fractional cent after `points × stake × junkMultiplier`) only exists after performing that multiplication. `aggregate.ts` has `bet.stake`, `bet.junkMultiplier`, and the `points` map from `JunkAwarded` events. `junk.ts` does not have `bet.stake` or `bet.junkMultiplier` available at the time `settleJunkHole` returns — those fields live on `BetSelection`, not on `JunkRoundConfig`.
+
+The three current call sites pass `{}` as the points map (confirmed at `junk.ts:164`, `junk.ts:175`, `junk.ts:197`), making the stub incapable of ever emitting a correct `RoundingAdjustment` event.
+
+**Consequence for #8 engineer scope:** Delete `maybeEmitRoundingAdjustment` at `junk.ts:111–116` and remove its three call sites. No replacement logic is added to `junk.ts`. The equivalent correct logic lands in `aggregate.ts` Phase 1 (see Phase breakdown below).
+
+---
+
+#### Decision 3 — Supersessions: consume-only
+
+**Decision: `aggregate.ts` consumes `supersessions` (filters events where `supersessions[e.id]` is defined before reducing). `aggregate.ts` does NOT own the write-side lifecycle.**
+
+`ScoringEventLog.supersessions` has zero write sites and zero read sites anywhere in `src/` today (confirmed). The write-side spec — who writes a supersession, under what conditions, with what lifecycle guarantee — is deferred to a separate pass. No doc specifies it.
+
+The reducer-side filter is a single guard: before reducing an event, skip it if `log.supersessions[event.id] !== undefined`. This is one line in the reduce loop.
+
+#8 does not implement supersession write-side logic. Any attempt to write to `supersessions` in #8 is out of scope.
+
+---
+
+#### Decision 4 — Full-recompute only
+
+**Decision: `aggregate.ts` implements full-recompute only. `lastRecomputeTs` is set to `new Date().toISOString()` on each return.**
+
+`_FINAL_ADJUSTMENT.md §2` states: "the running ledger re-derives on every committed event." `lastRecomputeTs` has no existing writer, no existing reader, and no comment explaining an incremental path. Full-recompute-only is doc-specified and is the only viable approach until a consumer with incremental requirements exists.
+
+Incremental aggregation is deferred. The field `lastRecomputeTs` is populated on every call; it is not a signal for incremental state.
+
+---
+
+#### Decision 5 — Sizing: M
+
+**Decision: M.**
+
+The original `S` stub underweights the orchestration scope. The file must: (1) drive all 5 games per hole in declaration order, (2) thread `MatchState[]` for Nassau across 18 holes, (3) thread `MatchState` for Match Play across 18 holes, (4) call finalizers (`finalizeNassauRound`, `finalizeMatchPlayRound`, `finalizeWolfRound`, `finalizeStrokePlayRound` if it exists) at the round boundary, (5) compute `RoundingAdjustment` for Junk events after reducing `JunkAwarded` per bet. The pure reducer pass over the event log is small. The orchestration surface across 5 games with stateful threading is not.
+
+`M` is the correct size. `L` would be appropriate only if the orchestration includes significant conditional branching beyond game-type dispatch — it does not.
+
+---
+
+#### Input event stream
+
+**Monetary events** (carry `WithPoints`; contribute to `RunningLedger`):
+
+`SkinWon`, `NassauWithdrawalSettled`, `WolfHoleResolved`, `LoneWolfResolved`, `BlindLoneResolved`, `MatchClosedOut`, `ExtraHoleResolved`, `StrokePlaySettled`, `RoundingAdjustment`, `JunkAwarded`, `FinalAdjustmentApplied`.
+
+These events carry a `points` map (`Record<PlayerId, number>`). The reducer adds each `points[p]` entry to `netByPlayer[p]` and to `byBet[event.declaringBet][p]`.
+
+**Bookkeeping-only events** (no monetary contribution; not reduced):
+
+`StrokePlayHoleRecorded`, `CardBackResolved`, `ScorecardPlayoffResolved`, `TieFallthrough`, `IncompleteCard`, `FieldTooSmall`, `HoleResolved`, `HoleHalved`, `HoleForfeited`, `ConcessionRecorded`, `TeamSizeReduced`, `NassauHoleResolved`, `NassauHoleForfeited`, `PressOffered`, `PressOpened`, `PressVoided`, `MatchTied`, `MatchHalved`, `WolfDecisionMissing`, `WolfCaptainTiebreak`, `CTPWinnerSelected`, `CTPCarried`, `LongestDriveWinnerSelected`.
+
+The reducer skips bookkeeping events entirely.
+
+---
+
+#### Output shape
+
+```
+RunningLedger {
+  netByPlayer: Record<PlayerId, number>   // sum across all bets and all monetary events
+  byBet: Record<BetId, Record<PlayerId, number>>  // per-bet slice; zero-sum within each bet
+  lastRecomputeTs: string                 // new Date().toISOString() on every call
+}
+```
+
+The completed `ScoringEventLog` (with `supersessions` populated by the write-side, deferred) is accepted as input but `aggregate.ts` does not produce a new `ScoringEventLog` as output. Output is `RunningLedger` only.
+
+---
+
+#### Money formula
+
+For **Junk events** (`JunkAwarded`):
+
+```
+money[p] = event.points[p] × bet.stake × bet.junkMultiplier
+```
+
+For **all other monetary events** (`SkinWon`, `WolfHoleResolved`, `LoneWolfResolved`, `BlindLoneResolved`, `MatchClosedOut`, `NassauWithdrawalSettled`, `ExtraHoleResolved`, `StrokePlaySettled`, `RoundingAdjustment`, `FinalAdjustmentApplied`):
+
+```
+money[p] = event.points[p]
+```
+
+Points on non-Junk events already encode the stake-scaled delta. `JunkAwarded.points` carries the raw unit-points value (e.g., `+1` per winner, `−1` per loser for a 2-player bet); stake scaling is `aggregate.ts`'s responsibility for Junk only.
+
+This formula is applied once, in `aggregate.ts`. It has not previously appeared in the plan.
+
+Zero-sum is guaranteed for Junk: `Σ points[p] = 0` (enforced by #7 engine), and `stake × junkMultiplier` is a common multiplier applied to all participants, so `Σ money[p] = 0` follows.
+
+---
+
+#### Phase breakdown
+
+##### Phase 1 — Scaffold + Junk reducer (end-to-end test harness)
+
+**Objective:** Create `aggregate.ts` with the full function signature, supersession filter, the Junk-only monetary reducer (Junk events are the only monetary events requiring the `points × stake × junkMultiplier` formula), and `RoundingAdjustment` computation for Junk. Delete `maybeEmitRoundingAdjustment` from `junk.ts`. Establish the test harness for all later phases.
+
+**Scope:**
+- A. Create `src/games/aggregate.ts`. Export `aggregateRound(log: ScoringEventLog, roundCfg: RoundConfig): RunningLedger`. Stub: for non-Junk monetary events, return `money[p] = event.points[p]` (correct formula — not a stub for those events). For `JunkAwarded`, apply `event.points[p] × bet.stake × bet.junkMultiplier`. Compute `RoundingAdjustment` when `points × stake × junkMultiplier` has a per-winner cent remainder; assign remainder to the winner with the lowest `playerId` lexicographically.
+- B. Supersession filter: before the reduce loop, build a `Set<EventId>` of superseded event IDs from `Object.keys(log.supersessions)`. Skip any event whose `id` is in that set. (`supersessions` maps `oldEventId → replacementEventId`; the superseded events are the keys.)
+- C. Delete `maybeEmitRoundingAdjustment` from `src/games/junk.ts` (lines 109–116) and remove its three call sites (lines 164, 175, 197).
+- D. Create `src/games/__tests__/aggregate.test.ts`. Tests: (1) empty log returns zeroed ledger; (2) `JunkAwarded` with known `points`, `stake`, `junkMultiplier` produces correct `money`; (3) `RoundingAdjustment` emitted when remainder exists; (4) superseded event is excluded from ledger; (5) purity test (same input → same output, two calls).
+
+**Fence:** No Nassau / Match Play / Wolf / Skins / Stroke Play orchestration. No `MatchState` threading. No finalizer calls. Only `JunkAwarded` and `RoundingAdjustment` events reduced. `junk.ts` deletion is the only change to an existing engine file.
+
+**Stop-artifact:** Phase 1 tests pass. `tsc --noEmit --strict` zero errors. `grep 'maybeEmitRoundingAdjustment' src/games/junk.ts` → 0.
+
+**Gate to Phase 2:** `aggregateRound` signature stable. Supersession filter path tested. Junk money formula verified against known inputs.
+
+---
+
+##### Phase 2 — Skins + Wolf reduction
+
+**Objective:** Add Skins and Wolf monetary events to the reducer. No orchestration yet — tests construct synthetic event logs.
+
+**Scope:**
+- A. Reduce `SkinWon` events: `money[p] = event.points[p]`. Accumulate to `netByPlayer` and `byBet[event.declaringBet]`.
+- B. Reduce Wolf monetary events: `WolfHoleResolved`, `LoneWolfResolved`, `BlindLoneResolved`. Same formula.
+- C. Tests: Skins synthetic log (2 skins, 4 players, zero-sum). Wolf synthetic log (one lone wolf hole, zero-sum). Mixed Skins + Wolf log (zero-sum across both bets, per-bet slices correct).
+
+**Fence:** No Nassau / Match Play / Stroke Play. No orchestrator loop. No `MatchState` threading.
+
+**Stop-artifact:** All Phase 2 tests pass. `npm run test:run` passes. Zero-sum verified.
+
+**Gate to Phase 3:** Skins and Wolf reducer paths confirmed by test. No regression in Phase 1 tests.
+
+---
+
+##### Phase 3 — Nassau + Match Play with `MatchState` threading
+
+**Objective:** Add orchestration loop and `MatchState` threading for Nassau and Match Play. The orchestrator calls `settleNassauHole` and `settleMatchPlayHole` per hole, threads state, calls finalizers, and feeds the resulting events into the reducer.
+
+**Scope:**
+- A. Implement the per-hole orchestration loop: iterate `hole 1..N` in the event log (using `StrokePlayHoleRecorded` or `NassauHoleResolved` as hole-boundary signals — TBD; see Open items). Call `settleNassauHole` and `settleMatchPlayHole` with threaded `MatchState`.
+- B. Reduce `NassauWithdrawalSettled`, `MatchClosedOut` monetary events.
+- C. Call `finalizeNassauRound` and `finalizeMatchPlayRound` after the last hole; reduce their emitted events.
+- D. Tests: Nassau front+back+overall synthetic scenario (zero-sum). Match Play closeout scenario (zero-sum). Nassau + Match Play combined round (per-bet slices correct).
+
+**Fence:** No Stroke Play. No Skins / Wolf orchestration (those engines are stateless — they are called per-hole without threading).
+
+**Stop-artifact:** Nassau and Match Play per-bet slices correct. `MatchState` threading verified by asserting `MatchClosedOut` appears at the correct hole. Zero-sum on every test.
+
+**Gate to Phase 4:** Orchestration loop reviewed and stable before Stroke Play (which adds `tieRule` dispatch) builds on it.
+
+---
+
+##### Phase 4 — Stroke Play + `tieRule` dispatch + finalizers for all 5 games
+
+**Objective:** Add Stroke Play settlement, `aggregate.ts` owns `tieRule` dispatch per `game_stroke_play.md` §11. Complete the all-5-games zero-sum test.
+
+**Scope:**
+- A. Call `recordStrokePlayHole` per hole; call `settleStrokePlay` (round finalizer) at round end. `aggregate.ts` passes the `tieRule` field to the settler, consistent with §11 ownership.
+- B. Reduce `StrokePlaySettled`, `RoundingAdjustment` (from Stroke Play, distinct from Junk `RoundingAdjustment`), `CardBackResolved`, `TieFallthrough`, `FinalAdjustmentApplied`.
+- C. Skins and Wolf stateless orchestration (call per-hole settle functions in declaration order for those bets; no `MatchState` threading needed).
+- D. All-5-games zero-sum integration test: Skins + Wolf + Stroke Play + Nassau + Match Play + Junk events in a single synthetic round. Assert `Σ netByPlayer === 0`. Assert per-bet slices each independently zero-sum.
+
+**Fence:** No UI wiring. No routing through `src/lib/*`. No changes to any engine file beyond Phase 1's `junk.ts` deletion (already landed).
+
+**Stop-artifact:**
+- All-5-games integration test passes. Zero-sum holds.
+- `npm run test:run` passes — no regression.
+- `npx tsc --noEmit --strict` zero errors.
+- Portability grep on `src/games/aggregate.ts` → 0.
+- Grep gate: `grep 'src/lib/' src/games/aggregate.ts` → 0.
+
+---
+
+#### Open — rules documenter pass pending
+
+The following topics are NOT resolved in this scope pass. They must be resolved before the corresponding phase can close.
+
+- **CTPCarried accumulation formula**: what does `carryPoints` accumulate across sequential par-3 ties? Phase 2 can stub `carryPoints: 0` from `junk.ts` (already present), but correct reduction of `CTPCarried` in `aggregate.ts` requires this formula. Deferred.
+- **CTPCarried "next eligible par-3" resolution logic**: when a carry resolves, which subsequent par-3 receives the accumulated carry? The reducer needs to know when to apply the carry total and to whom. Deferred.
+- **`FinalAdjustmentApplied.targetBet: 'all-bets'` fan-out semantics**: when `targetBet === 'all-bets'`, the reducer must distribute the delta across all bets' `byBet` slices. The fan-out rule (equal split? proportional? each bet gets the full delta?) is not specified in any doc. Deferred.
+- **`byBet` key space for Nassau**: Nassau runs three base matches (front/back/overall) plus presses, all under a single `betId`. Does `byBet[betId]` aggregate all Nassau matches together, or does Nassau require a compound key (`betId + matchId`)? The `RunningLedger` type uses `Record<BetId, ...>` which is a flat key space. The resolution affects Phase 3 design. Deferred.
+- **Zero-sum invariant enforcement**: if `Σ netByPlayer !== 0` after a full recompute, should `aggregateRound` throw, emit a diagnostic event, or return silently with a discrepancy? No doc specifies. Deferred.
+- **Nassau press/carry `junkItems` inheritance**: if a press is opened mid-Nassau, does the press match inherit the parent's `junkItems` and `junkMultiplier` for Junk fan-out purposes? Affects `byBet` accumulation for Junk events declared under a Nassau bet. Deferred.
+
+---
+
+#### Audit reference
+
+AUDIT.md #1 lists `aggregate.ts` as one of the four remaining open files under `src/games/`. #8 closes that item. AUDIT.md #10 names `aggregate.ts` for round-total aggregation; #8 closes #10 fully (Nassau and Match Play land in #5 and #6; `aggregate.ts` is the final piece). #8 is a partial close of AUDIT.md #1 (the fourth remaining file under that item's umbrella; the other three — `nassau.ts`, `match_play.ts`, `junk.ts` — are closed by #5, #6, #7 respectively).
 
 ---
 

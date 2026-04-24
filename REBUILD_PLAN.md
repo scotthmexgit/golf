@@ -1045,23 +1045,23 @@ press.junkMultiplier = parentBet.junkMultiplier
 
 ##### Phase 3 — Nassau + Match Play with `MatchState` threading
 
-**Objective:** Add orchestration loop and `MatchState` threading for Nassau and Match Play. The orchestrator calls `settleNassauHole` and `settleMatchPlayHole` per hole, threads state, calls finalizers, and feeds the resulting events into the reducer.
+**Objective:** Add event-walk orchestration and `MatchState` threading for Nassau and Match Play. Walk the event log in hole order, update `MatchState` per hole-resolved events, call finalizers at end-of-log. No settle-function calls from `aggregateRound`. Reducer paths for resolved events already landed in Phase 1.
 
 Note: The reducer paths for `NassauWithdrawalSettled`, `MatchClosedOut`, and `ExtraHoleResolved` landed in Phase 1 as part of the over-build (Phase 1 switch, lines 132–136). Phase 3 does not re-implement those reducer paths. Phase 3's distinct work is: orchestration loop, `MatchState` threading across 18 holes, Nassau finalizer calls, and `byBet` compound key wiring for Nassau. These are Phase 3 tasks regardless of reducer coverage.
 
 byBet compound key for Nassau: `${betId}::${matchId}` — decided in Topic 4 (REBUILD_PLAN.md line 957). `NassauWithdrawalSettled` IS already in Phase 1's switch (line 135), using simple `event.declaringBet` key. Phase 3 must widen that key to the compound form. Decision is made; no pre-Phase-3 gate required beyond engineer implementation.
 
 **Scope:**
-- A. Implement the per-hole orchestration loop: iterate `hole 1..N` in the event log (using `StrokePlayHoleRecorded` or `NassauHoleResolved` as hole-boundary signals — TBD; see Open items). Call `settleNassauHole` and `settleMatchPlayHole` with threaded `MatchState`.
+- A. Walk the event log in ascending `event.hole` order. For each `NassauHoleResolved` event, update the relevant `MatchState` in `matches[]` (threaded across holes). For each `HoleResolved` (Match Play) event, update the scalar `MatchState`. No settle-function calls from `aggregateRound` — the event log is pre-populated by the caller. `aggregateRound` signature stays `(log: ScoringEventLog, roundCfg: RoundConfig)` — no `HoleState[]` input.
 - B. ~~Reduce `NassauWithdrawalSettled`, `MatchClosedOut` monetary events~~ — reducer paths already in Phase 1 switch. Phase 3 work is: widen the `byBet` key from `event.declaringBet` (simple) to `${event.declaringBet}::${event.matchId}` (compound) for Nassau monetary events (`NassauWithdrawalSettled`, `MatchClosedOut` under Nassau). Widen `RunningLedger.byBet` key type in `types.ts` (authorized in Topic 4 decision). Non-Nassau monetary events keep the simple key.
-- C. Call `finalizeNassauRound` and `finalizeMatchPlayRound` after the last hole; reduce their emitted events.
+- C. Call `finalizeNassauRound` and `finalizeMatchPlayRound` after the last hole; reduce their emitted events. Finalizers are the only engine functions called from `aggregateRound`; they take the accumulated `MatchState` threaded from the event walk.
 - D. Tests: Nassau front+back+overall synthetic scenario (zero-sum, per-match `byBet` slices correct using compound keys). Match Play closeout scenario (zero-sum). Nassau + Match Play combined round (per-bet slices correct).
 
 **Fence:** No Stroke Play. No Skins / Wolf orchestration (those engines are stateless — they are called per-hole without threading).
 
 **Stop-artifact:** Nassau and Match Play per-bet slices correct. `MatchState` threading verified by asserting `MatchClosedOut` appears at the correct hole. Compound `byBet` key verified for Nassau slices (`${betId}::${matchId}`). Zero-sum on every test.
 
-**Gate to Phase 4:** Orchestration loop reviewed and stable before Stroke Play (which adds `tieRule` dispatch) builds on it. `byBet` compound key design decision resolved (see Open items).
+**Gate to Phase 4:** Event-walk orchestration reviewed and stable before Stroke Play (which adds `tieRule` dispatch) builds on it. `byBet` compound key design decision resolved (Topic 4, line 957).
 
 ---
 
@@ -1098,7 +1098,7 @@ The following topics are NOT resolved in this scope pass. They must be resolved 
 - ~~**`byBet` key space for Nassau**~~ — **Resolved** in Topic 4 (line 957): compound key `${betId}::${matchId}`, `byBet` widens to `Record<string, ...>`, nominal alias ceded to engineer. Phase 3 scope item B covers implementation.
 - **Zero-sum invariant enforcement**: if `Σ netByPlayer !== 0` after a full recompute, should `aggregateRound` throw, emit a diagnostic event, or return silently with a discrepancy? No doc specifies. Deferred.
 - **Nassau press/carry `junkItems` inheritance**: if a press is opened mid-Nassau, does the press match inherit the parent's `junkItems` and `junkMultiplier` for Junk fan-out purposes? Affects `byBet` accumulation for Junk events declared under a Nassau bet. Deferred.
-- **Hole-boundary signal for Phase 3 orchestrator**: when `aggregate.ts` drives the per-hole loop, it needs to know when each hole ends. Three options: (a) orchestrator-driven from `roundCfg.holes` (no event needed — drive the loop index); (b) `StrokePlayHoleRecorded` as boundary signal (problematic if Stroke Play not declared); (c) new game-neutral `HoleConfirmed` event (scope expansion). Requires a **pre-Phase-3 researcher micro-pass** to evaluate and decide before Phase 3 engineer work starts. Not a rules question — design call.
+- ~~**Hole-boundary signal for Phase 3 orchestrator**~~ — **Dissolved** (2026-04-24): Interpretation A (pure event-walk, no settle-function calls from `aggregateRound`) makes the hole-boundary question moot. Phase 3 walks the event log in hole order — the boundary is `event.hole` field on each event. No new event type needed. See session log `2026-04-24/005_phase3_interpretation_fork.md`.
 
 ---
 

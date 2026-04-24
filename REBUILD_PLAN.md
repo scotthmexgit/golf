@@ -1026,20 +1026,20 @@ press.junkMultiplier = parentBet.junkMultiplier
 
 ---
 
-##### Phase 2 — Skins + Wolf reduction
+##### Phase 2 — Skins + Wolf validation (test-only)
 
-**Objective:** Add Skins and Wolf monetary events to the reducer. No orchestration yet — tests construct synthetic event logs.
+**Objective:** The reducer paths for Skins (`SkinWon`) and Wolf (`WolfHoleResolved`, `LoneWolfResolved`, `BlindLoneResolved`) monetary events were implemented in Phase 1 as an over-build (Phase 1 scope framing stated "Junk-only reducer"; the engineer implemented the reducer for all 11 monetary events in the same switch block with an inline comment at `aggregate.ts:119–126` documenting the decision). Phase 2's job is to verify those already-landed paths via synthetic event logs. No `aggregate.ts` changes are made in Phase 2.
 
 **Scope:**
-- A. Reduce `SkinWon` events: `money[p] = event.points[p]`. Accumulate to `netByPlayer` and `byBet[event.declaringBet]`.
-- B. Reduce Wolf monetary events: `WolfHoleResolved`, `LoneWolfResolved`, `BlindLoneResolved`. Same formula.
-- C. Tests: Skins synthetic log (2 skins, 4 players, zero-sum). Wolf synthetic log (one lone wolf hole, zero-sum). Mixed Skins + Wolf log (zero-sum across both bets, per-bet slices correct).
+- ~~A. Reduce `SkinWon` events~~ — already implemented in Phase 1 switch (line 128).
+- ~~B. Reduce Wolf monetary events~~ — already implemented in Phase 1 switch (lines 129–131).
+- A. Tests (formerly C): Skins synthetic log (2 skins, 4 players, zero-sum). Wolf synthetic log (one lone wolf hole, zero-sum). Mixed Skins + Wolf log (zero-sum across both bets, per-bet slices correct). **Test file additions only — no changes to `aggregate.ts`.**
 
-**Fence:** No Nassau / Match Play / Stroke Play. No orchestrator loop. No `MatchState` threading.
+**Fence:** No `aggregate.ts` code changes. Test file additions only. No Nassau / Match Play / Stroke Play. No orchestrator loop. No `MatchState` threading.
 
-**Stop-artifact:** All Phase 2 tests pass. `npm run test:run` passes. Zero-sum verified.
+**Stop-artifact:** All Phase 2 tests pass. `npm run test:run` passes. Zero-sum verified. Grep gate: `aggregate.ts` is not modified in this phase (confirm via `git diff --name-only`).
 
-**Gate to Phase 3:** Skins and Wolf reducer paths confirmed by test. No regression in Phase 1 tests.
+**Gate to Phase 3:** Skins and Wolf reducer paths verified by test (not implemented — they were implemented in Phase 1). No regression in Phase 1 tests.
 
 ---
 
@@ -1047,17 +1047,21 @@ press.junkMultiplier = parentBet.junkMultiplier
 
 **Objective:** Add orchestration loop and `MatchState` threading for Nassau and Match Play. The orchestrator calls `settleNassauHole` and `settleMatchPlayHole` per hole, threads state, calls finalizers, and feeds the resulting events into the reducer.
 
+Note: The reducer paths for `NassauWithdrawalSettled`, `MatchClosedOut`, and `ExtraHoleResolved` landed in Phase 1 as part of the over-build (Phase 1 switch, lines 132–136). Phase 3 does not re-implement those reducer paths. Phase 3's distinct work is: orchestration loop, `MatchState` threading across 18 holes, Nassau finalizer calls, and `byBet` compound key wiring for Nassau. These are Phase 3 tasks regardless of reducer coverage.
+
+Open question (byBet compound key — still load-bearing): `aggregate.ts:92` comment notes "Phase 3 widens to compound keys for Nassau (`${betId}::${matchId}`)." `NassauWithdrawalSettled` IS already in Phase 1's switch (line 135), using `event.declaringBet` as the key (simple key, not compound). Phase 3 must widen that key to the compound form. The byBet compound key design decision (Open items below) remains open and is required before Phase 3 engineer scope is finalized.
+
 **Scope:**
 - A. Implement the per-hole orchestration loop: iterate `hole 1..N` in the event log (using `StrokePlayHoleRecorded` or `NassauHoleResolved` as hole-boundary signals — TBD; see Open items). Call `settleNassauHole` and `settleMatchPlayHole` with threaded `MatchState`.
-- B. Reduce `NassauWithdrawalSettled`, `MatchClosedOut` monetary events.
+- B. ~~Reduce `NassauWithdrawalSettled`, `MatchClosedOut` monetary events~~ — reducer paths already in Phase 1 switch. Phase 3 work is: widen the `byBet` key from `event.declaringBet` (simple) to `${event.declaringBet}::${event.matchId}` (compound) for Nassau monetary events (`NassauWithdrawalSettled`, `MatchClosedOut` under Nassau). Widen `RunningLedger.byBet` key type in `types.ts` (authorized in Topic 4 decision). Non-Nassau monetary events keep the simple key.
 - C. Call `finalizeNassauRound` and `finalizeMatchPlayRound` after the last hole; reduce their emitted events.
-- D. Tests: Nassau front+back+overall synthetic scenario (zero-sum). Match Play closeout scenario (zero-sum). Nassau + Match Play combined round (per-bet slices correct).
+- D. Tests: Nassau front+back+overall synthetic scenario (zero-sum, per-match `byBet` slices correct using compound keys). Match Play closeout scenario (zero-sum). Nassau + Match Play combined round (per-bet slices correct).
 
 **Fence:** No Stroke Play. No Skins / Wolf orchestration (those engines are stateless — they are called per-hole without threading).
 
-**Stop-artifact:** Nassau and Match Play per-bet slices correct. `MatchState` threading verified by asserting `MatchClosedOut` appears at the correct hole. Zero-sum on every test.
+**Stop-artifact:** Nassau and Match Play per-bet slices correct. `MatchState` threading verified by asserting `MatchClosedOut` appears at the correct hole. Compound `byBet` key verified for Nassau slices (`${betId}::${matchId}`). Zero-sum on every test.
 
-**Gate to Phase 4:** Orchestration loop reviewed and stable before Stroke Play (which adds `tieRule` dispatch) builds on it.
+**Gate to Phase 4:** Orchestration loop reviewed and stable before Stroke Play (which adds `tieRule` dispatch) builds on it. `byBet` compound key design decision resolved (see Open items).
 
 ---
 
@@ -1069,7 +1073,7 @@ press.junkMultiplier = parentBet.junkMultiplier
 - A. Call `settleStrokePlayHole` per hole (per `src/games/stroke_play.ts:158`); call `finalizeStrokePlayRound(events, config)` at round end (confirmed at `stroke_play.ts:210`, signature `(events: ScoringEvent[], config: StrokePlayCfg): ScoringEvent[]`). `aggregate.ts` passes the `tieRule` field to the settler, consistent with §11 ownership.
 - B. Reduce `StrokePlaySettled`, `RoundingAdjustment` (from Stroke Play, distinct from Junk `RoundingAdjustment`), `CardBackResolved`, `TieFallthrough`, `FinalAdjustmentApplied`.
 - C. Skins and Wolf stateless orchestration (call per-hole settle functions in declaration order for those bets; no `MatchState` threading needed).
-- D. All-5-games zero-sum integration test. Fixture: a **synthetic event log** (not an orchestrator run) representing a 3-hole excerpt of an 18-hole round — a minimal complete scenario where every game type contributes at least one monetary event. Event log is constructed by hand in the test, not emitted by the orchestrator (the orchestrator is tested via Phase 3 scenarios; this test exercises the reducer against a complete known input). Games declared: Skins (1 skin won on hole 2), Wolf (1 hole resolved on hole 1), Stroke Play (round settled after hole 3), Nassau (front-9 match resolved), Match Play (match closedout), Junk (1 Greenie awarded on hole 2). Assert: `Σ netByPlayer === 0` across all events. Assert: each bet's `byBet[betId]` slice independently zero-sums. Assert: Junk `JunkAwarded` applies `stake × junkMultiplier` scaling; all other events do not. Fixture stake values chosen to be integer-clean (no `RoundingAdjustment` needed) to keep the fixture readable. `RoundingAdjustment` is tested separately in Phase 1.
+- D. All-5-games zero-sum integration test. Fixture: a **synthetic event log** (not an orchestrator run) representing a 3-hole excerpt of an 18-hole round — a minimal complete scenario where every game type contributes at least one monetary event. Event log is constructed by hand in the test, not emitted by the orchestrator (the orchestrator is tested via Phase 3 scenarios; this test exercises the reducer against a complete known input). Games declared: Skins (1 skin won on hole 2), Wolf (1 hole resolved on hole 1), Stroke Play (round settled after hole 3), Nassau (front-9 match resolved), Match Play (match closedout), Junk (1 Greenie awarded on hole 2). Assert: `Σ netByPlayer === 0` across all events. Assert: each bet's `byBet[betId]` slice independently zero-sums. Assert: Junk `JunkAwarded` applies `stake × junkMultiplier` scaling; all other events do not. Fixture stake values chosen to be integer-clean (no `RoundingAdjustment` needed) to keep the fixture readable. `RoundingAdjustment` event type is dead schema (see parking-lot item — "RoundingAdjustment existence question" in Open items); Phase 4 fixture is integer-clean and does not emit `RoundingAdjustment`.
 
 **Fence:** No UI wiring. No routing through `src/lib/*`. No changes to any engine file beyond Phase 1's `junk.ts` deletion (already landed).
 

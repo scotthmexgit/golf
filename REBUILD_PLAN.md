@@ -447,7 +447,7 @@ The `matchFormat` type widening is a prerequisite that belongs in Phase 1 becaus
 **Caller convention (from #12):** `HoleState.withdrew[N] = [A]` on the transition hole only. Subsequent `HoleState.withdrew` arrays do not include A. `TeamSizeReduced.hole = N` (transition hole = first affected hole) matches § 9's "subsequent holes" phrasing.
 
 **Scope:**
-- A. When `state.withdrew` on hole N contains a player belonging to a best-ball team, emit `TeamSizeReduced` with `{ hole: hole.hole, teamId, remainingSize: 1 }`. No `teamCourseHandicap` call — that function was deleted 2026-04-23. Post-deletion behavior: the remaining player's individual `courseHcp` is already used by the existing `bestNet` computation; no additional handicap logic required.
+- A. When `state.withdrew` on hole N contains a player belonging to a best-ball team, emit `TeamSizeReduced` with `{ hole: hole.hole, teamId: 'team1' | 'team2', remainingSize: 1 }`. `teamId` is `'team1'` when the withdrawing player is in `cfg.teams![0]`, `'team2'` when in `cfg.teams![1]`. No `teamCourseHandicap` call — that function was deleted 2026-04-23. Post-deletion behavior: the remaining player's individual `courseHcp` is already used by the existing `bestNet` computation; no additional handicap logic required.
 
 The engine excludes `withdrew` players from `bestNet` regardless of gross presence — `withdrew` is the authoritative signal for team composition. In practice the caller sets `withdrew` without a gross for the transitioning player, but the engine does not rely on gross being absent. `TeamSizeReduced` is the only Phase 4d-specific event on hole N; normal scoring events (`HoleResolved` or `HoleHalved`) still fire per hole outcome.
 
@@ -483,19 +483,21 @@ Final gate greps:
 
 ### #7 — Junk engine
 
-**Audit references**: closes #14 (junk engine-side rewrite); partially closes #1.
+> Scope-first pass completed 2026-04-24. Decisions A and B locked; topics 3, 4, 10, 11, 12 resolved; phase breakdown drafted. Rules-documenter pass pending (Topics 2, 5, 6, 7, 8, 9 — see "Open" list below).
+
+**Audit references**: partially closes #14 (engine-side rewrite only; cutover of `src/lib/junk.ts` is #11); partially closes #1 (Junk engine is one of four remaining open items under #1's umbrella).
 
 **Acceptance criteria**:
 - `src/games/junk.ts` implements `settleJunkHole(hole, config, roundCfg)` and any finalization helpers per `docs/games/game_junk.md` § 5.
 - All seven Junk kinds per `JunkKind` type (`ctp | longestDrive | greenie | sandy | barkie | polie | arnie`). `groupResolve` vs `carry` CTP tie-handling per `ctpTieRule`. Longest-drive tie split with `RoundingAdjustment` fallback. Every event is zero-sum within the declaring-bet's bettor set.
 - Bet-id lookup uses `b.id === cfg.id` (from #4), never reference identity.
 - Emits only existing `ScoringEvent` variants: `JunkAwarded`, `CTPWinnerSelected`, `CTPCarried`, `LongestDriveWinnerSelected`, `RoundingAdjustment`, `FieldTooSmall`. **No new variants added** (confirmed by audit — `events.ts` already covers Junk). If the rule file names a variant not in `events.ts`, the engineer stops and escalates — no invention.
-- Test file `src/games/__tests__/junk.test.ts`: § 10 Worked Example verbatim, every § 9 edge case, every § 12 Test Case. Zero-sum asserted.
+- Test file `src/games/__tests__/junk.test.ts`: § 12 Tests 1–5 (verbatim). Zero-sum asserted.
 - `tsc --noEmit --strict` passes. Portability grep empty.
 - **No changes to Skins/Wolf/Stroke Play/Nassau/Match Play engines. No changes to `docs/games/game_junk.md`. No deletion of `src/lib/junk.ts` — that is cutover (#11).**
 
 **Files touched**:
-- Create: `src/games/junk.ts`.
+- Delete and replace: `src/games/junk.ts` (rebuild — see Decision A below).
 - Create: `src/games/__tests__/junk.test.ts`.
 
 **Dependencies**: #4 (string-id pattern). Can run in parallel with #5 or #6 on a different branch if schedule permits.
@@ -504,6 +506,255 @@ Final gate greps:
 
 **Risk flags**:
 - Rule file has the drift closures from Round 5 Sub-Task 2. Should be cleaner to implement than Nassau or Match Play.
+- Naming divergence between `game_junk.md` § 5 pseudocode and canonical `types.ts` fields — see Naming canon check below. Engineer uses canonical `types.ts` names, not the doc pseudocode names.
+
+---
+
+#### Decision A — Rebuild (delete existing 75 LOC)
+
+**Decision: Rebuild.** The existing `src/games/junk.ts` (75 lines) is deleted and replaced.
+
+**Reasoning:**
+- 3 of 7 Junk kinds are implemented (CTP, Greenie, Longest Drive). The 4 missing kinds (Sandy, Barkie, Polie, Arnie) are not present.
+- The existing 3 items use inlined `if` blocks per kind. `docs/games/game_junk.md` § 5 specifies a `resolveJunkWinner` dispatch switch over `JunkKind`. Adding 4 more `if` blocks diverges further from the doc shape; refactoring the existing 3 items into the dispatch then adding the remaining 4 is structurally a rebuild of the loop body.
+- The 75 LOC contains no state accumulated across the 3 working items that would be lost by deletion; the whole file is a pure function with helpers.
+- Rebuild is cleaner than a partial completion that leaves the implementation shape misaligned with the spec.
+
+**Engineer action**: delete `src/games/junk.ts` entirely; create a fresh file following the `resolveJunkWinner` dispatch structure from § 5.
+
+---
+
+#### Decision B — §12 Tests 1–5 are the stop-artifact (B1)
+
+**Decision: B1 — §12 passes = #7 closes.** Sandy, Barkie, Polie, and Arnie ship in a follow-up item (see #7b / addendum, to be created after the rules-documenter pass).
+
+**Reasoning:**
+- §12 Tests 1–5 exercise CTP (bookkeeping), Greenie (two declaring bets), CTP without Greenie (GIR toggle), non-bettor CTP, and Longest Drive tie. These cover the most common in-round scenarios and the full declaring-bet fan-out logic.
+- Sandy, Barkie, Polie, and Arnie have unresolved rules-documenter questions: §5 vs §6 tie-handling conflict, Super Sandy point doubling, Polie three-putt doubled-loss event schema. Implementing them before those decisions risks engine drift that requires rework.
+- B2 (all 7 items before close) would make the rules-documenter pass a hard dependency before #7 can close, blocking #8 and downstream.
+- The junk engine is immediately usable for the most common case (CTP, Greenie, Longest Drive) after #7 closes under B1. Sandy/Barkie/Polie/Arnie are additive.
+
+**Consequence**: Sandy, Barkie, Polie, Arnie are implemented in their resolver functions (the switch case structure lands as scaffolding — functions present but returning `null` until the rules pass resolves the open topics). They are NOT gated by §12.
+
+---
+
+#### Topic 3 — Bookkeeping event emission
+
+**Decision: `settleJunkHole` emits bookkeeping events (`CTPWinnerSelected`, `LongestDriveWinnerSelected`) as part of its return value.**
+
+The return type is `ScoringEvent[]` (not the narrowed `JunkAwarded[]` used in the current 75 LOC). Bookkeeping events live in the same return slice because:
+- `CTPWinnerSelected` and `LongestDriveWinnerSelected` are fired once per hole regardless of declaring-bet count (§ 9: "fires exactly once per hole"). They are logically coupled to the same hole resolution that produces `JunkAwarded` events.
+- Pushing bookkeeping events into a separate caller layer would require the caller to know Junk-internal rules (when does CTP fire? when does LD fire?) that belong in `junk.ts`.
+- The `game_junk.md` § 5 pseudocode shows the full event list returned from `settleJunkHole`; bookkeeping events appear first, `JunkAwarded` events fan out from them.
+
+The caller layer (bridge item #12, or any future hole-settlement orchestrator) receives the full `ScoringEvent[]` and appends it to the event log; it does not need to split bookkeeping from monetary events.
+
+---
+
+#### Topic 4 — `CTPCarried` in #7 or deferred
+
+**Decision: `CTPCarried` emission is in scope for #7 but is AC-pending until the rules-documenter pass resolves §5/§6 carry handling.**
+
+Rationale: The `CTPCarried` event type already exists in `events.ts`. Emitting it on the transition hole (when `ctpTieRule === 'carry'` and a CTP ties) requires knowing only: (a) the tie occurred, (b) the `fromHole`, and (c) the `carryPoints` accumulation. Items (a) and (b) are specifiable without the full Final Adjustment design. Item (c) requires understanding how `carryPoints` accumulates across multiple carry transitions — this is the rules-documenter dependency.
+
+The Phase 2 scaffold includes the `carry` branch with an AC-pending note. The `CTPCarried` emission is implemented as part of Phase 2 once the rules pass confirms the carry accumulation formula. If the rules pass is not complete before Phase 2, the `carry` branch emits a `CTPCarried` with `carryPoints: 0` as a stub (compilable, non-zero-sum-breaking placeholder) and is flagged as incomplete in the test file.
+
+---
+
+#### Topic 10 — Return type
+
+**Target return type for `settleJunkHole`: `ScoringEvent[]`.**
+
+Based on Topic 3 (bookkeeping events emitted by `settleJunkHole`) and Topic 4 (`CTPCarried` emitted in the same call), the return type must be the full discriminated union, not the narrowed `JunkAwarded[]` used in the current 75 LOC. The existing `JunkAwarded[]` narrowing is a defect in the current implementation — bookkeeping events are currently not emitted by the function at all.
+
+Signature: `settleJunkHole(hole: HoleState, roundCfg: RoundConfig, junkCfg: JunkRoundConfig): ScoringEvent[]`
+
+---
+
+#### Topic 11 — `aggregate.ts` dependency for #7 tests
+
+**Decision: event-log assertion is sufficient for #7's test gate. No `aggregate.ts` stub is required.**
+
+§12 Tests 1–5 assert on emitted events (event kinds, points maps, zero-sum on `event.points`, `Number.isInteger` on deltas). They do not assert on money totals produced by multiplying `points × stake × junkMultiplier` — that aggregation step is `aggregate.ts` territory (#8). The §12 "money at display" figures in the worked example (Test 1) are for human verification; the test asserts `points` values and zero-sum, not rendered money.
+
+`aggregate.ts` is not a dependency for #7 to close. Test 1's money assertions are written as comments, not executable assertions, until #8 lands.
+
+---
+
+#### Topic 12 — Test gate
+
+**Stop-artifact: §12 Tests 1–5 all pass.**
+
+- Test 1: § 10 worked example verbatim (CTP + Greenie fan-out across two declaring bets, bookkeeping events, zero-sum, `Number.isInteger` on all deltas).
+- Test 2: Parallel awards (two declaring bets, one `CTPWinnerSelected`, two `JunkAwarded`).
+- Test 3: CTP without Greenie (GIR toggle OFF).
+- Test 4: Non-bettor CTP winner (zero `JunkAwarded` events).
+- Test 5: Tied Longest Drive with 3 eligible bettors (`RoundingAdjustment` present; integer-clean points).
+
+Sandy/Barkie/Polie/Arnie tests are NOT required for #7 close. They are scaffolded as skipped (`it.skip`) in the test file, to be unskipped when the rules-documenter pass is complete and the follow-up item (#7b) is active.
+
+---
+
+#### Naming canon check
+
+Canonical field names from `src/games/types.ts` (verbatim):
+
+**Bets collection on `RoundConfig`** (line 143):
+```
+  bets: BetSelection[]
+```
+
+**Participant list on `BetSelection`** (line 130):
+```
+  participants: PlayerId[]
+```
+
+**Divergence from `game_junk.md` § 5 pseudocode:**
+- Doc pseudocode uses `roundCfg.declaringBets` — canonical name is `roundCfg.bets`.
+- Doc pseudocode uses `bet.bettors` — canonical name is `bet.participants`.
+
+The existing `junk.ts` (75 LOC) already uses the canonical names (`roundCfg.bets`, `bet.participants`), so no runtime defect exists today. The doc pseudocode is the source of the naming drift. **Engineer uses canonical `types.ts` names.** This is a pointer for the rules-documenter to reconcile the pseudocode in a future doc pass; it is not a blocker for #7.
+
+---
+
+#### Open — rules-documenter pass pending
+
+The following topics are NOT resolved in this pass. They must be resolved before #7b (Sandy/Barkie/Polie/Arnie) can close. They do NOT block #7 (B1 decision above).
+
+- **Topic 2**: §5 vs §6 tie-handling conflict for Sandy, Barkie, Polie, Arnie. §5 `isSandy` returns `null` when candidates > 1 (no award on tie). §6 "all tied winners collect" formula contradicts. Rules doc must state which is authoritative.
+- **Topic 5**: `ctpTieRule` optionality fix — typed optional (`ctpTieRule?: 'groupResolve' | 'carry'`) in `types.ts`, but § 4 of `game_junk.md` states the default is `'groupResolve'`. Field should be required with a default expressed in the setup layer, or the optional must be treated as `?? 'groupResolve'` everywhere it is read. Rules-doc must clarify.
+- **Topic 6**: Super Sandy point doubling mechanism — §7 states "winner's points × 2" and "each loser's debit × 2 (zero-sum preserved)." The doubling is at the `points` level (event stores doubled values) vs. a separate `superSandy: boolean` flag on the event. Schema decision needed.
+- **Topic 7**: Polie invoked + three-putt doubled loss — §7 states "a three-putt after invocation doubles the loss." The event schema for the doubled-loss case is unspecified. Is there a separate event, or does the `JunkAwarded` event carry a `doubled: boolean` flag?
+- **Topic 8**: Multi-bet fan-out event ordering guarantee — when multiple declaring bets declare the same Junk kind, §9 states `JunkAwarded` events "fan out" from a single raw-award event. The ordering of those fan-out events relative to each other and relative to the bookkeeping event is not specified. Does order matter for `aggregate.ts`?
+- **Topic 9**: Non-bettor CTP → Greenie propagation rule — §9 states "non-bettor CTP → `CTPWinnerSelected` records the winner for bookkeeping; zero `JunkAwarded` events emit." If `ctpWinner` is a non-bettor, does Greenie also suppress (since Greenie derives from CTP)? The §9 edge case is silent on this.
+
+---
+
+#### Rules decisions (rules-pass 2026-04-24)
+
+**Naming canon for plan pseudocode:** Use canonical `types.ts` names throughout — `roundCfg.bets` (not `declaringBets`), `bet.participants` (not `bettors`). Code diverges from `game_junk.md` § 5 pseudocode; the code names are authoritative.
+
+##### Topic 2 — §5 vs §6 tie-handling for Sandy, Barkie, Polie, Arnie
+
+**Decision: §6 is authoritative. §5 is superseded for Sandy/Barkie/Polie/Arnie tie cases.**
+
+§6 contains an explicit tie table drafted specifically to handle all Junk kinds. For Sandy/Barkie/Polie/Arnie it states: "all tied winners collect; with `N` bettors and `w` tied winners, each winner's points = `N − w`, each loser's points = `−w`; zero-sum holds." §5's `resolveJunkWinner` dispatch (and each `isSandy`/`isBarkie`/`isPolie`/`isArnie` function) returns `null` when `candidates.length !== 1` — that is a single-winner constraint in the dispatch helper, written before §6's tie table was developed. The tie table in §6 is the later, more specific specification; it takes precedence.
+
+**Engine consequence for #7b:** `isSandy`, `isBarkie`, `isPolie`, `isArnie` must be revised to return `PlayerId | PlayerId[] | null` (or the calling layer must inspect the full candidate list). The simplest approach is: the individual resolver returns the full `candidates` array (possibly empty, single, or multi), and `settleJunkHole` applies the §6 formula when `candidates.length >= 1`. Zero-sum is guaranteed by the formula. No change to CTP or Longest Drive tie handling — those are governed by separate §6 rows.
+
+**Authority:** `game_junk.md` §6 (tie table, Sandy/Barkie/Polie/Arnie row); §5 pseudocode is informative but superseded for the multi-candidate case.
+
+##### Topic 5 — ctpTieRule optionality
+
+**Decision: (a) Engine-side default. No change to `types.ts`.**
+
+`types.ts` line 119 declares `ctpTieRule?: 'groupResolve' | 'carry'` (optional). `game_junk.md` §4 and §7 both state the default is `'groupResolve'`. The engine resolves `undefined` via `junkCfg.ctpTieRule ?? 'groupResolve'` wherever `ctpTieRule` is read. This requires no types.ts change, avoids a breaking schema change, and is consistent with how other optional config fields with documented defaults are handled in the codebase.
+
+Option (b) — making `ctpTieRule` required in `types.ts` — is rejected. It would require all existing `JunkRoundConfig` construction sites to add the field explicitly, is a larger blast radius for a one-field default, and provides no runtime safety benefit over the `??` coalesce.
+
+**No Phase 1 scope addition required.** The engine author uses `?? 'groupResolve'` in Phase 2 where `ctpTieRule` is first read.
+
+**Authority:** `game_junk.md` §4 (default annotation), §7 (`ctpTieRule` default); `types.ts` line 119.
+
+##### Topic 6 — Super Sandy point doubling
+
+**Decision: The multiplier lives at the `pushAward` call site. `pushAward` receives a `multiplier` argument (default `1`; Super Sandy passes `2`) and computes `points × multiplier` for every player in `bet.participants`. No new event type is needed.**
+
+`game_junk.md` §7 states: "winner's points × 2; each loser's debit × 2 (zero-sum preserved)." The event (`JunkAwarded`) stores the already-multiplied `points` values. Zero-sum is preserved because `(N − 1) × m − (N − 1) × m = 0` for any multiplier `m`.
+
+The alternative — doubling at stake level (`junkMultiplier × 2`) — is rejected. It would alter money rendering for every item under the declaring bet, not just the Super Sandy event, and contradicts the doc's "event stores `points × 2`" phrasing.
+
+Call chain: `isSandy` detects the fairway-bunker condition → `settleJunkHole` determines `multiplier = 2` when `junkCfg.superSandyEnabled && hole.fairwayBunker[winner]` → `pushAward` applies `points × multiplier` → `JunkAwarded.points` stores the doubled values.
+
+`JunkAwarded` in `events.ts` requires no new field. The schema is unchanged.
+
+**Authority:** `game_junk.md` §7 (Super Sandy variant description); `events.ts` `JunkAwarded` type (no `doubled` field present or needed).
+
+##### Topic 7 — Polie invoked + three-putt doubled loss
+
+**Decision: Defer to #7b. File parking-lot item. No schema change in #7.**
+
+`game_junk.md` §7 states "a three-putt after invocation doubles the loss." The doc does not specify what "doubles the loss" means at the event-schema level. §11's `JunkAwarded` shape — `{ kind, timestamp, hole, actor, declaringBet, junk, winner, points }` — has no `doubled` field. `events.ts` has no `doubled` field on `JunkAwarded` and no separate Polie three-putt event type.
+
+Option (a) — `doubled: boolean` on `JunkAwarded` — is a breaking schema change to `events.ts` that must be reviewed against the exhaustive-narrowing test constraint (line 8 of `events.ts`) and affects all consumers of `JunkAwarded`. Option (b) — a new event type — is also a schema change. Both require a rules-documenter ruling on what "doubles the loss" means mechanically (is it losers only, or winner + losers, does zero-sum still hold?).
+
+The three-putt Polie variant is a rare edge case with no §11 coverage and no §12 test case for it. Deferring to #7b keeps #7's schema footprint clean and groups this decision with the other Sandy/Barkie/Polie/Arnie rules.
+
+**Parking-lot item filed** in `IMPLEMENTATION_CHECKLIST.md`: Polie three-putt doubled-loss schema — rules-pass needed before #7b implements `isPolie`; specify whether "doubles the loss" applies to losers only (zero-sum preserved) or all parties; confirm whether `JunkAwarded.doubled: boolean` or a separate event type is the right carrier.
+
+##### Topic 8 — Multi-bet fan-out ordering
+
+**Decision: Declaration order in `roundCfg.bets` (array iteration order). No sort is applied.**
+
+When one hole produces N `JunkAwarded` events for the same Junk kind (one per declaring bet), the events are emitted in the order `roundCfg.bets` is iterated — i.e., the array's natural declaration order. This is deterministic given a fixed `roundCfg.bets` array, requires no sorting pass, and is consistent with the loop structure in the §5 pseudocode.
+
+**Bookkeeping-before-awards rule:** For a given Junk kind, the bookkeeping event (`CTPWinnerSelected` or `LongestDriveWinnerSelected`) is emitted exactly once, before any `JunkAwarded` fan-out events for that kind. Within the fan-out, bet-array iteration order applies. This ordering is a test-assertion requirement: any test that asserts on event index positions must respect this rule.
+
+`aggregate.ts` (#8) sums by `declaringBet` identity, not by event position, so ordering does not affect settlement correctness. The ordering rule exists solely for deterministic test assertions.
+
+**Authority:** `game_junk.md` §9 ("fires exactly once per hole"); §5 pseudocode loop structure.
+
+##### Topic 9 — Non-bettor CTP → Greenie propagation
+
+**Decision: If the CTP winner is not in `bet.participants` for a given declaring bet, no Greenie is awarded for that bet, regardless of GIR status. The `CTPWinnerSelected` bookkeeping event still fires exactly once.**
+
+`game_junk.md` §9 states: non-bettor CTP → "`CTPWinnerSelected` records the winner for bookkeeping; zero `JunkAwarded` events emit." Greenie derives from CTP via the `isGreenie → isCTP` chain in §5. Because the winner check (`if (!bet.participants.includes(winner)) continue`) precedes Greenie emission in the fan-out loop, Greenie is suppressed by the same condition that suppresses CTP.
+
+**§12 Test 4 confirmation:** Test 4 asserts zero `JunkAwarded` events when a non-bettor wins CTP. Test 4's bettor set is `{Bob, Carol, Dave}` with `junkItems = ['ctp']`. If `junkItems` had included `'greenie'`, the same zero-`JunkAwarded` result would hold — no Greenie can emit if no CTP `JunkAwarded` emits for that bet. This is consistent with the decision.
+
+**Authority:** `game_junk.md` §9 (non-bettor CTP edge case); §12 Test 4 (zero `JunkAwarded` assertion).
+
+---
+
+#### Phase breakdown — #7 Junk engine (rebuild + B1)
+
+##### Phase 1 — Delete old file, scaffold engine per doc shape
+
+**Objective:** Delete `src/games/junk.ts`, create a new file with the `resolveJunkWinner` dispatch switch from § 5, implement CTP + Greenie + Longest Drive (the 3 working items from the 75 LOC) using the canonical function shapes. Implement `settleJunkHole` with `ScoringEvent[]` return type and bookkeeping event emission for CTP and Longest Drive.
+
+**Scope:**
+- A. Delete `src/games/junk.ts`.
+- B. Create `src/games/junk.ts` with: `isCTP`, `isLongestDrive`, `isGreenie`, `isSandy` (stub → returns `null`), `isBarkie` (stub), `isPolie` (stub), `isArnie` (stub). Full `resolveJunkWinner` switch present; Sandy/Barkie/Polie/Arnie cases return `null` (AC-pending rules pass).
+- C. `settleJunkHole(hole: HoleState, roundCfg: RoundConfig, junkCfg: JunkRoundConfig): ScoringEvent[]` — emits `CTPWinnerSelected` (bookkeeping, once per awarded CTP), `LongestDriveWinnerSelected` (bookkeeping, once per awarded LD), and `JunkAwarded` fan-out per `(roundCfg.bets × junkKind)`. Uses `bet.participants` (canonical), not `bet.bettors` (doc pseudocode).
+- D. Create `src/games/__tests__/junk.test.ts` — stub file with a single `it('has a test file', () => expect(true).toBe(true))`.
+
+**Fence:** No CTP carry logic, no Longest Drive tie `RoundingAdjustment`, no Sandy/Barkie/Polie/Arnie beyond stubs. No changes to any other engine file.
+
+**Stop-artifact:** `tsc --noEmit --strict` zero errors. Portability grep → 0. Old `junk.ts` absent from repo (confirm via `git status`). New file present and compilable.
+
+**Gate to Phase 2:** `resolveJunkWinner` switch compiles with all 7 arms. `settleJunkHole` signature stable (return type `ScoringEvent[]`, not `JunkAwarded[]` — this is a breaking change from the 75 LOC; must be confirmed before Phase 2 builds on it).
+
+---
+
+##### Phase 2 — CTP + Greenie + Longest Drive (with bookkeeping and tie handling)
+
+**Objective:** Implement CTP (including `CTPWinnerSelected` bookkeeping), Greenie, and Longest Drive (including tie split and `RoundingAdjustment`). Implement `CTPCarried` emission stub (AC-pending rules pass). Wire §12 Tests 1–5.
+
+**Scope:**
+- A. CTP: emit `CTPWinnerSelected` (once per hole, regardless of declaring-bet count) before the `JunkAwarded` fan-out. `gir` field on `CTPWinnerSelected` sourced from `junkCfg.girEnabled && hole.gir[winner]`.
+- B. Greenie: derives from CTP per `isCTP` result and `junkCfg.girEnabled`. Fan-out per declaring bet same as CTP.
+- C. Longest Drive: emit `LongestDriveWinnerSelected` (once per hole) before `JunkAwarded` fan-out. Tie handling: `w` tied winners, each winner `points = N − w`, each loser `points = −w`; zero-sum holds. When `(points × stake × junkMultiplier)` has a per-winner cent remainder, emit `RoundingAdjustment` routing remainder to the tied winner with the lowest `playerId` lexicographically.
+- D. CTP carry branch: when `junkCfg.ctpTieRule === 'carry'` and a CTP tie exists (UI has not selected `ctpWinner`), emit `CTPCarried` with `hole: hole.hole`, `fromHole: hole.hole`, `carryPoints: 0` (stub — AC pending rules pass). Mark in test file as `// AC-pending: rules pass needed for carry accumulation formula`.
+- E. Tests: §12 Test 1 (worked example), Test 2 (parallel awards), Test 3 (GIR toggle OFF), Test 4 (non-bettor CTP), Test 5 (Longest Drive tie). All five pass. Zero-sum asserted on `event.points` for every `JunkAwarded`.
+
+**Fence:** Sandy/Barkie/Polie/Arnie stubs remain returning `null`. `CTPCarried` carry-accumulation logic is `carryPoints: 0` stub only. No `aggregate.ts` dependency.
+
+**Stop-artifact:**
+- §12 Tests 1–5 all pass (this is the #7 close gate per Decision B1).
+- `npm run test:run` passes — net-new tests from Phase 2 must not break any existing test.
+- `npx tsc --noEmit --strict` zero errors. Portability grep → 0.
+- Zero-sum assertion holds on every `event.points` map in the test file.
+- `Number.isInteger` holds for every `points[p]` and every `RoundingAdjustment.delta`.
+- Grep gate: `grep 'bet\.bettors' src/games/junk.ts` → 0 (no doc-pseudocode name leaked into engine).
+- Grep gate: `grep 'declaringBets' src/games/junk.ts` → 0 (canonical `roundCfg.bets` used throughout).
+
+**Gate to Phase 3 (Sandy/Barkie/Polie/Arnie — AC pending rules pass):** #7 is CLOSED at Phase 2 stop-artifact. Phase 3 is item #7b (follow-up), gated on the rules-documenter pass completing Topics 2, 5, 6, 7, 8, 9.
+
+---
+
+##### Phase 3 (follow-up item #7b — AC pending rules documenter pass)
+
+Sandy, Barkie, Polie, and Arnie implementation. Not in scope for #7 close. Full AC to be drafted after the rules-documenter pass resolves Topics 2, 5, 6, 7, 8, 9 listed above. Skipped tests in `junk.test.ts` (`it.skip`) serve as the implementation spec placeholders. Per the rules-pass decisions (2026-04-24): §6 governs Sandy/Barkie/Polie/Arnie ties (all tied winners collect, `N − w` / `−w` formula, zero-sum); Super Sandy doubling applies via `multiplier = 2` passed to `pushAward` (no new event type); Polie three-putt doubled-loss schema is parking-lot-deferred and must be resolved before `isPolie` is unskipped.
 
 ---
 

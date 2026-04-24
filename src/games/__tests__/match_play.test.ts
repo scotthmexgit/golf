@@ -915,3 +915,234 @@ describe('§ Phase 4c Test 5 — forfeit triggers closeout (HoleForfeited before
     expect(match.closedOut).toBe(true)
   })
 })
+
+// ─── Phase 4d — TeamSizeReduced (partner withdrawal) ─────────────────────────
+//
+// Spec source: REBUILD_PLAN.md § Phase 4d
+// Caller convention: HoleState.withdrew[N] = [A] on the transition hole only.
+// Subsequent holes have withdrew = [] for player A.
+// Persistent exclusion of A from hole N+1 onward handled by Phase 4c bestNet
+// filter (A has no gross from N+1 onward per caller convention).
+//
+// Pre-write arithmetic:
+//
+// Hole 3 (transition — alice withdrew):
+//   cfg.teams = [[alice,bob],[carol,dave]], state.withdrew = ['alice']
+//   Phase 4d: alice excluded from bestNet via withdrew filter (regardless of gross)
+//   alice gross = 2 (present but overridden by withdrew exclusion), bob=3, carol=4, dave=5
+//   bestNet(team1) = min(bob=3) = 3   (alice excluded by withdrew)
+//   bestNet(team2) = min(carol=4,dave=5) = 4
+//   winner = 'team1'; holesUp = +1
+//   TeamSizeReduced fires: { teamId: 'team1', remainingSize: 1 }
+//   HoleResolved fires:    { winner: 'team1' }
+//   No points on either event — Σ points = 0 ✓
+//
+// Hole 4 (subsequent — withdrew = [], alice has no gross):
+//   state.withdrew = [] — alice absent via Phase 4c gross filter
+//   alice gross absent; bob=4, carol=5, dave=6
+//   bestNet(team1) = min(bob=4) = 4
+//   bestNet(team2) = min(carol=5,dave=6) = 5
+//   winner = 'team1'; holesUp = +2
+//   No TeamSizeReduced (withdrew is empty)
+//   HoleResolved fires: { winner: 'team1' }
+//   Σ points = 0 ✓
+
+describe('Phase 4d — best-ball partner withdrawal emits TeamSizeReduced', () => {
+  const alice = 'alice', bob = 'bob', carol = 'carol', dave = 'dave'
+  const cfg = makeCfg({
+    id: 'mp-4d',
+    format: 'best-ball',
+    appliesHandicap: false,
+    playerIds: [alice, bob, carol, dave],
+    teams: [[alice, bob], [carol, dave]],
+  })
+  const roundCfg = makeRoundCfg(cfg)
+
+  // Hole 3: alice withdraws. alice gross present but withdrew overrides bestNet exclusion.
+  const h3: ReturnType<typeof makeHole> = {
+    ...makeHole(3, 5, { [alice]: 2, [bob]: 3, [carol]: 4, [dave]: 5 }),
+    withdrew: [alice],
+  }
+  // Hole 4: subsequent hole, withdrew=[], alice has no gross (caller convention).
+  const h4: ReturnType<typeof makeHole> = {
+    ...makeHole(4, 3, { [bob]: 4, [carol]: 5, [dave]: 6 }),
+    gross: { [bob]: 4, [carol]: 5, [dave]: 6 },
+    withdrew: [],
+  }
+
+  const result3 = settleMatchPlayHole(h3, cfg, roundCfg, initialMatch(cfg))
+  const result4 = settleMatchPlayHole(h4, cfg, roundCfg, result3.match)
+
+  it('TeamSizeReduced fires on hole 3 with teamId=team1, remainingSize=1', () => {
+    const tsr = result3.events.filter(e => e.kind === 'TeamSizeReduced')
+    expect(tsr).toHaveLength(1)
+    const ev = tsr[0] as { teamId: string; remainingSize: number; hole: number }
+    expect(ev.teamId).toBe('team1')
+    expect(ev.remainingSize).toBe(1)
+    expect(ev.hole).toBe(3)
+  })
+
+  it('hole 3: remaining player (bob) score used — HoleResolved winner=team1', () => {
+    const resolved = result3.events.filter(e => e.kind === 'HoleResolved')
+    expect(resolved).toHaveLength(1)
+    expect((resolved[0] as { winner: string }).winner).toBe('team1')
+    expect(result3.match.holesUp).toBe(1)
+    expect(result3.match.holesPlayed).toBe(1)
+  })
+
+  it('hole 3: zero-sum across all events (TeamSizeReduced and HoleResolved have no points)', () => {
+    const total = result3.events.reduce((sum, e) => {
+      const pts = (e as { points?: Record<string, number> }).points ?? {}
+      return sum + Object.values(pts).reduce((s, v) => s + v, 0)
+    }, 0)
+    expect(total).toBe(0)
+  })
+
+  it('hole 4: no TeamSizeReduced (withdrew is empty; alice absent via gross filter)', () => {
+    const tsr = result4.events.filter(e => e.kind === 'TeamSizeReduced')
+    expect(tsr).toHaveLength(0)
+  })
+
+  it('hole 4: HoleResolved winner=team1 using only bob vs carol/dave (alice excluded)', () => {
+    const resolved = result4.events.filter(e => e.kind === 'HoleResolved')
+    expect(resolved).toHaveLength(1)
+    expect((resolved[0] as { winner: string }).winner).toBe('team1')
+    expect(result4.match.holesUp).toBe(2)
+    expect(result4.match.holesPlayed).toBe(2)
+  })
+
+  it('hole 4: zero-sum across all events', () => {
+    const total = result4.events.reduce((sum, e) => {
+      const pts = (e as { points?: Record<string, number> }).points ?? {}
+      return sum + Object.values(pts).reduce((s, v) => s + v, 0)
+    }, 0)
+    expect(total).toBe(0)
+  })
+})
+
+// ─── Phase 4d — team2 branch: carol withdraws on hole 3, teamId='team2' ──────
+//
+// Pre-write arithmetic:
+//   cfg.teams = [[alice,bob],[carol,dave]], state.withdrew = ['carol']
+//   carol excluded from bestNet via withdrew filter (regardless of gross)
+//   carol gross=2 (present but overridden), dave=3, alice=4, bob=5
+//   bestNet(team1) = min(alice=4, bob=5) = 4
+//   bestNet(team2) = min(dave=3) = 3   (carol excluded by withdrew)
+//   winner = 'team2'; holesUp = -1
+//   TeamSizeReduced fires: { teamId: 'team2', remainingSize: 1 }
+//   HoleResolved fires:    { winner: 'team2' }
+
+describe('Phase 4d — team2 branch: carol withdraws, TeamSizeReduced fires with teamId=team2', () => {
+  const alice = 'alice', bob = 'bob', carol = 'carol', dave = 'dave'
+  const cfg = makeCfg({
+    id: 'mp-4d-t2',
+    format: 'best-ball',
+    appliesHandicap: false,
+    playerIds: [alice, bob, carol, dave],
+    teams: [[alice, bob], [carol, dave]],
+  })
+  const roundCfg = makeRoundCfg(cfg)
+
+  // carol withdraws on hole 3; carol gross present but withdrew overrides bestNet exclusion.
+  const h3: ReturnType<typeof makeHole> = {
+    ...makeHole(3, 5, { [alice]: 4, [bob]: 5, [carol]: 2, [dave]: 3 }),
+    withdrew: [carol],
+  }
+  const { events, match } = settleMatchPlayHole(h3, cfg, roundCfg, initialMatch(cfg))
+
+  it('TeamSizeReduced fires with teamId=team2, remainingSize=1; HoleResolved winner=team2', () => {
+    const tsr = events.filter(e => e.kind === 'TeamSizeReduced')
+    expect(tsr).toHaveLength(1)
+    const ev = tsr[0] as { teamId: string; remainingSize: number; hole: number }
+    expect(ev.teamId).toBe('team2')
+    expect(ev.remainingSize).toBe(1)
+    expect(ev.hole).toBe(3)
+    const resolved = events.filter(e => e.kind === 'HoleResolved')
+    expect(resolved).toHaveLength(1)
+    expect((resolved[0] as { winner: string }).winner).toBe('team2')
+    expect(match.holesUp).toBe(-1)
+  })
+})
+
+// ─── Phase 4d — stray PlayerId no-op: player in cfg.playerIds but not in either team ─
+//
+// Pre-write arithmetic:
+//   cfg.teams = [[alice,bob],[carol,dave]], cfg.playerIds includes 'eve' (not on any team)
+//   state.withdrew = ['eve']
+//   Phase 4d: eve found in neither cfg.teams![0] nor cfg.teams![1] → teamId = null → silent no-op
+//   No TeamSizeReduced emitted.
+//   All four team players have gross → normal best-ball resolution.
+//   bestNet(team1) = min(alice=3, bob=5) = 3
+//   bestNet(team2) = min(carol=4, dave=6) = 4
+//   winner = 'team1'; HoleResolved fires.
+
+describe('Phase 4d — stray PlayerId no-op: withdrew player not on any team emits no TeamSizeReduced', () => {
+  const alice = 'alice', bob = 'bob', carol = 'carol', dave = 'dave', eve = 'eve'
+
+  // Minimal inline fixture: eve is in playerIds but not in either team.
+  const cfgStray = makeCfg({
+    id: 'mp-4d-stray',
+    format: 'best-ball',
+    appliesHandicap: false,
+    playerIds: [alice, bob, carol, dave, eve],
+    teams: [[alice, bob], [carol, dave]],
+  })
+  const roundCfgStray = makeRoundCfg(cfgStray)
+
+  const hStray: ReturnType<typeof makeHole> = {
+    ...makeHole(1, 7, { [alice]: 3, [bob]: 5, [carol]: 4, [dave]: 6 }),
+    withdrew: [eve],
+  }
+  const { events } = settleMatchPlayHole(hStray, cfgStray, roundCfgStray, initialMatch(cfgStray))
+
+  it('no TeamSizeReduced emitted when withdrew player is not on any team; HoleResolved fires normally', () => {
+    expect(events.filter(e => e.kind === 'TeamSizeReduced')).toHaveLength(0)
+    const resolved = events.filter(e => e.kind === 'HoleResolved')
+    expect(resolved).toHaveLength(1)
+    expect((resolved[0] as { winner: string }).winner).toBe('team1')
+  })
+})
+
+// ─── Phase 4d — singles: TeamSizeReduced does NOT fire for singles format ─────
+//
+// Per spec: singles has no team to reduce. Skip the check entirely for singles.
+// Even if state.withdrew is set, no TeamSizeReduced event should be emitted.
+//
+// Pre-write arithmetic:
+//   cfg.format='singles', playerIds=['A','B'], state.withdrew=['A']
+//   A gross=3 (present), B gross=4
+//   Phase 4d withdrew check: cfg.format !== 'best-ball' → skip entirely
+//   holeWinner singles path: withdrew excludes A from bestNet regardless of gross →
+//     holeWinner returns 'team2' on this hole (A's score invisible, B wins)
+//   No TeamSizeReduced, one HoleResolved with winner='team2'
+//   Σ points = 0 ✓ (HoleResolved has no points field)
+
+describe('Phase 4d — singles format: TeamSizeReduced does NOT fire even when withdrew is set', () => {
+  const cfg = makeCfg({ playerIds: ['A', 'B'], stake: 1 })
+  const roundCfg = makeRoundCfg(cfg)
+
+  // withdrew=['A'] set on a singles hole — must be ignored for TeamSizeReduced.
+  const h1: ReturnType<typeof makeHole> = {
+    ...makeHole(1, 7, { A: 3, B: 4 }),
+    withdrew: ['A'],
+  }
+  const { events } = settleMatchPlayHole(h1, cfg, roundCfg, initialMatch(cfg))
+
+  it('no TeamSizeReduced event emitted in singles format', () => {
+    expect(events.filter(e => e.kind === 'TeamSizeReduced')).toHaveLength(0)
+  })
+
+  it('HoleResolved still fires normally with winner=team2 (A excluded by withdrew, B wins)', () => {
+    const resolved = events.filter(e => e.kind === 'HoleResolved')
+    expect(resolved).toHaveLength(1)
+    expect((resolved[0] as { winner: string }).winner).toBe('team2')
+  })
+
+  it('zero-sum across all events (singles, no points events)', () => {
+    const total = events.reduce((sum, e) => {
+      const pts = (e as { points?: Record<string, number> }).points ?? {}
+      return sum + Object.values(pts).reduce((s, v) => s + v, 0)
+    }, 0)
+    expect(total).toBe(0)
+  })
+})

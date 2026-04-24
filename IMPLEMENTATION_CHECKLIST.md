@@ -23,39 +23,30 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-### #6 — Match Play engine
+### #7 — Junk engine
 
-**Why**: End-to-end Match Play engine: `src/games/match_play.ts` + tests. Four formats (singles, best-ball, alternate-shot, foursomes). Widen `GameInstance.matchFormat` from the legacy 2-value union to the four-format union with legacy shims.
+**Why**: Implement `src/games/junk.ts` + tests. Two formats: rebuild from scratch (Decision A). Test gate: §12 Tests 1–5 (Decision B1). Sandy/Barkie/Polie/Arnie ship as stubs in Phase 1; full implementation in follow-up #7b after rules pass.
 
-**Acceptance criteria**: see `REBUILD_PLAN.md` `### #6 — Match Play engine` and `### Phase breakdown — #6 Match Play engine` for full AC. Summary:
-- `src/games/match_play.ts` implements `settleMatchPlayHole`, `finalizeMatchPlayRound` per `docs/games/game_match_play.md`.
-- Four formats: singles, best-ball, alternate-shot, foursomes.
-- `GameInstance.matchFormat` widened from `'individual' | 'teams'` to `'singles' | 'best-ball' | 'alternate-shot' | 'foursomes'` with legacy shims.
-- Zero-sum on every point-producing test. `tsc --noEmit --strict` clean. Portability grep empty. No `any` / `@ts-ignore` / non-null `!` on untrusted input.
-- Fence sentence: **No changes to `src/games/skins.ts`, `wolf.ts`, `stroke_play.ts`, `nassau.ts`, or their test files. No changes to `docs/games/game_match_play.md`. No UI wiring.**
+**Acceptance criteria**: see `REBUILD_PLAN.md` `### #7 — Junk engine` for full AC. Summary:
+- `settleJunkHole(hole, roundCfg, junkCfg): ScoringEvent[]` per `docs/games/game_junk.md`.
+- `resolveJunkWinner` dispatch switch with all 7 arms.
+- §12 Tests 1–5 pass. Zero-sum. tsc + portability grep clean.
+- Fence: no changes to other engines, no changes to `docs/games/game_junk.md`, no UI wiring.
 
-**Must complete before**: #7 Junk, #8 aggregate.
+**Must complete before**: #8 aggregate, #11 cutover (engine-side).
 
 **Phase tracking**:
-- [x] Phase 1a — Type widening + `MatchState` interface (no new behavior) — closed 2026-04-22 at prompt 016. `matchFormat` widened; legacy shims in roundStore + GameInstanceCard; `match_play.ts` skeleton (MatchState, error classes, initialMatch); stub test. 178 tests, tsc+greps clean.
-- [x] Phase 1b — Singles `holeWinner` + `settleMatchPlayHole` + § 10 worked example — closed 2026-04-22 at prompt 018. Engine correct per § 5; § 10 table bug (H13 not H14) surfaced via pre-write arithmetic gate, corrected in documenter turn (prompt 017), test assertions updated. 193 tests, tsc+greps clean.
-- [x] Phase 2a — Best-ball holeWinner + teams validation (Gap 10) + settleMatchPlayHole routing + per-player delta split + RoundingAdjustment (Gap 7) — closed 2026-04-23 at prompt 001. MatchConfigInvalid emitted per § 4; splitToTeam lex-lowest absorption; 203 tests, tsc+greps clean.
-- [x] Phase 2b — teamCourseHandicap in handicap.ts + alternate-shot/foursomes holeWinner — closed 2026-04-23 at prompt 002. teamGross/teamStrokes keyed '0'/'1'; alt-shot and foursomes share branch per § 2; 214 tests, tsc+greps clean.
-- [x] Phase 3 — End-of-round settlement — closed 2026-04-23 at prompt 004. finalizeMatchPlayRound; tieRule collapsed to 'halved'; 218 tests, tsc+greps clean.
-- [x] Phase 4a — Round Handicap integration test — closed 2026-04-23 at prompt 005. 2 tests (singles + alt-shot), caller-applies confirmed, 220 tests, tsc clean. (Alt-shot test removed in subtractive pass prompt 007; 1 test retained; final count 208.)
-- [x] Phase 4b — Concession-closeout ordering (Gap 4) — closed 2026-04-23 at prompt 009. concedeMatch + hole-concession short-circuit; § 12 Tests 4–5; 219 tests, tsc+greps clean. Engine-level only — HoleState.conceded has no UI writer; see #12.
-- [x] Phase 4c — Best-ball partial miss + HoleForfeited (Gap 9) — closed 2026-04-23 at prompt 010. getMissingScoreForfeit + bestNet partial-miss fix; § Phase 4c tests 1–5; 235 tests, tsc+greps clean. Engine-level only — HoleForfeited fires on missing gross; no UI path currently produces missing gross (withdrew, pickedUp, blank-entry flows all absent from HoleData); see #12.
-- [ ] Phase 4d — TeamSizeReduced emit logic
+- [ ] Phase 1 — Delete old files, scaffold dispatch switch, stable `ScoringEvent[]` return type
+- [ ] Phase 2 — CTP + Greenie + LD full implementation + §12 Tests 1–5 (#7 closes here)
+- [ ] Phase 3 (#7b) — Sandy/Barkie/Polie/Arnie — AC pending rules pass
 
-**Status**: Active — Phase 4d next; pending W9-prereq (§ 9 TeamSizeReduced timing decision) then W9 REBUILD_PLAN.md rewrite.
+**Status**: Active — Phase 1 next.
 
 ## Backlog
 
 Ordered; rough sizing in parens. Backlog structure revised after audit and rebuild plan: Skins, Wolf, Stroke Play meet their merge decisions and are NOT rebuilt. See `REBUILD_PLAN.md` for full acceptance criteria per item. Backlog numbers here match `REBUILD_PLAN.md` numbers.
 
-- (#6 is currently Active — see "Active item" section above.)
 - **D1** — Documenter: resolve Nassau rule-file ambiguities surfaced at prompt 012. Update `docs/games/game_nassau.md` § 5 pseudocode to show pair-wise USGA allocation (matching § 2 prose, which is authoritative per I1/I4 decision). Update § 9 N35 to clarify that "in favor of opposing player" applies only when a lead exists — tied in-flight matches on withdrawal get `MatchTied` zero-delta per § 6. Independent of all engine work; can be done any time. (XS)
-- **#7** — Junk engine: `src/games/junk.ts` + tests. (M)
 - **#8** — `src/games/aggregate.ts` for round-total aggregation. (S)
 - **#9** — `GAME_DEFS` cleanup: mark 4 non-scope games as `disabled: true`. (XS)
 - **#10** — Prisma `Float` → `Int` cents migration; drop-and-recreate per disposable-data baseline. (S)
@@ -90,6 +81,15 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 - [ ] Stroke play greenie resolution shows "nobody" option on hole 6 when all 5 players birdied; match play and skins correctly show all 5 players as eligible. Bet-scope filtering bug specific to stroke play — may be bet-membership mapping, junk-kind filter logic, or HoleData→HoleState translation (5 players assumed; confirm). [BRIDGE-#12] — 2026-04-23 — UI walkthrough
 - [ ] Greenie pop-up: no back-navigation to current hole's score entry from within greenie selection; user must advance to next hole then retreat. Navigation gap. [UI-FLOW] — 2026-04-23 — UI walkthrough
 - [ ] Results screen renders winners/losers correctly but lacks detail; presentationally complete but informationally thin. Low priority. [UI-FLOW] — 2026-04-23 — UI walkthrough
+- [ ] **Mutual forfeit rule decision** (both sides missing gross) — documenter pass needed; Match Play doc §5/§9 silent. Added 2026-04-24 from prompt 010 parking lot.
+- [ ] **Status line quotes plan wording inline** (#6 Status line now embeds "Emit-once: Option (i)..." verbatim) — if Phase 4d spec in REBUILD_PLAN.md evolves, the Status line goes stale again. Consider dropping the quoted detail to a pointer-only ("W9-prereq resolved: see REBUILD_PLAN.md Phase 4d") in a future micro-pass alongside AGENTS.md + #6 "Why" cleanups. Added 2026-04-24.
+- [ ] Best-ball mutual partner withdrawal (both players of one team in `state.withdrew` on one hole) — rule question against `game_match_play.md` §9. Current Phase 4c `bestNet` filter falls through to Infinity → halved, which may be incorrect behavior. Cross-ref: existing mutual-forfeit parking-lot item (both sides missing gross, filed 2026-04-23). Both are §9 rule gaps; resolve together. Added 2026-04-24.
+- [ ] Singles withdrew exclusion in bestNet: behavior is format-agnostic (Phase 4d AC scoped TeamSizeReduced emit to best-ball only, not the filter). Unspecified whether withdrew + gross set simultaneously in singles should exclude the player. Current caller convention prevents this in practice; gap bites if future phases write withdrew for singles players with gross present. Added 2026-04-24.
+- [ ] Same-hole concession + best-ball partner withdrawal overlap: settleMatchPlayHole returns early on concession before the Phase 4d emit block, so TeamSizeReduced is silently dropped when concession and withdrawal coincide. §9 rule gap. Cross-ref: mutual-forfeit (2026-04-23), mutual-partner-withdrawal (2026-04-24). All three resolve together in the §9 documenter pass. Added 2026-04-24.
+- [ ] Phase 4d team1/team2 test style inconsistency: team2 branch packs three assertions into one it() block; team1 splits them. Cosmetic. Added 2026-04-24.
+- [ ] Phase 4d remainingSize: 1 lacks comment noting 2-player-team invariant enforced by validateTeams. Cosmetic. Added 2026-04-24.
+- [ ] junk.ts: hole.timestamp used in pushAward without null guard (line ~46). If HoleState.timestamp is optional, events may emit timestamp: undefined. Added 2026-04-24.
+- [ ] **Polie three-putt doubled-loss schema** — rules-pass needed before #7b unskips `isPolie`. Specify: (1) whether "doubles the loss" applies to losers only (zero-sum preserved) or winner + losers; (2) whether `JunkAwarded.doubled: boolean` (schema change to `events.ts`) or a separate event type is the right carrier. Decision deferred from rules-pass 2026-04-24 Topic 7. Gating: #7b `isPolie` stub remains `null`-returning until resolved. — 2026-04-24 — rules-pass
 
 ## Done
 
@@ -102,6 +102,7 @@ Append-only. Close date + pointer to prompt NNN or EOD.
 - [x] #3 — Wolf follow-ups — closed 2026-04-20, prompt 007. Final test count 97 (AC's "still 100" figure was arithmetically wrong; 100 − 3 deletions = 97 was the intended result).
 - [x] #4 — Bet-id string-lookup refactor — closed 2026-04-20, prompt 009. Final test count 97 (AC's "100 modulo the #3 net-zero" figure was arithmetically wrong; 97 start, 97 end, 0 net change is correct).
 - [x] #5 — Nassau engine — closed 2026-04-22, prompt 011. 177 tests, tsc+greps clean. All phases 1–4d complete. `NassauCfg.matchTieRule` deleted; allPairs/singles both fully supported; press rules; closeout; finalize; forfeit per-match; withdrawal per-pair.
+- [x] #6 — Match Play engine — closed 2026-04-24 — prompts 016–010 (2026-04-22 to 2026-04-24). Phases 1a–4d complete. Engine-level: singles + best-ball; alternate-shot/foursomes deferred (product decision 2026-04-23). See REBUILD_PLAN.md §#6 for full AC.
 
 ## Deferred / won't-do
 

@@ -93,8 +93,12 @@ function holeWinner(
   const active1 = conceded.size > 0 ? side1.filter((p) => !conceded.has(p)) : side1
   const active2 = conceded.size > 0 ? side2.filter((p) => !conceded.has(p)) : side2
   // Filter players with undefined gross (§ 5 partial-miss: use available partner's score).
+  // Phase 4d: also exclude players in state.withdrew — withdrew is the authoritative signal
+  // for team composition regardless of gross presence.
   const bestNet = (pids: readonly PlayerId[]): number => {
-    const valid = pids.filter((p) => state.gross[p] !== undefined)
+    const valid = pids.filter(
+      (p) => state.gross[p] !== undefined && !state.withdrew.includes(p),
+    )
     return valid.length === 0
       ? Infinity
       : Math.min(...valid.map((p) => netScore(state, p, cfg.appliesHandicap)))
@@ -342,6 +346,31 @@ export function settleMatchPlayHole(
   const winner = holeWinner(hole, cfg)
   const updatedMatch = advanceMatch(match, winner, cfg.holesToPlay)
   const events: ScoringEvent[] = []
+
+  // Phase 4d: emit TeamSizeReduced for best-ball partner withdrawal (§ 9).
+  // Singles has no team to reduce — skip entirely for singles format.
+  if (cfg.format === 'best-ball' && hole.withdrew.length > 0) {
+    for (const wid of hole.withdrew) {
+      let teamId: string | null = null
+      if (cfg.teams![0].includes(wid)) {
+        teamId = 'team1'
+      } else if (cfg.teams![1].includes(wid)) {
+        teamId = 'team2'
+      }
+      // Stray PlayerId not on any team: silent no-op.
+      if (teamId !== null) {
+        events.push({
+          kind: 'TeamSizeReduced',
+          timestamp: hole.timestamp,
+          hole: hole.hole,
+          actor: 'system',
+          declaringBet,
+          teamId,
+          remainingSize: 1,
+        })
+      }
+    }
+  }
 
   if (winner !== 'halved') {
     events.push({

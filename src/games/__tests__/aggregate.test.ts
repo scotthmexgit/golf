@@ -1219,9 +1219,151 @@ describe('aggregateRound — Phase 3 Iter 2 (finalizers + compound keys + money)
   })
 })
 
-// ─── Phase 4 Iter 1 fixtures ──────────────────────────────────────────────────
+// ─── Phase 4 Iter 2 fixtures ──────────────────────────────────────────────────
 
-import type { StrokePlayCfg } from '../types'
+import type { StrokePlayCfg, WolfCfg } from '../types'
+
+function makePhase4Skins(
+  id: string,
+  playerIds: string[],
+  stake: number,
+  junkMultiplier: number,
+  junkItems: ('greenie')[],
+): BetSelection {
+  return {
+    id,
+    type: 'skins',
+    stake,
+    participants: playerIds,
+    config: {
+      id,
+      stake,
+      escalating: false,
+      tieRuleFinalHole: 'carryover',
+      appliesHandicap: false,
+      playerIds,
+      junkItems,
+      junkMultiplier,
+    },
+    junkItems,
+    junkMultiplier,
+  }
+}
+
+function makePhase4Wolf(
+  id: string,
+  playerIds: string[],
+  stake: number,
+): BetSelection {
+  const cfg: WolfCfg = {
+    id,
+    stake,
+    loneMultiplier: 2,
+    blindLoneEnabled: false,
+    blindLoneMultiplier: 3,
+    tieRule: 'no-points',
+    playerIds,
+    appliesHandicap: false,
+    junkItems: [],
+    junkMultiplier: 1,
+  }
+  return {
+    id,
+    type: 'wolf',
+    stake,
+    participants: playerIds,
+    config: cfg,
+    junkItems: [],
+    junkMultiplier: 1,
+  }
+}
+
+function makePhase4StrokePlay(
+  id: string,
+  playerIds: string[],
+  stake: number,
+): BetSelection {
+  const cfg: StrokePlayCfg = {
+    id,
+    stake,
+    settlementMode: 'winner-takes-pot',
+    stakePerStroke: 0,
+    placesPayout: [],
+    tieRule: 'split',
+    cardBackOrder: [],
+    appliesHandicap: false,
+    playerIds,
+    junkItems: [],
+    junkMultiplier: 1,
+  }
+  return {
+    id,
+    type: 'strokePlay',
+    stake,
+    participants: playerIds,
+    config: cfg,
+    junkItems: [],
+    junkMultiplier: 1,
+  }
+}
+
+function makePhase4Nassau(
+  id: string,
+  playerA: string,
+  playerB: string,
+  stake: number,
+): BetSelection {
+  return {
+    id,
+    type: 'nassau',
+    stake,
+    participants: [playerA, playerB],
+    config: {
+      id,
+      stake,
+      pressRule: 'manual',
+      pressScope: 'nine',
+      appliesHandicap: false,
+      pairingMode: 'singles',
+      playerIds: [playerA, playerB],
+      junkItems: [],
+      junkMultiplier: 1,
+    },
+    junkItems: [],
+    junkMultiplier: 1,
+  }
+}
+
+function makePhase4MatchPlay(
+  id: string,
+  playerIds: string[],
+  teams: [[string, string], [string, string]],
+  stake: number,
+): BetSelection {
+  const cfg: MatchPlayCfg = {
+    id,
+    stake,
+    format: 'best-ball',
+    appliesHandicap: false,
+    holesToPlay: 9,
+    tieRule: 'halved',
+    playerIds,
+    teams,
+    junkItems: [],
+    junkMultiplier: 1,
+  }
+  return {
+    id,
+    type: 'matchPlay',
+    stake,
+    participants: playerIds,
+    config: cfg,
+    junkItems: [],
+    junkMultiplier: 1,
+  }
+}
+
+// ─── Phase 4 Iter 1 fixtures ──────────────────────────────────────────────────
 
 function makeStrokePlayBet(
   id: string,
@@ -1339,5 +1481,171 @@ describe('aggregateRound — Phase 4 Iter 1 (Stroke Play finalizer wiring)', () 
     // confirms they were not.
     expect(ledger.netByPlayer['alice']).toBe(300)
     expect(Object.values(ledger.netByPlayer).reduce((a, b) => a + b, 0)).toBe(0)
+  })
+})
+
+// ─── Phase 4 Iter 2 tests ─────────────────────────────────────────────────────
+
+describe('aggregateRound — Phase 4 Iter 2 (all-5-games integration)', () => {
+  // ── All-5-games round ────────────────────────────────────────────────────────
+  //
+  // Five bets: skins-1 (junkMultiplier=2, greenie), wolf-1, strokeplay-1,
+  // nassau-1 (alice vs bob), mp-1 (best-ball teams alice+carol vs bob+dave).
+  //
+  // Pre-computed expected money:
+  //
+  // wolf-1 (WolfHoleResolved h1):
+  //   {alice:100, bob:100, carol:-100, dave:-100}  Σ=0 ✓
+  //
+  // skins-1 (SkinWon h2):
+  //   {alice:300, bob:-100, carol:-100, dave:-100}  Σ=0 ✓
+  // skins-1 (JunkAwarded h2 greenie, points×stake×junkMultiplier = pts×100×2):
+  //   {alice:3,bob:-1,carol:-1,dave:-1} × 200 = {alice:600,bob:-200,carol:-200,dave:-200}  Σ=0 ✓
+  // skins-1 combined: {alice:900, bob:-300, carol:-300, dave:-300}  Σ=0 ✓
+  //
+  // nassau-1 (MatchClosedOut h3, matchId='front', declaringBet='nassau-1'):
+  //   {alice:100, bob:-100}  key='nassau-1::front'  Σ=0 ✓
+  //
+  // mp-1 (MatchClosedOut h4, matchId='mp-1', declaringBet='mp-1'):
+  //   betType='matchPlay' → simple key 'mp-1'
+  //   {alice:100, carol:100, bob:-100, dave:-100}  Σ=0 ✓
+  //
+  // strokeplay-1 (finalizeStrokePlayRound, winner-takes-pot):
+  //   4 holes of StrokePlayHoleRecorded: alice nets 2/hole × 4 holes = 8 total
+  //   others net 3/hole × 4 holes = 12 total. alice wins (lowest).
+  //   alice = 100 × (4-1) = 300, each loser = -100  Σ=0 ✓
+  //
+  // netByPlayer:
+  //   alice: 100(wolf) + 900(skins) + 100(nassau) + 100(mp) + 300(sp) = 1500
+  //   bob:   100(wolf) − 300(skins) − 100(nassau) − 100(mp) − 100(sp) = −500
+  //   carol: −100(wolf) − 300(skins) + 0(nassau) + 100(mp) − 100(sp) = −400
+  //   dave:  −100(wolf) − 300(skins) + 0(nassau) − 100(mp) − 100(sp) = −600
+  //   Σ = 1500 − 500 − 400 − 600 = 0 ✓
+
+  it('all-5-games round: zero-sum per bet, compound key for Nassau, Junk scaling correct', () => {
+    const players = ['alice', 'bob', 'carol', 'dave']
+    const roundCfg = makeRoundCfg([
+      makePhase4Skins('skins-1', players, 100, 2, ['greenie']),
+      makePhase4Wolf('wolf-1', players, 100),
+      makePhase4StrokePlay('strokeplay-1', players, 100),
+      makePhase4Nassau('nassau-1', 'alice', 'bob', 100),
+      makePhase4MatchPlay('mp-1', players, [['alice', 'carol'], ['bob', 'dave']], 100),
+    ])
+
+    const log: ScoringEventLog = {
+      events: [
+        // hole 1: WolfHoleResolved
+        {
+          kind: 'WolfHoleResolved',
+          timestamp: '2026-04-24T10:00:01.000Z',
+          hole: 1,
+          actor: 'system',
+          declaringBet: 'wolf-1',
+          winners: ['alice', 'bob'],
+          losers: ['carol', 'dave'],
+          points: { alice: 100, bob: 100, carol: -100, dave: -100 },
+        } as ScoringEvent,
+        // hole 1: StrokePlayHoleRecorded
+        makeStrokePlayHoleRecorded('strokeplay-1', 1, { alice: 2, bob: 3, carol: 3, dave: 3 }),
+        // hole 2: SkinWon
+        {
+          kind: 'SkinWon',
+          timestamp: '2026-04-24T10:00:02.000Z',
+          hole: 2,
+          actor: 'system',
+          declaringBet: 'skins-1',
+          winner: 'alice',
+          points: { alice: 300, bob: -100, carol: -100, dave: -100 },
+        } as ScoringEvent,
+        // hole 2: JunkAwarded (greenie, raw points × stake × junkMultiplier = × 200)
+        {
+          kind: 'JunkAwarded',
+          timestamp: '2026-04-24T10:00:02.100Z',
+          hole: 2,
+          actor: 'system',
+          declaringBet: 'skins-1',
+          junk: 'greenie' as const,
+          winners: ['alice'],
+          points: { alice: 3, bob: -1, carol: -1, dave: -1 },
+        } as ScoringEvent,
+        // hole 2: StrokePlayHoleRecorded
+        makeStrokePlayHoleRecorded('strokeplay-1', 2, { alice: 2, bob: 3, carol: 3, dave: 3 }),
+        // hole 3: MatchClosedOut (nassau-1 front match)
+        {
+          kind: 'MatchClosedOut',
+          timestamp: '2026-04-24T10:00:03.000Z',
+          hole: 3,
+          actor: 'system',
+          declaringBet: 'nassau-1',
+          matchId: 'front',
+          holesUp: 1,
+          holesRemaining: 0,
+          points: { alice: 100, bob: -100 },
+        } as ScoringEvent,
+        // hole 3: StrokePlayHoleRecorded
+        makeStrokePlayHoleRecorded('strokeplay-1', 3, { alice: 2, bob: 3, carol: 3, dave: 3 }),
+        // hole 4: MatchClosedOut (mp-1 match)
+        {
+          kind: 'MatchClosedOut',
+          timestamp: '2026-04-24T10:00:04.000Z',
+          hole: 4,
+          actor: 'system',
+          declaringBet: 'mp-1',
+          matchId: 'mp-1',
+          holesUp: 1,
+          holesRemaining: 0,
+          points: { alice: 100, carol: 100, bob: -100, dave: -100 },
+        } as ScoringEvent,
+        // hole 4: StrokePlayHoleRecorded
+        makeStrokePlayHoleRecorded('strokeplay-1', 4, { alice: 2, bob: 3, carol: 3, dave: 3 }),
+      ],
+      supersessions: {},
+    }
+
+    const ledger = aggregateRound(log, roundCfg)
+
+    // ── Per-player net ────────────────────────────────────────────────────────
+    expect(ledger.netByPlayer['alice']).toBe(1500)
+    expect(ledger.netByPlayer['bob']).toBe(-500)
+    expect(ledger.netByPlayer['carol']).toBe(-400)
+    expect(ledger.netByPlayer['dave']).toBe(-600)
+
+    // ── Cross-bet zero-sum ────────────────────────────────────────────────────
+    expect(Object.values(ledger.netByPlayer).reduce((a, b) => a + b, 0)).toBe(0)
+
+    // ── wolf-1 per-bet slice ──────────────────────────────────────────────────
+    expect(ledger.byBet['wolf-1']?.['alice']).toBe(100)
+    expect(Object.values(ledger.byBet['wolf-1'] ?? {}).reduce((a, b) => a + b, 0)).toBe(0)
+
+    // ── skins-1: SkinWon + JunkAwarded combined ───────────────────────────────
+    // SkinWon: alice=300, others=-100 each
+    // JunkAwarded: points×stake×junkMultiplier = {3,-1,-1,-1}×100×2 = {600,-200,-200,-200}
+    // Combined: alice=900, bob=-300, carol=-300, dave=-300
+    expect(ledger.byBet['skins-1']?.['alice']).toBe(900)
+    expect(ledger.byBet['skins-1']?.['bob']).toBe(-300)
+    expect(Object.values(ledger.byBet['skins-1'] ?? {}).reduce((a, b) => a + b, 0)).toBe(0)
+
+    // ── strokeplay-1: StrokePlaySettled emitted by finalizer ─────────────────
+    // alice net total = 8 (lowest), winner-takes-pot: alice=+300, others=-100
+    expect(ledger.byBet['strokeplay-1']?.['alice']).toBe(300)
+    expect(Object.values(ledger.byBet['strokeplay-1'] ?? {}).reduce((a, b) => a + b, 0)).toBe(0)
+
+    // ── nassau-1::front — compound key ───────────────────────────────────────
+    expect(ledger.byBet['nassau-1::front']?.['alice']).toBe(100)
+    expect(ledger.byBet['nassau-1::front']?.['bob']).toBe(-100)
+    expect(Object.values(ledger.byBet['nassau-1::front'] ?? {}).reduce((a, b) => a + b, 0)).toBe(0)
+    // No simple nassau key
+    expect(ledger.byBet['nassau-1']).toBeUndefined()
+
+    // ── mp-1 — simple key (Match Play, not Nassau) ────────────────────────────
+    expect(ledger.byBet['mp-1']?.['alice']).toBe(100)
+    expect(ledger.byBet['mp-1']?.['carol']).toBe(100)
+    expect(Object.values(ledger.byBet['mp-1'] ?? {}).reduce((a, b) => a + b, 0)).toBe(0)
+
+    // ── Junk scaling explicit confirmation ────────────────────────────────────
+    // JunkAwarded alone would give alice 3×100×2 = 600 (not raw 3, not 300).
+    // SkinWon alone gives alice 300. Combined skins-1 alice = 900.
+    // This confirms junkMultiplier=2 was applied (600 not 300 from junk).
+    expect(ledger.byBet['skins-1']?.['alice']).toBe(900)
   })
 })

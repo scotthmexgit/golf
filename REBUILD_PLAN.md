@@ -901,6 +901,105 @@ Zero-sum is guaranteed for Junk: `Σ points[p] = 0` (enforced by #7 engine), and
 
 ---
 
+#### Rules decisions (rules-pass 2026-04-24)
+
+Use canonical `types.ts` names throughout — `roundCfg.bets`, `bet.participants`, `bet.junkItems`, `bet.junkMultiplier`, `bet.stake`. No `declaringBets` or `bettors` doc-pseudocode names.
+
+---
+
+##### Topic 1 — CTPCarried accumulation formula
+
+**Source:** `game_junk.md §6` (CTPCarried row). The doc states the carry "transfers to the next eligible par 3" and that `CTPCarried` emits with `carryPoints`, but is silent on how `carryPoints` accumulates when a second CTP tie occurs while a carry is already live.
+
+**Decision:** Additive carry. Each subsequent CTP tie on a par 3 while a carry is active adds one additional stake-equivalent to the running total. Standard golf carry convention: the pot grows by the same unit on each successive tie.
+
+```
+carryPoints_new = carryPoints_old + stake_equivalent
+```
+
+Where `stake_equivalent` is the per-declaring-bet CTP stake unit (the points value a single CTP winner would collect from the bet). The new `CTPCarried` event replaces the prior one; `carryPoints` on the emitted event reflects the cumulative total.
+
+---
+
+##### Topic 2 — CTPCarried resolution criterion
+
+**Source:** `game_junk.md §6` — resolution trigger: "the pot transfers to the next eligible par 3 in the round." An eligible par 3 is one where a clear CTP winner is selected (tie broken). End-of-round unresolved path: "if no subsequent par 3 exists … the carry stays unresolved and escalates to the Final Adjustment screen per `docs/games/_FINAL_ADJUSTMENT.md`; the app never plays extra holes."
+
+**Decision:**
+- (a) Resolution trigger: the carry resolves on the next par-3 hole where `CTPWinnerSelected` emits with a single winner (i.e., the tie is broken). `aggregate.ts` applies the accumulated `carryPoints` total to that winner's account in addition to the standard CTP award for that hole.
+- (b) End-of-round unresolved path: if hole 18 `Confirmed` is reached with an active carry, the carry does not settle automatically. It escalates to the Final Adjustment screen (`_FINAL_ADJUSTMENT.md §1`). No synthetic winner is assigned; the `CTPCarried` event remains in the log as an open item visible to the role-holder.
+
+Cross-reference: the Final Adjustment screen is the resolution path per Topic 3 fan-out rules.
+
+---
+
+##### Topic 3 — `FinalAdjustmentApplied` routing for `targetBet: 'all-bets'`
+
+**Source:** `_FINAL_ADJUSTMENT.md §6`: "When an adjustment targets 'all-bets', the same zero-sum check applies per bet: each declaring bet's derived adjustment points must sum to zero across that bet's bettor set." `_FINAL_ADJUSTMENT.md §11 Test 6`: "Two `FinalAdjustmentApplied` events emit (one per declaring bet). Each has `points` summing to zero within its bet's bettor set." `_FINAL_ADJUSTMENT.md §9` edge case: "when a player named in `targetPlayers` is not a bettor in one of the bets, the adjustment for that bet is zero for that player (points redistribute among the remaining named bettors in that bet to preserve zero-sum)."
+
+**Decision:** Fan-out is one event per declaring bet, with the same `targetPlayers` point values applied per bet. Players named in `targetPlayers` who are not bettors in a given bet receive zero for that bet; remaining named bettors absorb the redistribution to preserve zero-sum. This is not equal-per-bet, not proportional to stake, and not full-delta-per-bet. It is: same points applied per bet, with non-bettor exclusion handled by redistribution.
+
+```
+for each bet in roundCfg.bets:
+  eligible = targetPlayers.filter(tp => bet.participants.includes(tp.playerId))
+  // redistribute to zero-sum within eligible if any player was excluded
+  emit FinalAdjustmentApplied { targetBet: bet.id, points: redistributed(eligible) }
+```
+
+---
+
+##### Topic 4 — `byBet` key space for Nassau
+
+**Source:** `events.ts` lines 109–144 — `NassauHoleResolved`, `NassauWithdrawalSettled`, `MatchClosedOut`, `PressOpened` all carry a `matchId: string` field (e.g., `'front' | 'back' | 'overall' | 'press-<n>'` per `game_nassau.md §5` `MatchState.id`). All Nassau monetary events (`NassauWithdrawalSettled`, `MatchClosedOut`) carry both `declaringBet` (via `WithBet`) and `matchId`. No schema change is required to access both fields.
+
+**Decision:** `byBet` uses a compound string key `${betId}::${matchId}` for Nassau matches. The `RunningLedger.byBet` type (`Record<BetId, Record<PlayerId, number>>`) uses `BetId` as the key alias but BetId is `string`; the compound key is a valid string. This avoids collapsing front/back/overall/press into a single per-bet bucket and preserves per-match auditability in the ledger.
+
+```
+key = `${event.declaringBet}::${event.matchId}`
+byBet[key][p] += money[p]
+```
+
+For non-Nassau monetary events (no `matchId` field), the key remains `event.declaringBet` unchanged.
+
+Finding — engineer scope: `RunningLedger.byBet` is typed as `Record<BetId, Record<PlayerId, number>>`. The compound key form `${betId}::${matchId}` is not a `BetId` in the strict type sense. Engineer must either widen the key type to `string` for Nassau entries or define a `MatchLedgerKey = BetId | \`${BetId}::${string}\`` union alias in `types.ts`. This is a schema-adjacent change to `types.ts` — flagged under Findings below.
+
+---
+
+##### Topic 5 — Zero-sum invariant enforcement
+
+**Source:** No doc specifies enforcement mode. `_FINAL_ADJUSTMENT.md §2`: "the running ledger re-derives on every committed event." `aggregate.ts` is specified as a pure function (Decision 1). If zero-sum fails after a full recompute, the event log or reduce logic is wrong; propagating corrupted numbers is worse than a hard failure.
+
+**Decision:** Throw at runtime. After the reduce loop completes, `aggregate.ts` checks `Σ netByPlayer`. If the sum is not zero (accounting for integer rounding of any `RoundingAdjustment` already applied), throw a typed error `ZeroSumViolationError` with the offending delta and the event log length. No silent fallthrough. No diagnostic event (avoids schema addition per the fence). Zero-sum assertion is also present in the test suite per the acceptance criteria, but runtime enforcement is the primary guard.
+
+```
+const total = Object.values(ledger.netByPlayer).reduce((a, b) => a + b, 0)
+if (total !== 0) throw new ZeroSumViolationError(total, log.events.length)
+```
+
+---
+
+##### Topic 6 — Nassau press `junkItems` inheritance
+
+**Source:** `game_junk.md §7`: "When a main bet opens a press, every Junk event awarded during the press window inherits the parent bet's `junkMultiplier` — the press is just another declaring bet for Junk purposes." `game_nassau.md §7` press section does not mention `junkItems` inheritance. `game_nassau.md §4` shows `NassauConfig.junkItems: JunkKind[]` — `junkItems` lives on the bet config, not per-press.
+
+**Decision:** A press inherits both `junkItems` AND `junkMultiplier` from its parent bet. Rationale: "the press is just another declaring bet for Junk purposes" (`game_junk.md §7`); the press is a scope-restricted continuation of the same bet, so the parent bet's `junkItems` list applies for the press window. `junkMultiplier` was already decided in #7 as inherited; `junkItems` follows the same logic. There is no mechanism by which a press declares its own independent `junkItems`.
+
+```
+// press inherits parent bet's junkItems and junkMultiplier
+press.junkItems = parentBet.junkItems
+press.junkMultiplier = parentBet.junkMultiplier
+```
+
+---
+
+##### Findings — engineer scope
+
+1. **`RunningLedger.byBet` key type** (Topic 4): the compound key `${betId}::${matchId}` requires widening `byBet`'s key type from strict `BetId` to `string` or introducing a `MatchLedgerKey` union alias in `src/games/types.ts`. This is a `types.ts` change that the #8 acceptance criteria currently forbids ("No changes to `src/games/types.ts`"). Engineer must resolve with team-lead before Phase 3.
+
+2. **`ZeroSumViolationError` type** (Topic 5): the throw decision requires a typed error class. If `ZeroSumViolationError` is not already in `src/games/types.ts` or a shared errors file, the engineer adds it in Phase 1 as a plain class (no schema change to `events.ts` or `types.ts` needed — it is a runtime error class, not a `ScoringEvent` variant).
+
+---
+
 #### Phase breakdown
 
 ##### Phase 1 — Scaffold + Junk reducer (end-to-end test harness)

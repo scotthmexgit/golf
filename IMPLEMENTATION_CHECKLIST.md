@@ -36,11 +36,11 @@ Updated at EOD-FINAL.
 **Must complete before**: #8 aggregate, #11 cutover (engine-side).
 
 **Phase tracking**:
-- [ ] Phase 1 — Delete old files, scaffold dispatch switch, stable `ScoringEvent[]` return type
-- [ ] Phase 2 — CTP + Greenie + LD full implementation + §12 Tests 1–5 (#7 closes here)
+- [x] Phase 1 — Delete old files, scaffold dispatch switch, stable `ScoringEvent[]` return type — closed 2026-04-24
+- [x] Phase 2 — CTP + Greenie + LD full implementation + §12 Tests 1–5 — closed 2026-04-24. Schema widening: `JunkAwarded.winners` + `LongestDriveWinnerSelected.winners` → `PlayerId[]` (Option A). 273 tests, tsc clean.
 - [ ] Phase 3 (#7b) — Sandy/Barkie/Polie/Arnie — AC pending rules pass
 
-**Status**: Active — Phase 1 next.
+**Status**: Done — Phase 2 closed 2026-04-24, all REBUILD_PLAN.md stop-artifact conditions met. Phase 3 (#7b) is backlog, gated on rules pass.
 
 ## Backlog
 

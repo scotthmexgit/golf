@@ -23,31 +23,27 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-### #7 — Junk engine
+### #8 — aggregate.ts
 
-**Why**: Implement `src/games/junk.ts` + tests. Two formats: rebuild from scratch (Decision A). Test gate: §12 Tests 1–5 (Decision B1). Sandy/Barkie/Polie/Arnie ship as stubs in Phase 1; full implementation in follow-up #7b after rules pass.
+**Why**: Reduce a `ScoringEventLog` to a `RunningLedger`. Shape A (combined orchestrator + reducer). Junk-only stake-scaled formula; all other monetary events pass points through directly. Zero-sum enforcement via `ZeroSumViolationError`.
 
-**Acceptance criteria**: see `REBUILD_PLAN.md` `### #7 — Junk engine` for full AC. Summary:
-- `settleJunkHole(hole, roundCfg, junkCfg): ScoringEvent[]` per `docs/games/game_junk.md`.
-- `resolveJunkWinner` dispatch switch with all 7 arms.
-- §12 Tests 1–5 pass. Zero-sum. tsc + portability grep clean.
-- Fence: no changes to other engines, no changes to `docs/games/game_junk.md`, no UI wiring.
+**Acceptance criteria**: see `REBUILD_PLAN.md` `### #8` for full AC.
 
-**Must complete before**: #8 aggregate, #11 cutover (engine-side).
+**Must complete before**: #11 cutover (engine-side).
 
 **Phase tracking**:
-- [x] Phase 1 — Delete old files, scaffold dispatch switch, stable `ScoringEvent[]` return type — closed 2026-04-24
-- [x] Phase 2 — CTP + Greenie + LD full implementation + §12 Tests 1–5 — closed 2026-04-24. Schema widening: `JunkAwarded.winners` + `LongestDriveWinnerSelected.winners` → `PlayerId[]` (Option A). 273 tests, tsc clean.
-- [ ] Phase 3 (#7b) — Sandy/Barkie/Polie/Arnie — AC pending rules pass
+- [x] Phase 1 — Scaffold + Junk reducer + junk.ts dead-code deletion — closed 2026-04-24 (commit 8c0a147). 277 tests, tsc clean. Supersession filter deferred (Option C); RoundingAdjustment branch removed (Outcome A).
+- [ ] Phase 2 — Skins + Wolf reduction
+- [ ] Phase 3 — Nassau + Match Play with MatchState threading
+- [ ] Phase 4 — Stroke Play + all-5-games integration test
 
-**Status**: Done — Phase 2 closed 2026-04-24, all REBUILD_PLAN.md stop-artifact conditions met. Phase 3 (#7b) is backlog, gated on rules pass.
+**Status**: Active — Phase 1 closed 2026-04-24.
 
 ## Backlog
 
 Ordered; rough sizing in parens. Backlog structure revised after audit and rebuild plan: Skins, Wolf, Stroke Play meet their merge decisions and are NOT rebuilt. See `REBUILD_PLAN.md` for full acceptance criteria per item. Backlog numbers here match `REBUILD_PLAN.md` numbers.
 
 - **D1** — Documenter: resolve Nassau rule-file ambiguities surfaced at prompt 012. Update `docs/games/game_nassau.md` § 5 pseudocode to show pair-wise USGA allocation (matching § 2 prose, which is authoritative per I1/I4 decision). Update § 9 N35 to clarify that "in favor of opposing player" applies only when a lead exists — tied in-flight matches on withdrawal get `MatchTied` zero-delta per § 6. Independent of all engine work; can be done any time. (XS)
-- **#8** — `src/games/aggregate.ts` for round-total aggregation. (S)
 - **#9** — `GAME_DEFS` cleanup: mark 4 non-scope games as `disabled: true`. (XS)
 - **#10** — Prisma `Float` → `Int` cents migration; drop-and-recreate per disposable-data baseline. (S)
 - **#11** — Cutover session: parallel-path migration across ~7 commits with grep gates. Depends on #5, #6, #7, #8. (M)
@@ -90,7 +86,9 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 - [ ] Phase 4d remainingSize: 1 lacks comment noting 2-player-team invariant enforced by validateTeams. Cosmetic. Added 2026-04-24.
 - [ ] junk.ts: hole.timestamp used in pushAward without null guard (line ~46). If HoleState.timestamp is optional, events may emit timestamp: undefined. Added 2026-04-24.
 - [ ] **Polie three-putt doubled-loss schema** — rules-pass needed before #7b unskips `isPolie`. Specify: (1) whether "doubles the loss" applies to losers only (zero-sum preserved) or winner + losers; (2) whether `JunkAwarded.doubled: boolean` (schema change to `events.ts`) or a separate event type is the right carrier. Decision deferred from rules-pass 2026-04-24 Topic 7. Gating: #7b `isPolie` stub remains `null`-returning until resolved. — 2026-04-24 — rules-pass
-- [ ] Junk RoundingAdjustment: Phase 2 scope item C specifies RoundingAdjustment emission, but §12 tests don't exercise it (JunkAwarded.points are integers by construction; cent remainders only arise in points × stake × junkMultiplier in money aggregation). Architectural question: does RoundingAdjustment belong in Junk engine (#7) or money aggregation (#8)? When #8 lands, revisit with evidence — amend plan if RoundingAdjustment should move. Added 2026-04-24.
+- [x] Junk RoundingAdjustment architectural question: does the branch belong in junk.ts (#7) or aggregate.ts (#8)? Resolved 2026-04-24 — Decision 2 placed it in aggregate.ts. Branch then removed in Phase 1 remediation (Outcome A): integer-only mandate (game_junk.md §11, §12 ACs: `Number.isInteger` on all money values) makes the branch unreachable. See parking-lot item below for remaining open question. Added 2026-04-24.
+- [ ] **Supersession schema design (pre-Phase-2 gate)** — `EventBase` has no `id` field; `ScoringEventLog.supersessions` has zero writers. Supersession filter was removed from `aggregate.ts` Phase 1 (Option C, remediation pass 2026-04-24). Before Phase 2 can implement supersession reduction, schema decision needed: (A) add `id: EventId` to `EventBase` — breaking change across all emit sites; (B) redesign `supersessions` from `Record<EventId, EventId>` to index-based; or (C) other. Belongs with the feature that writes supersessions. Added 2026-04-24.
+- [ ] **RoundingAdjustment existence question** — `RoundingAdjustment` event type exists in `events.ts` as dead schema (never emitted under integer-only mandate; branch removed from `aggregate.ts` Phase 1). Open: remove the event type entirely (schema cleanup), or retain as forward-compatibility scaffold? Resolve before #8 Phase 4 if the all-5-games integration test fixture references `RoundingAdjustment`. Added 2026-04-24.
 - [ ] Junk CTPCarried stub: Phase 2 ships CTPCarried with carryPoints: 0, AC-pending rules pass per plan. No §12 test exercises the carry path (all tests use groupResolve). Coverage gap inherited by #7b; rules pass before #7b must specify test coverage for carry accumulation and resolution at Final Adjustment boundary. Added 2026-04-24.
 - [ ] `pushAward` multiplier hazard: the `multiplier` param is for event-level point doubling (Super Sandy) only. `bet.junkMultiplier` is a money-rendering boundary value — must NEVER be passed as the `pushAward` multiplier argument. Safe in Phase 2 (all calls use default=1). Add a guard comment above the `multiplier` param before Phase 3 Sandy/Barkie/Polie/Arnie work begins. Added 2026-04-24.
 
@@ -106,6 +104,7 @@ Append-only. Close date + pointer to prompt NNN or EOD.
 - [x] #4 — Bet-id string-lookup refactor — closed 2026-04-20, prompt 009. Final test count 97 (AC's "100 modulo the #3 net-zero" figure was arithmetically wrong; 97 start, 97 end, 0 net change is correct).
 - [x] #5 — Nassau engine — closed 2026-04-22, prompt 011. 177 tests, tsc+greps clean. All phases 1–4d complete. `NassauCfg.matchTieRule` deleted; allPairs/singles both fully supported; press rules; closeout; finalize; forfeit per-match; withdrawal per-pair.
 - [x] #6 — Match Play engine — closed 2026-04-24 — prompts 016–010 (2026-04-22 to 2026-04-24). Phases 1a–4d complete. Engine-level: singles + best-ball; alternate-shot/foursomes deferred (product decision 2026-04-23). See REBUILD_PLAN.md §#6 for full AC.
+- [x] #7 — Junk engine (Phase 2 core) — closed 2026-04-24. Phases 1–2 complete: CTP, Greenie, Longest Drive fully implemented and tested (§12 Tests 1–5 pass, 273 tests at close). Schema widening: `JunkAwarded.winners` + `LongestDriveWinnerSelected.winners` → `PlayerId[]`; `HoleState.longestDriveWinners: PlayerId[]`. Phase 3 (#7b — Sandy/Barkie/Polie/Arnie) is backlog, gated on rules pass.
 
 ## Deferred / won't-do
 

@@ -23,21 +23,17 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-### #8 — aggregate.ts
+### #8 — aggregate.ts — Done 2026-04-24
 
-**Why**: Reduce a `ScoringEventLog` to a `RunningLedger`. Shape A (combined orchestrator + reducer). Junk-only stake-scaled formula; all other monetary events pass points through directly. Zero-sum enforcement via `ZeroSumViolationError`.
+All 4 phases closed. See Done section and `REBUILD_PLAN.md #8`.
 
-**Acceptance criteria**: see `REBUILD_PLAN.md` `### #8` for full AC.
+### Verification agent — src/verify/verifyRound.ts
 
-**Must complete before**: #11 cutover (engine-side).
+**Why**: Post-#8. `aggregateRound` is stable; use its `netByPlayer`, `byBet`, and
+finalized `MatchState` as primitives for a 10-invariant round verification pass.
+See parking-lot item for full scope description.
 
-**Phase tracking**:
-- [x] Phase 1 — Scaffold + Junk reducer + junk.ts dead-code deletion — closed 2026-04-24 (commit 8c0a147). 277 tests, tsc clean. Supersession filter deferred (Option C); RoundingAdjustment branch removed (Outcome A).
-- [x] Phase 2 — Skins + Wolf validation (test-only) — closed 2026-04-24 (commit cfa5fa2). 280 tests. aggregate.ts unchanged.
-- [x] Phase 3 — Nassau + Match Play (MatchState threading, finalizers, compound keys) — closed 2026-04-24 (Iter 1: b4b5e25, Iter 2: c64fc3d). 290 tests.
-- [ ] Phase 4 — Stroke Play + all-5-games integration test
-
-**Status**: Active — Phase 1 closed 2026-04-24.
+**Status**: Pre-scope (researcher pass next — no engineer work until scope is written).
 
 ## Backlog
 
@@ -108,6 +104,7 @@ Append-only. Close date + pointer to prompt NNN or EOD.
 - [x] #5 — Nassau engine — closed 2026-04-22, prompt 011. 177 tests, tsc+greps clean. All phases 1–4d complete. `NassauCfg.matchTieRule` deleted; allPairs/singles both fully supported; press rules; closeout; finalize; forfeit per-match; withdrawal per-pair.
 - [x] #6 — Match Play engine — closed 2026-04-24 — prompts 016–010 (2026-04-22 to 2026-04-24). Phases 1a–4d complete. Engine-level: singles + best-ball; alternate-shot/foursomes deferred (product decision 2026-04-23). See REBUILD_PLAN.md §#6 for full AC.
 - [x] #7 — Junk engine (Phase 2 core) — closed 2026-04-24. Phases 1–2 complete: CTP, Greenie, Longest Drive fully implemented and tested (§12 Tests 1–5 pass, 273 tests at close). Schema widening: `JunkAwarded.winners` + `LongestDriveWinnerSelected.winners` → `PlayerId[]`; `HoleState.longestDriveWinners: PlayerId[]`. Phase 3 (#7b — Sandy/Barkie/Polie/Arnie) is backlog, gated on rules pass.
+- [x] #8 — src/games/aggregate.ts — closed 2026-04-24. Phases 1–4: scaffold + Junk reducer (Phase 1), Skins + Wolf validation (Phase 2), Nassau + Match Play with MatchState threading and compound keys (Phase 3), Stroke Play finalizer + all-5-games capstone (Phase 4). 292 tests. See REBUILD_PLAN.md #8 for full AC.
 
 ## Deferred / won't-do
 

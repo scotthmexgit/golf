@@ -16,3 +16,5 @@ Second-pass engineer brief described change scope as "test-addition only" withou
 None.
 
 **Addendum (verification pass):** AUDIT.md references in REBUILD_PLAN.md #7 verified. Item #14 and #1 both exist. "closes #14" corrected to "partially closes #14" (cutover is #11, not #7). "Round 5 Sub-Task 2" is real — verbatim in AUDIT.md:200. Risk flag retained as written.
+
+**Addendum (Phase 1 gate — plan amendment):** Phase 1 engineer prompt narrowed scope below REBUILD_PLAN.md Phase 1 AC. Reviewer caught mismatch. Plan amended to match delivery: scope items B/C/D narrowed; isCTP/isLongestDrive/isGreenie and event emission moved to Phase 2. Pattern to watch: engineer-prompt drafting should re-read plan AC immediately before the prompt goes out, not rely on summary. Second occurrence this session of prompt-narrower-than-plan (first: Phase 4d W9-prereq prompt missing Phase 1 context).

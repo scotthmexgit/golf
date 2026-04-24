@@ -714,9 +714,9 @@ When one hole produces N `JunkAwarded` events for the same Junk kind (one per de
 
 **Scope:**
 - A. Delete `src/games/junk.ts`.
-- B. Create `src/games/junk.ts` with: `isCTP`, `isLongestDrive`, `isGreenie`, `isSandy` (stub → returns `null`), `isBarkie` (stub), `isPolie` (stub), `isArnie` (stub). Full `resolveJunkWinner` switch present; Sandy/Barkie/Polie/Arnie cases return `null` (AC-pending rules pass).
-- C. `settleJunkHole(hole: HoleState, roundCfg: RoundConfig, junkCfg: JunkRoundConfig): ScoringEvent[]` — emits `CTPWinnerSelected` (bookkeeping, once per awarded CTP), `LongestDriveWinnerSelected` (bookkeeping, once per awarded LD), and `JunkAwarded` fan-out per `(roundCfg.bets × junkKind)`. Uses `bet.participants` (canonical), not `bet.bettors` (doc pseudocode).
-- D. Create `src/games/__tests__/junk.test.ts` — stub file with a single `it('has a test file', () => expect(true).toBe(true))`.
+- B. Create `src/games/junk.ts` with: `resolveJunkWinner` dispatch switch, all 7 `JunkKind` arms. CTP/Greenie/Longest Drive arms return `null` stub (`// Phase 2 — full implementation`). Sandy/Barkie/Polie/Arnie arms return `null` stub (`// #7b — rules pass 2026-04-24 pending`). Exhaustive `default` branch (`const _exhaustive: never = kind`). Named exports only.
+- C. `settleJunkHole(hole: HoleState, roundCfg: RoundConfig, junkCfg: JunkRoundConfig): ScoringEvent[]` — body returns `[]`. Phase 2 fills in event emission. Named export.
+- D. Create `src/games/__tests__/junk.test.ts` — scaffold: import check; one test asserting all 7 `resolveJunkWinner` arms do not throw; one test asserting `settleJunkHole` returns `[]`.
 
 **Fence:** No CTP carry logic, no Longest Drive tie `RoundingAdjustment`, no Sandy/Barkie/Polie/Arnie beyond stubs. No changes to any other engine file.
 
@@ -731,6 +731,7 @@ When one hole produces N `JunkAwarded` events for the same Junk kind (one per de
 **Objective:** Implement CTP (including `CTPWinnerSelected` bookkeeping), Greenie, and Longest Drive (including tie split and `RoundingAdjustment`). Implement `CTPCarried` emission stub (AC-pending rules pass). Wire §12 Tests 1–5.
 
 **Scope:**
+- (Absorbs from Phase 1 amendment: isCTP, isLongestDrive, isGreenie named helpers are implemented here, not in Phase 1.)
 - A. CTP: emit `CTPWinnerSelected` (once per hole, regardless of declaring-bet count) before the `JunkAwarded` fan-out. `gir` field on `CTPWinnerSelected` sourced from `junkCfg.girEnabled && hole.gir[winner]`.
 - B. Greenie: derives from CTP per `isCTP` result and `junkCfg.girEnabled`. Fan-out per declaring bet same as CTP.
 - C. Longest Drive: emit `LongestDriveWinnerSelected` (once per hole) before `JunkAwarded` fan-out. Tie handling: `w` tied winners, each winner `points = N − w`, each loser `points = −w`; zero-sum holds. When `(points × stake × junkMultiplier)` has a per-winner cent remainder, emit `RoundingAdjustment` routing remainder to the tied winner with the lowest `playerId` lexicographically.

@@ -1336,3 +1336,125 @@ Rough effort order: S + S + L + L + M + S + XS + S + M. Three parallel tracks po
 ## Plan status
 
 **Awaiting user approval.** No code changes until the user signs off. #2 (this rebuild plan) stays Active until sign-off; #3 then becomes Active.
+
+---
+
+## Post-#8 Tooling
+
+Items in this section are not part of the numbered game-engine rebuild (#3–#11)
+and have no cutover dependency. They build on the stable #8 aggregate.ts surface.
+
+---
+
+### Verification tool — `src/verify/verifyRound.ts`
+
+**What it is**: A pure function `verifyRound(log: ScoringEventLog, roundCfg: RoundConfig, ledger: RunningLedger): VerificationReport`. Read-only. No side effects. No state mutations. Returns a structured report; does NOT throw.
+
+**Why not an agent**: Scope A — library tool callable from tests and as a diagnostic utility. Not a `.claude/agents/` agent.
+
+**Why post-#8**: Requires stable `aggregateRound` as a prerequisite (callers pass the already-computed ledger). The verifier checks the ledger's correctness, not recompute it. Phase 1 is defense-in-depth; Phases 2–3 are the bug-catching payload.
+
+**Phase 1 role note**: invariants 1, 2, 7 overlap with `aggregate.ts`'s `ZeroSumViolationError` runtime enforcement. Phase 1's value is (a) richer per-bet reporting (errors list, not throw), and (b) establishing the `VerificationReport` shape that Phases 2 and 3 extend. Phase 1 does not catch bugs that `aggregateRound` doesn't already catch. Phase 2 and 3 are the incremental value.
+
+**VerificationReport shape**:
+```typescript
+interface InvariantResult {
+  invariant: string        // human-readable name, e.g. 'money-zero-sum-per-bet'
+  passed: boolean
+  severity: 'error' | 'warning' | 'info'
+  details?: string         // human-readable explanation if !passed
+}
+
+interface VerificationReport {
+  passed: boolean          // true only if all invariants pass
+  invariants: InvariantResult[]
+  summary: string          // e.g. "2 errors, 1 warning, 7 passed"
+}
+```
+
+The report is structured (machine-readable and human-readable). Callers may choose to throw on `!passed`, log the report, or surface it in UI. The verifier itself never throws.
+
+**File location**: `src/verify/verifyRound.ts`. Exports: `verifyRound`, `VerificationReport`, `InvariantResult`.
+
+**Dependencies**: `src/games/types.ts` (ScoringEventLog, RoundConfig, RunningLedger), `src/games/aggregate.ts` (buildMatchStates — imported for Phase 3 state consistency checks).
+
+**10 invariants and phase assignments**:
+
+| # | Invariant | Phase | Data source |
+|---|---|---|---|
+| 1 | Money zero-sum per bet (Σ byBet[key] = 0 for each key) | Phase 1 | RunningLedger.byBet |
+| 2 | Money zero-sum across all participants (Σ netByPlayer = 0) | Phase 1 | RunningLedger.netByPlayer |
+| 7 | Integer invariants (all money values satisfy Number.isInteger) | Phase 1 | RunningLedger |
+| 4 | Hole coverage (declared games' events present for each hole in log) | Phase 2 | ScoringEventLog |
+| 5 | Player validity (all event actors/targets in roundCfg.players) | Phase 2 | ScoringEventLog |
+| 6 | Bet validity (all declaringBet IDs in log correspond to roundCfg.bets) | Phase 2 | ScoringEventLog |
+| 8 | Junk award validity (JunkAwarded only for declared kinds and bettor players) | Phase 3 | ScoringEventLog + RoundConfig |
+| 9 | State-transition consistency (MatchClosedOut matches trajectory from event history) | Phase 3 | ScoringEventLog + buildMatchStates |
+| 3 | MatchState consistency (final MatchState from buildMatchStates matches log events) | Phase 3 | buildMatchStates |
+| 10 | Supersession consistency (log.supersessions references exist in log.events) | Phase 3 | ScoringEventLog |
+
+*(Numbers match original parking-lot item; ordering by phase, not original number.)*
+
+**Phase breakdown**:
+
+##### Phase 1 — VerificationReport scaffold + RunningLedger invariants
+
+**Objective**: Establish the `VerificationReport` shape. Check the three ledger-derivable invariants. Caller passes a pre-computed `RunningLedger` (from `aggregateRound`). Phase 1 adds no new bug-catching power over `aggregateRound`'s `ZeroSumViolationError`; its value is per-bet granularity and structured reporting format.
+
+**Scope:**
+- A. Create `src/verify/verifyRound.ts`. Export `verifyRound(log, roundCfg, ledger): VerificationReport`. Export `VerificationReport` and `InvariantResult` types.
+- B. Implement invariants 1 (byBet zero-sum per key), 2 (netByPlayer total zero-sum), 7 (integer check).
+- C. Create `src/verify/__tests__/verifyRound.test.ts`. Tests: (1) valid ledger from a known-good log passes all Phase 1 invariants; (2) deliberately unbalanced byBet slice fails invariant 1; (3) non-integer money value fails invariant 7.
+
+**Stop-artifact**: all Phase 1 tests pass. `tsc --noEmit --strict` zero errors. `verifyRound` returns `VerificationReport` with correct `passed`/`invariants` shape for both clean and broken fixtures.
+
+**Gate to Phase 2**: `VerificationReport` shape stable. Phase 1 tests cover the three ledger invariants.
+
+---
+
+##### Phase 2 — Event log walk: player, bet, hole-coverage invariants
+
+**Objective**: Add invariants that require walking `log.events`. No `buildMatchStates` call yet.
+
+**Scope:**
+- A. Invariant 5 (player validity): all `event.actor`, all event-specific player fields (e.g., `winner`, `forfeiter`, `conceder`) appear in `roundCfg.players[].id`.
+- B. Invariant 6 (bet validity): all `event.declaringBet` and `event.targetBet` values appear in `roundCfg.bets[].id` or equal `'all-bets'` (for FinalAdjustmentApplied).
+- C. Invariant 4 (hole coverage): for each declared game, each hole in `1..roundCfg.bets` scope has at least one expected event kind. Exact definition of "expected event" per game type — define before implementation.
+- D. Tests: fabricate logs with unknown player IDs, unknown bet IDs, missing per-hole events. Assert `passed: false` with correct `invariant` names in the report.
+
+**Open scope question for rules pass**: hole coverage exact definition. Does "Skins coverage" mean at least one `SkinWon` or `StrokePlayHoleRecorded` per declared hole? Or only at round boundaries? Defer to rules-documenter pass if non-trivial.
+
+**Stop-artifact**: Phase 2 invariants fire correctly on deliberately broken fixtures. Phase 1 tests still pass.
+
+**Gate to Phase 3**: Event-walk invariants stable. Fixture library pattern established (inline or shared? decide before Phase 2 engineer starts).
+
+---
+
+##### Phase 3 — State-aware invariants (MatchState, Junk, supersession)
+
+**Objective**: Add invariants requiring `buildMatchStates` or cross-game state knowledge.
+
+**Scope:**
+- A. Invariant 3 (MatchState consistency): call `buildMatchStates(log, roundCfg)`, compare resulting MatchState to what the event log implies. E.g., number of MatchClosedOut events for a match must agree with `match.closed === true` in the returned state.
+- B. Invariant 8 (Junk validity): for each `JunkAwarded` event, verify `event.junk` is in the declaring bet's `junkItems`, and `event.winners` are all in the declaring bet's `participants`.
+- C. Invariant 9 (state-transition consistency): for each `MatchClosedOut`, verify `event.holesUp > event.holesRemaining` (the closeout condition).
+- D. Invariant 10 (supersession): for each `[k, v]` in `log.supersessions`, verify `k` and `v` both exist in `log.events` (schema design TBD per parking-lot "Supersession schema design" item — stub until resolved).
+- E. Tests covering each of the four Phase 3 invariants with deliberately broken fixtures.
+
+**Stop-artifact**: All 10 invariants implemented and tested. `verifyRound` returns correct report for a clean all-5-games log (should produce `passed: true`). `tsc` clean. Prior phase tests still pass.
+
+---
+
+#### Open scope questions
+
+- **Fixture library**: broken-log fixtures in each phase test — inline (per-test, self-contained) or shared library in `src/verify/__tests__/fixtures/`? Inline for Phase 1; decide before Phase 2 if complexity warrants sharing.
+- **VerificationReport machine-readability**: structured JSON (current shape above) is machine-readable. No additional serialization needed unless UI surfacing is planned.
+- **Invariant 4 (hole coverage) exact definition**: what counts as "covered" for each game type? Rules-documenter pass if non-trivial.
+- **Invariant 10 (supersession) schema**: depends on "Supersession schema design" parking-lot item. Phase 3 item D stubs until that's resolved.
+
+#### Out of scope
+
+- Verifier does NOT modify `ledger`, `log`, or any game state.
+- Verifier does NOT call `aggregateRound` internally (caller passes pre-computed ledger).
+- Verifier does NOT throw; all errors are captured in `VerificationReport.invariants`.
+- `.claude/agents/` integration: Scope A only. No agent wrapping in this plan.

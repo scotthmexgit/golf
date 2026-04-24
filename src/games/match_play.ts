@@ -111,7 +111,7 @@ function holeWinner(
   return 'halved'
 }
 
-function advanceMatch(
+export function advanceMatch(
   match: MatchState,
   winner: 'team1' | 'team2' | 'halved',
   holesToPlay: number,

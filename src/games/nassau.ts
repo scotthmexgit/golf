@@ -194,7 +194,7 @@ export function offerPress(
   }]
 }
 
-function endOfCurrent9Leg(hole: number, parentEndHole: number): number {
+export function endOfCurrent9Leg(hole: number, parentEndHole: number): number {
   const legEnd = hole <= 9 ? 9 : 18
   return Math.min(legEnd, parentEndHole)
 }
@@ -216,13 +216,7 @@ export function openPress(
     )
   }
 
-  const startHole = confirmation.hole + 1
-  const endHole = config.pressScope === 'match'
-    ? parent.endHole
-    : endOfCurrent9Leg(confirmation.hole, parent.endHole)
-
-  const pressCount = matches.filter((m) => m.id.startsWith('press-')).length
-  const pressId = `press-${pressCount + 1}`
+  const pressMatch = buildPressMatchState(confirmation.hole, confirmation.parentMatchId, matches, config)
   const base = {
     timestamp: String(confirmation.hole),
     actor: confirmation.openingPlayer,
@@ -234,12 +228,12 @@ export function openPress(
     kind: 'PressOpened',
     ...base,
     parentMatchId: parent.id,
-    pressMatchId: pressId,
+    pressMatchId: pressMatch.id,
   }]
 
   // § 9: press opened on the last hole of its window has zero holes to play
   // and ties immediately. Emit PressVoided; do NOT add the MatchState.
-  if (startHole > endHole) {
+  if (pressMatch.startHole > pressMatch.endHole) {
     events.push({
       kind: 'PressVoided',
       ...base,
@@ -249,7 +243,30 @@ export function openPress(
     return { events, matches }
   }
 
-  const pressMatch: MatchState = {
+  return { events, matches: [...matches, pressMatch] }
+}
+
+export function buildPressMatchState(
+  hole: number,
+  parentMatchId: string,
+  matches: MatchState[],
+  config: NassauCfg,
+): MatchState {
+  const parent = matches.find((m) => m.id === parentMatchId)
+  if (!parent) {
+    throw new NassauConfigError(
+      'parentMatchId',
+      `no MatchState with id '${parentMatchId}'`,
+    )
+  }
+  const startHole = hole + 1
+  const endHole =
+    config.pressScope === 'match'
+      ? parent.endHole
+      : endOfCurrent9Leg(hole, parent.endHole)
+  const pressCount = matches.filter((m) => m.id.startsWith('press-')).length
+  const pressId = `press-${pressCount + 1}`
+  return {
     id: pressId,
     startHole,
     endHole,
@@ -258,8 +275,6 @@ export function openPress(
     pair: parent.pair,
     parentId: parent.id,
   }
-
-  return { events, matches: [...matches, pressMatch] }
 }
 
 // ─── Net-score computation (pair-wise USGA allocation) ──────────────────────
@@ -301,7 +316,7 @@ function holeResult(
   return 'tie'
 }
 
-function applyHoleToMatch(match: MatchState, winner: 'A' | 'B' | 'tie'): MatchState {
+export function applyHoleToMatch(match: MatchState, winner: 'A' | 'B' | 'tie'): MatchState {
   if (winner === 'A') return { ...match, holesWonA: match.holesWonA + 1 }
   if (winner === 'B') return { ...match, holesWonB: match.holesWonB + 1 }
   return match

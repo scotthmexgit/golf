@@ -911,13 +911,13 @@ Use canonical `types.ts` names throughout — `roundCfg.bets`, `bet.participants
 
 **Source:** `game_junk.md §6` (CTPCarried row). The doc states the carry "transfers to the next eligible par 3" and that `CTPCarried` emits with `carryPoints`, but is silent on how `carryPoints` accumulates when a second CTP tie occurs while a carry is already live.
 
-**Decision:** Additive carry. Each subsequent CTP tie on a par 3 while a carry is active adds one additional stake-equivalent to the running total. Standard golf carry convention: the pot grows by the same unit on each successive tie.
+**Decision:** Additive carry. When a CTP tie occurs while a carry is already live, the accumulated `carryPoints` grows by one unit per tie.
 
-```
-carryPoints_new = carryPoints_old + stake_equivalent
-```
+`carryPoints` is a **dimensionless integer count of consecutive ties** — not a money value. It is not bet-specific because `CTPCarried` carries no `declaringBet` field (confirmed at `events.ts` line 265–272). At resolution time, `aggregate.ts` computes the per-declaring-bet money award as `carryPoints × stake_equivalent_per_bet`, where `stake_equivalent_per_bet` is the points value a single CTP winner would collect from that bet (`N - 1` in the base case).
 
-Where `stake_equivalent` is the per-declaring-bet CTP stake unit (the points value a single CTP winner would collect from the bet). The new `CTPCarried` event replaces the prior one; `carryPoints` on the emitted event reflects the cumulative total.
+Additive accumulation is chosen because: (a) each successive tie represents one additional missed resolution at stake, and the fairest reparation is proportional to the number of ties; (b) the doc says the pot "transfers to the next eligible par 3" (§6), implying the carry is a single undivided pot that grows across ties — not a separate carry per declaring bet. The doc is silent on the specific formula; this is a designed-for-this-codebase decision, not an inherited rules standard.
+
+`carryPoints_new = carryPoints_old + 1`
 
 ---
 
@@ -926,7 +926,7 @@ Where `stake_equivalent` is the per-declaring-bet CTP stake unit (the points val
 **Source:** `game_junk.md §6` — resolution trigger: "the pot transfers to the next eligible par 3 in the round." An eligible par 3 is one where a clear CTP winner is selected (tie broken). End-of-round unresolved path: "if no subsequent par 3 exists … the carry stays unresolved and escalates to the Final Adjustment screen per `docs/games/_FINAL_ADJUSTMENT.md`; the app never plays extra holes."
 
 **Decision:**
-- (a) Resolution trigger: the carry resolves on the next par-3 hole where `CTPWinnerSelected` emits with a single winner (i.e., the tie is broken). `aggregate.ts` applies the accumulated `carryPoints` total to that winner's account in addition to the standard CTP award for that hole.
+- (a) Resolution trigger: the carry resolves on the next par-3 hole where `CTPWinnerSelected` emits with a single unambiguous winner. `aggregate.ts` applies the accumulated `carryPoints` total to that winner's account in addition to the standard CTP award for that hole. If the next par-3 is also a tie, `carryPoints` accumulates further per Topic 1; resolution waits for the next unambiguous par-3 or end-of-round escalation.
 - (b) End-of-round unresolved path: if hole 18 `Confirmed` is reached with an active carry, the carry does not settle automatically. It escalates to the Final Adjustment screen (`_FINAL_ADJUSTMENT.md §1`). No synthetic winner is assigned; the `CTPCarried` event remains in the log as an open item visible to the role-holder.
 
 Cross-reference: the Final Adjustment screen is the resolution path per Topic 3 fan-out rules.
@@ -946,6 +946,12 @@ for each bet in roundCfg.bets:
   emit FinalAdjustmentApplied { targetBet: bet.id, points: redistributed(eligible) }
 ```
 
+From `_FINAL_ADJUSTMENT.md §11 Test 6`:
+> ### Test 6 — `'all-bets'` adjustment
+>
+> Setup: a round with two bets — Skins (bettors A, B, C, D) and Nassau (bettors A, B). Role-holder applies `{ Alice: +1, Bob: -1 }` with `targetBet: 'all-bets'`.
+> Assert: Two `FinalAdjustmentApplied` events emit (one per declaring bet). Each has `points` summing to zero within its bet's bettor set.
+
 ---
 
 ##### Topic 4 — `byBet` key space for Nassau
@@ -961,7 +967,7 @@ byBet[key][p] += money[p]
 
 For non-Nassau monetary events (no `matchId` field), the key remains `event.declaringBet` unchanged.
 
-Finding — engineer scope: `RunningLedger.byBet` is typed as `Record<BetId, Record<PlayerId, number>>`. The compound key form `${betId}::${matchId}` is not a `BetId` in the strict type sense. Engineer must either widen the key type to `string` for Nassau entries or define a `MatchLedgerKey = BetId | \`${BetId}::${string}\`` union alias in `types.ts`. This is a schema-adjacent change to `types.ts` — flagged under Findings below.
+**Authorized scope change**: `RunningLedger.byBet: Record<BetId, Record<PlayerId, number>>` widens to `Record<string, Record<PlayerId, number>>` in `types.ts`. This change is explicitly authorized as part of #8 scope and lands in Phase 3 AC (not a fence violation). Engineer may optionally introduce a nominal type alias `type BetLedgerKey = string` — micro-decision ceded to the engineer.
 
 ---
 
@@ -994,7 +1000,7 @@ press.junkMultiplier = parentBet.junkMultiplier
 
 ##### Findings — engineer scope
 
-1. **`RunningLedger.byBet` key type** (Topic 4): the compound key `${betId}::${matchId}` requires widening `byBet`'s key type from strict `BetId` to `string` or introducing a `MatchLedgerKey` union alias in `src/games/types.ts`. This is a `types.ts` change that the #8 acceptance criteria currently forbids ("No changes to `src/games/types.ts`"). Engineer must resolve with team-lead before Phase 3.
+1. **`RunningLedger.byBet` key type** (Topic 4): the compound key `${betId}::${matchId}` requires widening `byBet`'s key type from strict `BetId` to `string` or introducing a `MatchLedgerKey` union alias in `src/games/types.ts`. Authorization granted (2026-04-24). This change is part of #8 Phase 3 AC.
 
 2. **`ZeroSumViolationError` type** (Topic 5): the throw decision requires a typed error class. If `ZeroSumViolationError` is not already in `src/games/types.ts` or a shared errors file, the engineer adds it in Phase 1 as a plain class (no schema change to `events.ts` or `types.ts` needed — it is a runtime error class, not a `ScoringEvent` variant).
 

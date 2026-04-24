@@ -17,12 +17,13 @@
 // Decision 5: Sizing M.
 
 import type { PlayerId, BetId, RoundConfig, RunningLedger } from './types'
-import type { ScoringEventLog, NassauCfg, MatchPlayCfg } from './types'
+import type { ScoringEventLog, NassauCfg, MatchPlayCfg, StrokePlayCfg } from './types'
 import type { ScoringEvent } from './events'
 import { initialMatches, applyHoleToMatch, buildPressMatchState, finalizeNassauRound } from './nassau'
 import type { MatchState as NassauMatchState } from './nassau'
 import { initialMatch, advanceMatch, finalizeMatchPlayRound } from './match_play'
 import type { MatchState as MPMatchState } from './match_play'
+import { finalizeStrokePlayRound } from './stroke_play'
 
 // ─── ZeroSumViolationError ────────────────────────────────────────────────────
 //
@@ -366,6 +367,15 @@ export function aggregateRound(
         const { events } = finalizeMatchPlayRound(bet.config as MatchPlayCfg, roundCfg, match)
         finalizerEvents.push(...events)
       }
+    } else if (bet.type === 'strokePlay') {
+      // Filter to StrokePlayHoleRecorded events for this bet only.
+      // finalizeStrokePlayRound groups by declaringBet internally, so passing
+      // only this bet's events prevents cross-bet contamination.
+      const strokeEvents = log.events.filter(
+        e => e.kind === 'StrokePlayHoleRecorded' && e.declaringBet === bet.id
+      )
+      const spEvents = finalizeStrokePlayRound(strokeEvents, bet.config as StrokePlayCfg)
+      finalizerEvents.push(...spEvents)
     }
   }
 

@@ -1218,3 +1218,126 @@ describe('aggregateRound — Phase 3 Iter 2 (finalizers + compound keys + money)
     expect(total).toBe(0)
   })
 })
+
+// ─── Phase 4 Iter 1 fixtures ──────────────────────────────────────────────────
+
+import type { StrokePlayCfg } from '../types'
+
+function makeStrokePlayBet(
+  id: string,
+  playerIds: string[],
+  stake: number,
+): BetSelection {
+  const cfg: StrokePlayCfg = {
+    id,
+    stake,
+    settlementMode: 'winner-takes-pot',
+    stakePerStroke: 0,
+    placesPayout: [],
+    tieRule: 'split',
+    cardBackOrder: [],
+    appliesHandicap: false,
+    playerIds,
+    junkItems: [],
+    junkMultiplier: 1,
+  }
+  return {
+    id,
+    type: 'strokePlay',
+    stake,
+    participants: playerIds,
+    config: cfg,
+    junkItems: [],
+    junkMultiplier: 1,
+  }
+}
+
+function makeStrokePlayHoleRecorded(
+  betId: string,
+  hole: number,
+  nets: Record<string, number>,
+): ScoringEvent {
+  return {
+    kind: 'StrokePlayHoleRecorded',
+    timestamp: `2026-04-24T10:00:0${hole}.000Z`,
+    hole,
+    actor: 'system',
+    declaringBet: betId,
+    nets,
+  } as ScoringEvent
+}
+
+// ─── Phase 4 Iter 1 tests ─────────────────────────────────────────────────────
+
+describe('aggregateRound — Phase 4 Iter 1 (Stroke Play finalizer wiring)', () => {
+  // ── Test K: Stroke Play finalizer produces StrokePlaySettled ───────────────
+  //
+  // Fixture: 4 players (alice, bob, carol, dave), one strokePlay bet
+  //   (winner-takes-pot, stake=100). 4 holes of StrokePlayHoleRecorded events.
+  //   Alice has the lowest net total (70); others net 72, 73, 74.
+  //
+  // winner-takes-pot with 4 players, stake=100, clear winner:
+  //   alice  = 100 × (4-1) =  300
+  //   bob    =            = -100
+  //   carol  =            = -100
+  //   dave   =            = -100
+  //   Zero-sum: 300 - 100 - 100 - 100 = 0 ✓
+  //
+  // StrokePlayHoleRecorded events carry nets but no points — they fall to
+  // default:break in reduceEvent and produce no money. All money comes from
+  // the StrokePlaySettled emitted by the finalizer.
+
+  it('Test K: Stroke Play finalizer emits StrokePlaySettled; winner collects 300, each loser pays 100', () => {
+    const players = ['alice', 'bob', 'carol', 'dave']
+    const betId = 'bet-strokeplay'
+    const bet = makeStrokePlayBet(betId, players, 100)
+    const cfg = makeRoundCfg([bet])
+
+    // 4 holes. Alice nets 70 total (17+17+18+18), others net 72+ so alice wins
+    // clearly with no tie.
+    //   hole 1: alice=17, bob=18, carol=18, dave=18
+    //   hole 2: alice=17, bob=18, carol=18, dave=19
+    //   hole 3: alice=18, bob=18, carol=18, dave=18
+    //   hole 4: alice=18, bob=18, carol=19, dave=19
+    //   totals: alice=70, bob=72, carol=73, dave=74
+    const log: ScoringEventLog = {
+      events: [
+        makeStrokePlayHoleRecorded(betId, 1, { alice: 17, bob: 18, carol: 18, dave: 18 }),
+        makeStrokePlayHoleRecorded(betId, 2, { alice: 17, bob: 18, carol: 18, dave: 19 }),
+        makeStrokePlayHoleRecorded(betId, 3, { alice: 18, bob: 18, carol: 18, dave: 18 }),
+        makeStrokePlayHoleRecorded(betId, 4, { alice: 18, bob: 18, carol: 19, dave: 19 }),
+      ],
+      supersessions: {},
+    }
+
+    const ledger = aggregateRound(log, cfg)
+
+    // byBet key exists for the stroke play bet
+    expect(ledger.byBet[betId]).toBeDefined()
+
+    // Winner collects (N-1) × stake = 300
+    expect(ledger.netByPlayer['alice']).toBe(300)
+    expect(ledger.byBet[betId]?.['alice']).toBe(300)
+
+    // Each loser pays -stake = -100
+    expect(ledger.netByPlayer['bob']).toBe(-100)
+    expect(ledger.byBet[betId]?.['bob']).toBe(-100)
+    expect(ledger.netByPlayer['carol']).toBe(-100)
+    expect(ledger.byBet[betId]?.['carol']).toBe(-100)
+    expect(ledger.netByPlayer['dave']).toBe(-100)
+    expect(ledger.byBet[betId]?.['dave']).toBe(-100)
+
+    // Zero-sum
+    const total = Object.values(ledger.netByPlayer).reduce((a, b) => a + b, 0)
+    expect(total).toBe(0)
+
+    // Double-count check: StrokePlayHoleRecorded events have no points in
+    // reduceEvent (they fall to default:break). Confirm that the per-hole
+    // recorded nets (e.g., alice 17, 17, 18, 18 = 70) did NOT inflate the
+    // ledger. The only money in the ledger must come from StrokePlaySettled.
+    // If hole events were double-counted alice would be >300 — this assertion
+    // confirms they were not.
+    expect(ledger.netByPlayer['alice']).toBe(300)
+    expect(Object.values(ledger.netByPlayer).reduce((a, b) => a + b, 0)).toBe(0)
+  })
+})

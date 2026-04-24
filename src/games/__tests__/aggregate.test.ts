@@ -844,3 +844,377 @@ describe('aggregateRound — Phase 3 Iter 1 (MatchState threading)', () => {
     expect(matches!.some(m => m.id.startsWith('press-'))).toBe(false)
   })
 })
+
+// ─── Phase 3 Iter 2 fixtures ──────────────────────────────────────────────────
+//
+// These helpers build NassauHoleResolved and HoleResolved events for use in
+// finalizer tests. Reuses makeNassauBet / makeMPBet from Iter 1 fixtures above.
+
+/** Build a NassauHoleResolved event. */
+function makeNassauHoleResolved(
+  betId: string,
+  hole: number,
+  matchId: string,
+  winner: 'A' | 'B' | 'tie',
+): ScoringEvent {
+  return {
+    kind: 'NassauHoleResolved',
+    timestamp: String(hole),
+    hole,
+    actor: 'system',
+    declaringBet: betId,
+    matchId,
+    winner,
+  } as ScoringEvent
+}
+
+/** Build a HoleResolved event for Match Play. */
+function makeMPHoleResolved(
+  betId: string,
+  hole: number,
+  winner: 'team1' | 'team2' | 'halved',
+): ScoringEvent {
+  return {
+    kind: winner === 'halved' ? 'HoleHalved' : 'HoleResolved',
+    timestamp: String(hole),
+    hole,
+    actor: 'system',
+    declaringBet: betId,
+    ...(winner !== 'halved' ? { winner } : {}),
+  } as ScoringEvent
+}
+
+/** Build a MatchClosedOut event for Match Play with pre-computed points. */
+function makeMPMatchClosedOut(
+  betId: string,
+  hole: number,
+  points: Record<string, number>,
+): ScoringEvent {
+  return {
+    kind: 'MatchClosedOut',
+    timestamp: String(hole),
+    hole,
+    actor: 'system',
+    declaringBet: betId,
+    matchId: betId,      // Match Play MatchClosedOut uses cfg.id as matchId
+    holesUp: 1,
+    holesRemaining: 0,
+    points,
+  } as ScoringEvent
+}
+
+// ─── Phase 3 Iter 2 tests ─────────────────────────────────────────────────────
+
+describe('aggregateRound — Phase 3 Iter 2 (finalizers + compound keys + money)', () => {
+  // ── Test F: Nassau finalizer fires MatchClosedOut for open won match ─────────
+  //
+  // Fixture: 2-player singles Nassau (stake=10), holes 1-7 only played in front/overall window.
+  //   NassauHoleResolved: holes 1,2,3,4 → winner 'A' (alice wins)
+  //   NassauHoleResolved: holes 5,6,7   → winner 'B' (bob wins)
+  //
+  // After buildMatchStates:
+  //   front  (1-9):   holesWonA=4, holesWonB=3, open
+  //   back   (10-18): holesWonA=0, holesWonB=0, open
+  //   overall(1-18):  holesWonA=4, holesWonB=3, open
+  //
+  // finalizeNassauRound:
+  //   front:   4>3 → MatchClosedOut(matchId='front',   alice+10, bob-10)
+  //   back:    0=0 → MatchTied(matchId='back')          [no points]
+  //   overall: 4>3 → MatchClosedOut(matchId='overall', alice+10, bob-10)
+  //
+  // reduceEvent compound key: 'bet-nassau::front' and 'bet-nassau::overall'.
+  // netByPlayer: alice=+20, bob=-20. Zero-sum: 0.
+  //
+  // ZeroSumViolationError counts log.events.length + finalizerEvents.length (fixed Iter 2).
+
+  it('Test F: Nassau finalizer MatchClosedOut uses compound key; net is zero-sum', () => {
+    const betId = 'bet-nassau'
+    const nassauBet = makeNassauBet(betId, 'alice', 'bob')
+    const cfg = makeRoundCfg([nassauBet])
+
+    const log: ScoringEventLog = {
+      events: [
+        makeNassauHoleResolved(betId, 1, 'overall', 'A'),
+        makeNassauHoleResolved(betId, 2, 'overall', 'A'),
+        makeNassauHoleResolved(betId, 3, 'overall', 'A'),
+        makeNassauHoleResolved(betId, 4, 'overall', 'A'),
+        makeNassauHoleResolved(betId, 5, 'overall', 'B'),
+        makeNassauHoleResolved(betId, 6, 'overall', 'B'),
+        makeNassauHoleResolved(betId, 7, 'overall', 'B'),
+        // Same holes apply to front match (1-9)
+        makeNassauHoleResolved(betId, 1, 'front', 'A'),
+        makeNassauHoleResolved(betId, 2, 'front', 'A'),
+        makeNassauHoleResolved(betId, 3, 'front', 'A'),
+        makeNassauHoleResolved(betId, 4, 'front', 'A'),
+        makeNassauHoleResolved(betId, 5, 'front', 'B'),
+        makeNassauHoleResolved(betId, 6, 'front', 'B'),
+        makeNassauHoleResolved(betId, 7, 'front', 'B'),
+      ],
+      supersessions: {},
+    }
+
+    const ledger = aggregateRound(log, cfg)
+
+    // Compound keys exist for front and overall (both won, closed by finalizer)
+    expect(ledger.byBet[`${betId}::front`]).toBeDefined()
+    expect(ledger.byBet[`${betId}::front`]?.['alice']).toBe(10)
+    expect(ledger.byBet[`${betId}::front`]?.['bob']).toBe(-10)
+
+    expect(ledger.byBet[`${betId}::overall`]).toBeDefined()
+    expect(ledger.byBet[`${betId}::overall`]?.['alice']).toBe(10)
+    expect(ledger.byBet[`${betId}::overall`]?.['bob']).toBe(-10)
+
+    // back match ends tied (0-0) → MatchTied (no points) → no byBet entry for back
+    expect(ledger.byBet[`${betId}::back`]).toBeUndefined()
+
+    // No simple-key entry for the Nassau bet itself
+    expect(ledger.byBet[betId]).toBeUndefined()
+
+    // netByPlayer: front + overall, alice gets +10 twice
+    expect(ledger.netByPlayer['alice']).toBe(20)
+    expect(ledger.netByPlayer['bob']).toBe(-20)
+
+    // Zero-sum
+    const total = Object.values(ledger.netByPlayer).reduce((a, b) => a + b, 0)
+    expect(total).toBe(0)
+  })
+
+  // ── Test G: Match Play finalizer fires MatchHalved — no money ───────────────
+  //
+  // Fixture: 2-player singles Match Play (stake=10), holesToPlay=9.
+  // 4 team1 wins, 4 team2 wins, 1 halved → holesUp=0 at round end.
+  // advanceMatch with halved gives delta=0; last hole: holesPlayed=9,
+  //   holesRemaining=0, abs(0) > 0 is false → closedOut stays false.
+  //
+  // finalizeMatchPlayRound: closedOut=false, holesUp=0 → MatchHalved (bookkeeping only).
+  // No MatchClosedOut emitted. reduceEvent default branch → no money.
+  // netByPlayer empty, byBet empty. Zero-sum holds (Σ 0 = 0).
+
+  it('Test G: Match Play finalizer MatchHalved — no money in ledger', () => {
+    const betId = 'bet-mp'
+    const mpBet = makeMPBet(betId, 'alice', 'bob')
+    const cfg = makeRoundCfg([mpBet])
+
+    const log: ScoringEventLog = {
+      events: [
+        // team1 wins holes 1,2,3,4; team2 wins 5,6,7,8; hole 9 halved
+        makeMPHoleResolved(betId, 1, 'team1'),
+        makeMPHoleResolved(betId, 2, 'team1'),
+        makeMPHoleResolved(betId, 3, 'team1'),
+        makeMPHoleResolved(betId, 4, 'team1'),
+        makeMPHoleResolved(betId, 5, 'team2'),
+        makeMPHoleResolved(betId, 6, 'team2'),
+        makeMPHoleResolved(betId, 7, 'team2'),
+        makeMPHoleResolved(betId, 8, 'team2'),
+        makeMPHoleResolved(betId, 9, 'halved'),
+      ],
+      supersessions: {},
+    }
+
+    const ledger = aggregateRound(log, cfg)
+
+    // MatchHalved has no points — byBet should be empty
+    expect(Object.keys(ledger.byBet)).toHaveLength(0)
+
+    // netByPlayer: no money transferred in a halved match
+    expect(Object.keys(ledger.netByPlayer)).toHaveLength(0)
+
+    // Zero-sum: trivially holds
+    const total = Object.values(ledger.netByPlayer).reduce((a, b) => a + b, 0)
+    expect(total).toBe(0)
+  })
+
+  // ── Test H: Nassau + Match Play combined round ────────────────────────────────
+  //
+  // Fixture: Nassau bet (bet-nassau) + Match Play bet (bet-mp), both alice vs bob.
+  //
+  // Nassau log: 7 NassauHoleResolved events for front match (holes 1-7):
+  //   alice wins 4 (holes 1-4), bob wins 3 (holes 5-7). Holes 8-9 not played.
+  //   finalizeNassauRound fires MatchClosedOut for front (alice+10,bob-10)
+  //   and overall (alice+10,bob-10). back match is 0-0 → MatchTied.
+  //
+  // Match Play log: MP MatchClosedOut in the log (alice wins, alice+10, bob-10).
+  //   buildMatchStates sees the MatchClosedOut and sets mpMatch.closedOut=true.
+  //   finalizeMatchPlayRound returns empty (match.closedOut=true).
+  //
+  // byBet keys: 'bet-nassau::front', 'bet-nassau::overall', 'bet-mp'
+  //   → compound for Nassau, simple for Match Play — no collision.
+  //
+  // netByPlayer: alice = 10+10+10=30, bob = -10-10-10=-30. Zero-sum: 0.
+
+  it('Test H: Nassau + Match Play combined round — compound and simple keys coexist, zero-sum', () => {
+    const nassauBetId = 'bet-nassau'
+    const mpBetId = 'bet-mp'
+    const nassauBet = makeNassauBet(nassauBetId, 'alice', 'bob')
+    const mpBet = makeMPBet(mpBetId, 'alice', 'bob')
+    const cfg = makeRoundCfg([nassauBet, mpBet])
+
+    const log: ScoringEventLog = {
+      events: [
+        // Nassau front match holes 1-7
+        makeNassauHoleResolved(nassauBetId, 1, 'front', 'A'),
+        makeNassauHoleResolved(nassauBetId, 2, 'front', 'A'),
+        makeNassauHoleResolved(nassauBetId, 3, 'front', 'A'),
+        makeNassauHoleResolved(nassauBetId, 4, 'front', 'A'),
+        makeNassauHoleResolved(nassauBetId, 5, 'front', 'B'),
+        makeNassauHoleResolved(nassauBetId, 6, 'front', 'B'),
+        makeNassauHoleResolved(nassauBetId, 7, 'front', 'B'),
+        // Nassau overall match holes 1-7 (same result)
+        makeNassauHoleResolved(nassauBetId, 1, 'overall', 'A'),
+        makeNassauHoleResolved(nassauBetId, 2, 'overall', 'A'),
+        makeNassauHoleResolved(nassauBetId, 3, 'overall', 'A'),
+        makeNassauHoleResolved(nassauBetId, 4, 'overall', 'A'),
+        makeNassauHoleResolved(nassauBetId, 5, 'overall', 'B'),
+        makeNassauHoleResolved(nassauBetId, 6, 'overall', 'B'),
+        makeNassauHoleResolved(nassauBetId, 7, 'overall', 'B'),
+        // Match Play: closed out during play via explicit MatchClosedOut in log
+        makeMPMatchClosedOut(mpBetId, 9, { alice: 10, bob: -10 }),
+      ],
+      supersessions: {},
+    }
+
+    const ledger = aggregateRound(log, cfg)
+
+    // Nassau compound keys
+    expect(ledger.byBet[`${nassauBetId}::front`]?.['alice']).toBe(10)
+    expect(ledger.byBet[`${nassauBetId}::front`]?.['bob']).toBe(-10)
+    expect(ledger.byBet[`${nassauBetId}::overall`]?.['alice']).toBe(10)
+    expect(ledger.byBet[`${nassauBetId}::overall`]?.['bob']).toBe(-10)
+    // back match tied → no entry
+    expect(ledger.byBet[`${nassauBetId}::back`]).toBeUndefined()
+
+    // Match Play simple key
+    expect(ledger.byBet[mpBetId]?.['alice']).toBe(10)
+    expect(ledger.byBet[mpBetId]?.['bob']).toBe(-10)
+
+    // Keys do not collide — MP simple key ≠ any Nassau compound key
+    expect(Object.keys(ledger.byBet)).toContain(`${nassauBetId}::front`)
+    expect(Object.keys(ledger.byBet)).toContain(`${nassauBetId}::overall`)
+    expect(Object.keys(ledger.byBet)).toContain(mpBetId)
+    expect(Object.keys(ledger.byBet)).not.toContain(nassauBetId)
+
+    // netByPlayer: nassau front(10) + nassau overall(10) + mp(10) = 30 for alice
+    expect(ledger.netByPlayer['alice']).toBe(30)
+    expect(ledger.netByPlayer['bob']).toBe(-30)
+
+    // Zero-sum
+    const total = Object.values(ledger.netByPlayer).reduce((a, b) => a + b, 0)
+    expect(total).toBe(0)
+  })
+
+  // ── Test I: Nassau press compound key ─────────────────────────────────────────
+  //
+  // Fixture: 2-player singles Nassau (stake=10), press opened at hole 5 of front.
+  //   Press startHole=6, endHole=endOfCurrent9Leg(5,9)=9. Press id='press-1'.
+  //   NassauHoleResolved for press-1 holes 6,7: both winner='A' (alice).
+  //   holesWonA=2, holesWonB=0, holes 8-9 not played.
+  //
+  // finalizeNassauRound: press-1 open, 2>0 → MatchClosedOut(matchId='press-1',
+  //   alice+10, bob-10).
+  //
+  // Front, back, overall all at 0-0 (no NassauHoleResolved for base matches)
+  //   → MatchTied for each → no money.
+  //
+  // Compound key: 'bet-nassau::press-1' = {alice:10, bob:-10}.
+  // netByPlayer: alice=+10, bob=-10. Zero-sum: 0.
+
+  it('Test I: Nassau press match settled by finalizer uses compound key ::press-1', () => {
+    const betId = 'bet-nassau'
+    const nassauBet = makeNassauBet(betId, 'alice', 'bob')
+    const cfg = makeRoundCfg([nassauBet])
+
+    const log: ScoringEventLog = {
+      events: [
+        // PressOpened at hole 5 of front match
+        {
+          kind: 'PressOpened',
+          timestamp: '5',
+          hole: 5,
+          actor: 'system',
+          declaringBet: betId,
+          parentMatchId: 'front',
+          pressMatchId: 'press-1',
+        } as ScoringEvent,
+        // Press match holes 6 and 7 — alice wins both
+        makeNassauHoleResolved(betId, 6, 'press-1', 'A'),
+        makeNassauHoleResolved(betId, 7, 'press-1', 'A'),
+        // Holes 8 and 9 not played — press stays open, finalizer fires
+      ],
+      supersessions: {},
+    }
+
+    const ledger = aggregateRound(log, cfg)
+
+    // Compound key for press match
+    expect(ledger.byBet[`${betId}::press-1`]).toBeDefined()
+    expect(ledger.byBet[`${betId}::press-1`]?.['alice']).toBe(10)
+    expect(ledger.byBet[`${betId}::press-1`]?.['bob']).toBe(-10)
+
+    // Base matches all tied at 0-0 → MatchTied (no money) → no byBet entries
+    expect(ledger.byBet[`${betId}::front`]).toBeUndefined()
+    expect(ledger.byBet[`${betId}::back`]).toBeUndefined()
+    expect(ledger.byBet[`${betId}::overall`]).toBeUndefined()
+
+    // No simple-key entry
+    expect(ledger.byBet[betId]).toBeUndefined()
+
+    // netByPlayer
+    expect(ledger.netByPlayer['alice']).toBe(10)
+    expect(ledger.netByPlayer['bob']).toBe(-10)
+
+    // Zero-sum
+    const total = Object.values(ledger.netByPlayer).reduce((a, b) => a + b, 0)
+    expect(total).toBe(0)
+  })
+
+  // ── Test J: byBet key string exactness for NassauWithdrawalSettled ───────────
+  //
+  // Fixture: one NassauWithdrawalSettled event (matchId='front',
+  //   declaringBet='bet-nassau', points={alice:10, bob:-10}).
+  //
+  // The compound key MUST be 'bet-nassau::front' — not 'bet-nassau', not
+  // 'front::bet-nassau', not 'bet-nassau/front'.
+
+  it('Test J: NassauWithdrawalSettled key is exactly "${declaringBet}::${matchId}"', () => {
+    const betId = 'bet-nassau'
+    const nassauBet = makeNassauBet(betId, 'alice', 'bob')
+    const cfg = makeRoundCfg([nassauBet])
+
+    const log: ScoringEventLog = {
+      events: [
+        {
+          kind: 'NassauWithdrawalSettled',
+          timestamp: '3',
+          hole: 3,
+          actor: 'system',
+          declaringBet: betId,
+          matchId: 'front',
+          withdrawer: 'bob',
+          points: { alice: 10, bob: -10 },
+        } as ScoringEvent,
+      ],
+      supersessions: {},
+    }
+
+    const ledger = aggregateRound(log, cfg)
+
+    const keys = Object.keys(ledger.byBet)
+
+    // Exact compound key present
+    expect(keys).toContain('bet-nassau::front')
+
+    // Wrong key forms must NOT be present
+    expect(keys).not.toContain('bet-nassau')
+    expect(keys).not.toContain('front::bet-nassau')
+    expect(keys).not.toContain('bet-nassau/front')
+    expect(keys).not.toContain('front')
+
+    // Value is correct
+    expect(ledger.byBet['bet-nassau::front']?.['alice']).toBe(10)
+    expect(ledger.byBet['bet-nassau::front']?.['bob']).toBe(-10)
+
+    // Zero-sum
+    const total = Object.values(ledger.netByPlayer).reduce((a, b) => a + b, 0)
+    expect(total).toBe(0)
+  })
+})

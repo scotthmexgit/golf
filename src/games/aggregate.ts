@@ -18,9 +18,10 @@
 
 import type { PlayerId, BetId, RoundConfig, RunningLedger } from './types'
 import type { ScoringEventLog, NassauCfg, MatchPlayCfg } from './types'
-import { initialMatches, applyHoleToMatch, buildPressMatchState } from './nassau'
+import type { ScoringEvent } from './events'
+import { initialMatches, applyHoleToMatch, buildPressMatchState, finalizeNassauRound } from './nassau'
 import type { MatchState as NassauMatchState } from './nassau'
-import { initialMatch, advanceMatch } from './match_play'
+import { initialMatch, advanceMatch, finalizeMatchPlayRound } from './match_play'
 import type { MatchState as MPMatchState } from './match_play'
 
 // ─── ZeroSumViolationError ────────────────────────────────────────────────────
@@ -69,6 +70,90 @@ function accumulate(
   for (const [p, amount] of Object.entries(money)) {
     credit(netByPlayer, p, amount)
     credit(byBet[betKey], p, amount)
+  }
+}
+
+// ─── Event reducer ───────────────────────────────────────────────────────────
+//
+// Single source of truth for the money-reduction switch. Called for both
+// log events and finalizer events — no inline duplication in aggregateRound.
+// Nassau monetary events use compound key "${betId}::${matchId}"; Match Play
+// and all other events use the simple declaringBet / targetBet key.
+
+function reduceEvent(
+  event: ScoringEvent,
+  roundCfg: RoundConfig,
+  netByPlayer: Record<PlayerId, number>,
+  byBet: Record<string, Record<PlayerId, number>>,
+): void {
+  switch (event.kind) {
+    // ── Junk: stake-scaled formula ────────────────────────────────────────────
+    case 'JunkAwarded': {
+      const bet = roundCfg.bets.find(b => b.id === event.declaringBet)
+      if (bet === undefined) {
+        throw new Error(
+          `aggregate: JunkAwarded references unknown bet "${event.declaringBet}". ` +
+            `Event log is corrupt.`,
+        )
+      }
+      const multiplier = bet.stake * bet.junkMultiplier
+      const money: Record<PlayerId, number> = {}
+      for (const [p, pts] of Object.entries(event.points)) {
+        money[p] = pts * multiplier
+      }
+      accumulate(netByPlayer, byBet, event.declaringBet, money)
+      break
+    }
+
+    // ── Nassau compound-key events ────────────────────────────────────────────
+    //
+    // NassauWithdrawalSettled and Nassau-sourced MatchClosedOut use compound key
+    // "${declaringBet}::${matchId}" to separate per-match money buckets.
+
+    case 'NassauWithdrawalSettled': {
+      const betKey = `${event.declaringBet}::${event.matchId}`
+      accumulate(netByPlayer, byBet, betKey, event.points)
+      break
+    }
+
+    case 'MatchClosedOut': {
+      const betType = roundCfg.bets.find(b => b.id === event.declaringBet)?.type
+      const betKey = betType === 'nassau'
+        ? `${event.declaringBet}::${event.matchId}`
+        : event.declaringBet
+      accumulate(netByPlayer, byBet, betKey, event.points)
+      break
+    }
+
+    // ── Non-Junk monetary events: points already stake-scaled ─────────────────
+    //
+    // Decision in §Money formula: money[p] = event.points[p] for all of:
+    // SkinWon, WolfHoleResolved, LoneWolfResolved, BlindLoneResolved,
+    // ExtraHoleResolved, StrokePlaySettled, RoundingAdjustment (dead schema),
+    // FinalAdjustmentApplied.
+    //
+    // Phase 3 uses compound keys for Nassau events (handled above).
+
+    case 'SkinWon':
+    case 'WolfHoleResolved':
+    case 'LoneWolfResolved':
+    case 'BlindLoneResolved':
+    case 'ExtraHoleResolved':
+    case 'StrokePlaySettled':
+    case 'RoundingAdjustment': {
+      accumulate(netByPlayer, byBet, (event as { declaringBet: BetId }).declaringBet, event.points)
+      break
+    }
+
+    case 'FinalAdjustmentApplied': {
+      // FinalAdjustmentApplied uses targetBet (BetId | 'all-bets'), not declaringBet.
+      accumulate(netByPlayer, byBet, event.targetBet, event.points)
+      break
+    }
+
+    // ── Bookkeeping events — no monetary contribution ──────────────────────────
+    default:
+      break
   }
 }
 
@@ -257,77 +342,41 @@ export function aggregateRound(
   const netByPlayer: Record<PlayerId, number> = {}
   const byBet: Record<string, Record<PlayerId, number>> = {}
 
-  // Phase 3 Iter 1: thread MatchState for Nassau and Match Play bets.
-  // Maps are not yet consumed in the money-reduction loop (Iter 2).
+  // Phase 3: thread MatchState for Nassau and Match Play bets.
   const { nassauMatches, mpMatches } = buildMatchStates(log, roundCfg)
-  void nassauMatches
-  void mpMatches
 
+  // Reduce all log events through the single-source-of-truth reducer.
   for (const event of log.events) {
-    switch (event.kind) {
-      // ── Junk: stake-scaled formula ──────────────────────────────────────────
+    reduceEvent(event, roundCfg, netByPlayer, byBet)
+  }
 
-      case 'JunkAwarded': {
-        const bet = roundCfg.bets.find(b => b.id === event.declaringBet)
-        if (bet === undefined) {
-          throw new Error(
-            `aggregate: JunkAwarded references unknown bet "${event.declaringBet}". ` +
-              `Event log is corrupt.`,
-          )
-        }
-        const multiplier = bet.stake * bet.junkMultiplier
-        const money: Record<PlayerId, number> = {}
-        for (const [p, pts] of Object.entries(event.points)) {
-          money[p] = pts * multiplier
-        }
-        accumulate(netByPlayer, byBet, event.declaringBet, money)
-        break
+  // Invoke finalizers and reduce their emitted events.
+  const finalizerEvents: ScoringEvent[] = []
+
+  for (const bet of roundCfg.bets) {
+    if (bet.type === 'nassau') {
+      const matches = nassauMatches.get(bet.id)
+      if (matches) {
+        const events = finalizeNassauRound(bet.config as NassauCfg, roundCfg, matches)
+        finalizerEvents.push(...events)
       }
-
-      // ── Non-Junk monetary events: points already stake-scaled ───────────────
-      //
-      // Decision in §Money formula: money[p] = event.points[p] for all of:
-      // SkinWon, WolfHoleResolved, LoneWolfResolved, BlindLoneResolved,
-      // MatchClosedOut, NassauWithdrawalSettled, ExtraHoleResolved,
-      // StrokePlaySettled, RoundingAdjustment (dead schema — never emitted
-      // under integer-only mandate), FinalAdjustmentApplied.
-      //
-      // Phase 1 reduces all of these (correct formula, not a stub).
-      // Phase 3 widens byBet key for Nassau monetary events.
-
-      case 'SkinWon':
-      case 'WolfHoleResolved':
-      case 'LoneWolfResolved':
-      case 'BlindLoneResolved':
-      case 'MatchClosedOut':
-      case 'ExtraHoleResolved':
-      case 'StrokePlaySettled':
-      case 'NassauWithdrawalSettled':
-      case 'RoundingAdjustment':
-      case 'FinalAdjustmentApplied': {
-        // FinalAdjustmentApplied uses targetBet (BetId | 'all-bets'), not declaringBet.
-        // All others use declaringBet via WithBet.
-        const betKey =
-          event.kind === 'FinalAdjustmentApplied'
-            ? event.targetBet
-            : (event as { declaringBet: BetId }).declaringBet
-
-        accumulate(netByPlayer, byBet, betKey, event.points)
-        break
+    } else if (bet.type === 'matchPlay') {
+      const match = mpMatches.get(bet.id)
+      if (match) {
+        const { events } = finalizeMatchPlayRound(bet.config as MatchPlayCfg, roundCfg, match)
+        finalizerEvents.push(...events)
       }
-
-      // ── Bookkeeping events — no monetary contribution ────────────────────────
-      // (All remaining ScoringEvent variants.)
-
-      default:
-        break
     }
+  }
+
+  for (const event of finalizerEvents) {
+    reduceEvent(event, roundCfg, netByPlayer, byBet)
   }
 
   // Topic 5: zero-sum enforcement.
   const total = Object.values(netByPlayer).reduce((acc, v) => acc + v, 0)
   if (total !== 0) {
-    throw new ZeroSumViolationError(total, log.events.length)
+    throw new ZeroSumViolationError(total, log.events.length + finalizerEvents.length)
   }
 
   return {

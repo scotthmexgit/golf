@@ -181,7 +181,7 @@ export interface HoleState {
 
 export interface RunningLedger {
   netByPlayer: Record<PlayerId, number>
-  byBet: Record<BetId, Record<PlayerId, number>>
+  byBet: Record<string, Record<PlayerId, number>>
   lastRecomputeTs: string
 }
 

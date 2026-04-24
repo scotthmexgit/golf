@@ -33,7 +33,7 @@ Updated at EOD-FINAL.
 
 **Phase tracking**:
 - [x] Phase 1 — Scaffold + Junk reducer + junk.ts dead-code deletion — closed 2026-04-24 (commit 8c0a147). 277 tests, tsc clean. Supersession filter deferred (Option C); RoundingAdjustment branch removed (Outcome A).
-- [ ] Phase 2 — Skins + Wolf reduction
+- [x] Phase 2 — Skins + Wolf validation (test-only) — closed 2026-04-24 (commit cfa5fa2). 280 tests. aggregate.ts unchanged.
 - [ ] Phase 3 — Nassau + Match Play with MatchState threading
 - [ ] Phase 4 — Stroke Play + all-5-games integration test
 

@@ -1073,7 +1073,31 @@ byBet compound key for Nassau: `${betId}::${matchId}` — decided in Topic 4 (RE
 - A. Process `StrokePlayHoleRecorded` events from the log in ascending `event.hole` order (no settle-function calls from `aggregateRound`). Call `finalizeStrokePlayRound(events, config)` at end-of-log — this is an active call from `aggregateRound`, consistent with Nassau/Match Play finalizer pattern in Phase 3. `aggregate.ts` owns `tieRule` dispatch (passes the `tieRule` field from `StrokePlayCfg` to the finalizer).
 - B. Reduce `StrokePlaySettled`, `RoundingAdjustment` (from Stroke Play, distinct from Junk `RoundingAdjustment`), `CardBackResolved`, `TieFallthrough`, `FinalAdjustmentApplied`.
 - C. Skins and Wolf events consumed directly from log — `SkinWon` and Wolf resolution events (`WolfHoleResolved`, `LoneWolfResolved`, `BlindLoneResolved`) are pre-populated by the caller and reduced by the existing Phase 2 passthrough paths. No per-game orchestration, no state threading, no settle-function calls for Skins/Wolf from `aggregateRound`. Phase 4 scope for Skins/Wolf is integration-test coverage only — verifying their event reduction in the combined all-5-games fixture.
-- D. All-5-games zero-sum integration test. Fixture: a **synthetic event log** (not an orchestrator run) representing a 3-hole excerpt of an 18-hole round — a minimal complete scenario where every game type contributes at least one monetary event. Event log is constructed by hand in the test, not emitted by the orchestrator (the orchestrator is tested via Phase 3 scenarios; this test exercises the reducer against a complete known input). Games declared: Skins (1 skin won on hole 2), Wolf (1 hole resolved on hole 1), Stroke Play (round settled after hole 3), Nassau (front-9 match resolved), Match Play (match closedout), Junk (1 Greenie awarded on hole 2). Assert: `Σ netByPlayer === 0` across all events. Assert: each bet's `byBet[betId]` slice independently zero-sums. Assert: Junk `JunkAwarded` applies `stake × junkMultiplier` scaling; all other events do not. Fixture stake values chosen to be integer-clean (no `RoundingAdjustment` needed) to keep the fixture readable. `RoundingAdjustment` event type is dead schema (see parking-lot item — "RoundingAdjustment existence question" in Open items); Phase 4 fixture is integer-clean and does not emit `RoundingAdjustment`.
+- D. All-5-games zero-sum integration test. Fixture: a hand-constructed synthetic
+  event log (not an orchestrator run) for a 4-hole round excerpt. Games declared:
+  - Skins (betId 'skins-1'): 4 players, stake 100. Hole 2: SkinWon (alice wins,
+    points pre-scaled: {alice:300,bob:-100,carol:-100,dave:-100}).
+  - Wolf (betId 'wolf-1'): 4 players, stake 100. Hole 1: WolfHoleResolved (alice+bob
+    vs carol+dave, alice side wins, points: {alice:100,bob:100,carol:-100,dave:-100}).
+  - Stroke Play (betId 'strokeplay-1'): 4 players, stake 100 per stroke.
+    StrokePlayHoleRecorded events for holes 1-4. Finalizer (finalizeStrokePlayRound)
+    called at end-of-log; its emitted StrokePlaySettled event is reduced. Stake/points
+    are integer-clean.
+  - Nassau (betId 'nassau-1'): alice vs bob. Mid-round MatchClosedOut in the log
+    (hole 3, matchId='front', alice wins, points: {alice:100,bob:-100}). No finalizer
+    needed (match already closed).
+  - Match Play (betId 'mp-1'): alice+carol vs bob+dave (best-ball or singles). Mid-round
+    MatchClosedOut in the log (hole 4, alice's side closes out, points integer-clean).
+    No finalizer needed.
+  - Junk (betId 'skins-1', junkMultiplier 2): Hole 2, JunkAwarded (greenie, alice wins,
+    raw points {alice:3,bob:-1,carol:-1,dave:-1}, money = points × 100 × 2).
+
+  Assert: Σ netByPlayer === 0 across all events. Assert: each bet's byBet slice
+  independently zero-sums. Assert: Nassau byBet key uses compound format
+  ('nassau-1::front'). Assert: Junk JunkAwarded applies stake × junkMultiplier
+  scaling (other events do not). Fixture stakes chosen to be integer-clean.
+  RoundingAdjustment event type is dead schema (parking-lot "RoundingAdjustment
+  existence question"); fixture emits none.
 
 **Fence:** No UI wiring. No routing through `src/lib/*`. No changes to any engine file beyond Phase 1's `junk.ts` deletion (already landed).
 
@@ -1083,6 +1107,8 @@ byBet compound key for Nassau: `${betId}::${matchId}` — decided in Topic 4 (RE
 - `npx tsc --noEmit --strict` zero errors.
 - Portability grep on `src/games/aggregate.ts` → 0.
 - Grep gate: `grep 'src/lib/' src/games/aggregate.ts` → 0.
+- `grep 'settleStrokePlayHole' src/games/aggregate.ts` → 0 matches (Interpretation A: no per-hole settle calls from `aggregateRound`).
+- `grep 'finalizeStrokePlayRound' src/games/aggregate.ts` → 1 match (finalizer called at end-of-log).
 
 ---
 

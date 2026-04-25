@@ -52,9 +52,9 @@ function makeWolfCfg(overrides: Partial<WolfCfg> = {}): WolfCfg {
   }
 }
 
-function makeRoundCfg(cfg: WolfCfg, betId = 'wolf-1'): RoundConfig {
+function makeRoundCfg(cfg: WolfCfg): RoundConfig {
   const bet: BetSelection = {
-    id: betId,
+    id: 'wolf-1',
     type: 'wolf',
     stake: cfg.stake,
     participants: cfg.playerIds,
@@ -312,10 +312,10 @@ describe("tied Lone Wolf hole, tieRule='no-points'", () => {
 // ─── Test 5 — Missing decision (§ 12 Test 5) ───────────────────────────────
 
 describe('missing decision emits WolfDecisionMissing with zero delta', () => {
-  it('emits WolfDecisionMissing with actor=captain (teeOrder rotation)', () => {
+  it('emits WolfDecisionMissing with actor=captain (roundCfg.players rotation)', () => {
     const cfg = makeWolfCfg()
     const round = makeRoundCfg(cfg)
-    // Hole 7 captain = teeOrder[(7-1) % 4] = teeOrder[2] = 'C'.
+    // Hole 7 captain = roundCfg.players[(7-1) % 4] = roundCfg.players[2] = 'C'.
     const events = settleWolfHole(
       makeHole(7, { A: 4, B: 4, C: 4, D: 4 }),
       cfg,
@@ -335,7 +335,7 @@ describe('missing decision emits WolfDecisionMissing with zero delta', () => {
 
 // ─── Test 7 — Captain rotation for holes 1–16 ─────────────────────────────
 
-describe('captain rotation holes 1–16 follows teeOrder modulo playerIds.length', () => {
+describe('captain rotation holes 1–16 follows roundCfg.players modulo playerIds.length', () => {
   it('emits no events and cycles A,B,C,D for 4-player round', () => {
     const cfg = makeWolfCfg()
     const round = makeRoundCfg(cfg)
@@ -362,7 +362,7 @@ describe('captain rotation holes 1–16 follows teeOrder modulo playerIds.length
 
 // ─── Test 7.5 — § 9: Captain withdraws → WolfCaptainReassigned ─────────────
 
-describe('§ 9 edge case: captain withdraws shifts rotation to next teeOrder player', () => {
+describe('§ 9 edge case: captain withdraws shifts rotation to next roundCfg.players entry', () => {
   it('A withdrew; hole 1 rotation captain A → shifts to B and emits WolfCaptainReassigned', () => {
     const cfg = makeWolfCfg()
     const round = makeRoundCfg(cfg)
@@ -704,5 +704,63 @@ describe('purity: settleWolfHole returns identical events for identical inputs',
     const a = settleWolfHole(hole, cfg, round, decision)
     const b = settleWolfHole(hole, cfg, round, decision)
     expect(a).toEqual(b)
+  })
+})
+
+// ─── carryover + Lone Wolf multiplier boundary (wolf.ts:334–336) ───────────
+//
+// Rule doc § 6 carryover: carryMult = 2^ties; effective = max(carryMult, decMult).
+// Boundary case: 2 consecutive ties (carryMult=4) followed by Lone Wolf (decMult=3).
+// Expected effective = max(4, 3) = 4.
+// Points before scaling (captain C wins Lone Wolf, stake=1, 4 players):
+//   unit = stake × loneMultiplier = 1 × 3 = 3
+//   C = +3 per opponent = +9; A,B,D = -3 each
+// After scale = effective/decMult = 4/3:
+//   C = 9 × 4/3 = 12; A,B,D = -3 × 4/3 = -4
+// WolfCarryApplied.multiplier must equal 4.
+// Triage Section 2 Finding 2.
+
+describe('carryover tieRule + Lone Wolf: effective multiplier = max(carryMult, decMult)', () => {
+  const cfg = makeWolfCfg({ tieRule: 'carryover', loneMultiplier: 3 })
+  const round = makeRoundCfg(cfg)
+
+  // Hole 1 captain = A, partner B — all tied → WolfHoleTied (consecutiveTies++)
+  const e1 = settleWolfHole(
+    makeHole(1, { A: 4, B: 4, C: 4, D: 4 }),
+    cfg, round,
+    { kind: 'partner', captain: 'A', partner: 'B' },
+  )
+  // Hole 2 captain = B, partner A — all tied → WolfHoleTied (consecutiveTies++)
+  const e2 = settleWolfHole(
+    makeHole(2, { A: 4, B: 4, C: 4, D: 4 }),
+    cfg, round,
+    { kind: 'partner', captain: 'B', partner: 'A' },
+  )
+  // Hole 3 captain = C, Lone Wolf, C wins — LoneWolfResolved
+  const e3 = settleWolfHole(
+    makeHole(3, { A: 5, B: 5, C: 3, D: 5 }),
+    cfg, round,
+    { kind: 'lone', captain: 'C', blind: false },
+  )
+
+  const finalized = finalizeWolfRound([...e1, ...e2, ...e3], cfg)
+
+  it('WolfCarryApplied.multiplier = 4 (max(2^2, 3) = max(4,3) = 4) — rule doc § 6', () => {
+    const carry = finalized.find((e) => e.kind === 'WolfCarryApplied') as
+      | (ScoringEvent & { multiplier: number }) | undefined
+    expect(carry).toBeDefined()
+    expect(carry!.multiplier).toBe(4)
+  })
+
+  it('C receives 12 points; A,B,D each -4 (base points × effective/decMult = ×4/3)', () => {
+    const resolved = finalized.find(
+      (e): e is ScoringEvent & { kind: 'LoneWolfResolved'; points: Record<string, number> } =>
+        e.kind === 'LoneWolfResolved',
+    )
+    expect(resolved).toBeDefined()
+    expect(resolved!.points['C']).toBe(12)
+    expect(resolved!.points['A']).toBe(-4)
+    expect(resolved!.points['B']).toBe(-4)
+    expect(resolved!.points['D']).toBe(-4)
   })
 })

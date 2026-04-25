@@ -48,9 +48,9 @@ function makeSkinsCfg(overrides: Partial<SkinsCfg> = {}): SkinsCfg {
   }
 }
 
-function makeRoundCfg(skinsCfg: SkinsCfg, betId = 'skins-1'): RoundConfig {
+function makeRoundCfg(skinsCfg: SkinsCfg): RoundConfig {
   const bet: BetSelection = {
-    id: betId,
+    id: 'skins-1',
     type: 'skins',
     stake: skinsCfg.stake,
     participants: skinsCfg.playerIds,
@@ -693,5 +693,49 @@ describe('Round Handicap integration (item 16 × Skins)', () => {
     const rh2 = [basePlayer('A', 0, 0), basePlayer('B', 0, 2)]
     expect(strokesFor(rh0)).toEqual({ A: 0, B: 0 })
     expect(strokesFor(rh2)).toEqual({ A: 0, B: 2 })
+  })
+})
+
+// ─── Multi-bet pass-through (skins.ts:211–227) ──────────────────────────────
+//
+// Verifies that finalizeSkinsRound passes non-Skins events through unchanged
+// while still processing Skins-owned events normally.
+// Triage Section 2 Finding 1.
+
+describe('finalizeSkinsRound passes non-Skins events through unchanged', () => {
+  const cfg = makeSkinsCfg({ playerIds: ['A', 'B'], stake: 1, escalating: false })
+  const round = makeRoundCfg(cfg)
+
+  // One real Skins event from settleSkinsHole
+  const skinsEvents = settleSkinsHole(makeHole(1, { A: 3, B: 4 }), cfg, round)
+
+  // One foreign Wolf event (not in SKINS_EVENT_KINDS) — constructed directly
+  const wolfEvent: ScoringEvent = {
+    kind: 'WolfHoleResolved',
+    timestamp: '1',
+    hole: 1,
+    actor: 'system',
+    declaringBet: 'wolf-bet',
+    winners: ['A'],
+    losers: ['B'],
+    points: { A: 1, B: -1 },
+  } as ScoringEvent
+
+  const mixed = [...skinsEvents, wolfEvent]
+  const result = finalizeSkinsRound(mixed, cfg)
+
+  it('WolfHoleResolved is present in the output unchanged', () => {
+    const wolf = result.find((e) => e.kind === 'WolfHoleResolved')
+    expect(wolf).toBeDefined()
+    expect(wolf).toEqual(wolfEvent)
+  })
+
+  it('Skins events are processed — SkinWon emitted for the uncontested hole', () => {
+    expect(result.some((e) => e.kind === 'SkinWon')).toBe(true)
+  })
+
+  it('output length = Skins result events + 1 pass-through', () => {
+    const skinsOnly = finalizeSkinsRound(skinsEvents, cfg)
+    expect(result).toHaveLength(skinsOnly.length + 1)
   })
 })

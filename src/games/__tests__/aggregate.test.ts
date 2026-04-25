@@ -1649,3 +1649,183 @@ describe('aggregateRound — Phase 4 Iter 2 (all-5-games integration)', () => {
     expect(ledger.byBet['skins-1']?.['alice']).toBe(900)
   })
 })
+
+// ─── Phase 4: Nassau allPairs 3-player end-to-end (triage Section 2 Finding 7)
+//
+// 3 players: alice, bob, carol. pairingMode = 'allPairs'.
+// Pairs: alice-bob, alice-carol, bob-carol → 9 matches total.
+// Match IDs (from initialMatches): front-alice-bob, back-alice-bob, overall-alice-bob,
+//   front-alice-carol, back-alice-carol, overall-alice-carol,
+//   front-bob-carol, back-bob-carol, overall-bob-carol.
+//
+// Fixture: alice wins all holes vs bob and carol; bob wins all holes vs carol.
+// alice wins 3 matches × 2 pairs = 6 MatchClosedOut; bob wins 3 vs carol.
+// All 9 byBet keys must appear (no tied matches in this fixture).
+//
+// Zero-sum per pair and overall:
+//   alice-bob:   alice +30, bob   -30  (stake=10, 3 matches)
+//   alice-carol: alice +30, carol -30
+//   bob-carol:   bob   +30, carol -30
+//
+// Globals: alice=+60, bob=0, carol=-60.  Σ = 0.
+
+describe('aggregateRound — Phase 4: Nassau allPairs 3-player end-to-end', () => {
+  const betId = 'nassau-allpairs'
+
+  /** allPairs NassauCfg for 3 players. */
+  function makeAllPairsNassauCfg(): NassauCfg {
+    return {
+      id: betId,
+      stake: 10,
+      pressRule: 'manual',
+      pressScope: 'nine',
+      appliesHandicap: false,
+      pairingMode: 'allPairs',
+      playerIds: ['alice', 'bob', 'carol'],
+      junkItems: [],
+      junkMultiplier: 1,
+    }
+  }
+
+  const nassauCfg = makeAllPairsNassauCfg()
+  const nassauBet: BetSelection = {
+    id: betId,
+    type: 'nassau',
+    stake: nassauCfg.stake,
+    participants: nassauCfg.playerIds,
+    config: nassauCfg,
+    junkItems: [],
+    junkMultiplier: 1,
+  }
+  const roundCfg = makeRoundCfg([nassauBet])
+
+  // Build NassauHoleResolved events: 5 wins for 'A' (pair[0]) in each of 9 matches.
+  // 5 wins with 0 losses → holesWonA=5, holesWonB=0 → finalizer emits MatchClosedOut.
+  const matchIds = [
+    'front-alice-bob', 'back-alice-bob', 'overall-alice-bob',
+    'front-alice-carol', 'back-alice-carol', 'overall-alice-carol',
+    'front-bob-carol', 'back-bob-carol', 'overall-bob-carol',
+  ]
+
+  const events: ScoringEvent[] = []
+  for (const matchId of matchIds) {
+    for (let h = 1; h <= 5; h++) {
+      events.push(makeNassauHoleResolved(betId, h, matchId, 'A'))
+    }
+  }
+
+  const log: ScoringEventLog = { events, supersessions: {} }
+  const ledger = aggregateRound(log, roundCfg)
+
+  it('all 9 byBet compound keys are present', () => {
+    for (const matchId of matchIds) {
+      expect(ledger.byBet[`${betId}::${matchId}`]).toBeDefined()
+    }
+    // No simple-key entry for the Nassau bet itself
+    expect(ledger.byBet[betId]).toBeUndefined()
+  })
+
+  it('alice-bob pair: alice=+10, bob=-10 per match (3 matches = ±30 total)', () => {
+    const abFront = ledger.byBet[`${betId}::front-alice-bob`]
+    const abBack  = ledger.byBet[`${betId}::back-alice-bob`]
+    const abOvrl  = ledger.byBet[`${betId}::overall-alice-bob`]
+    expect(abFront?.['alice']).toBe(10)
+    expect(abFront?.['bob']).toBe(-10)
+    expect(abBack?.['alice']).toBe(10)
+    expect(abOvrl?.['alice']).toBe(10)
+    const totalAliceBobAlice = (abFront?.['alice'] ?? 0) + (abBack?.['alice'] ?? 0) + (abOvrl?.['alice'] ?? 0)
+    expect(totalAliceBobAlice).toBe(30)
+  })
+
+  it('zero-sum per pair (alice-bob, alice-carol, bob-carol)', () => {
+    for (const matchId of matchIds) {
+      const bucket = ledger.byBet[`${betId}::${matchId}`] ?? {}
+      const pairSum = Object.values(bucket).reduce((s, v) => s + v, 0)
+      expect(pairSum).toBe(0)
+    }
+  })
+
+  it('zero-sum overall: alice=+60, bob=0, carol=-60, Σ=0', () => {
+    expect(ledger.netByPlayer['alice']).toBe(60)
+    expect(ledger.netByPlayer['bob']).toBe(0)
+    expect(ledger.netByPlayer['carol']).toBe(-60)
+    const total = Object.values(ledger.netByPlayer).reduce((a, b) => a + b, 0)
+    expect(total).toBe(0)
+  })
+})
+
+// ─── Serialization invariant ──────────────────────────────────────────────────
+//
+// aggregateRound must produce identical results when log and roundCfg are
+// serialized to JSON and deserialized before the call. Confirms:
+//   A — all data shapes are JSON-compatible (no Dates, Symbols, etc.)
+//   B — event routing uses string betId equality, not object reference identity
+
+describe('aggregateRound — serialization invariant', () => {
+  // ── Test A: JSON round-trip produces identical ledger ──────────────────────
+  //
+  // Fixture: one JunkAwarded event so that bet.stake and bet.junkMultiplier
+  // are read from the deserialized bet object (not from the event itself).
+  // junkMultiplier=2, stake=100 → money = points × 100 × 2.
+  // After JSON round-trip those numbers survive as primitives — routing and
+  // formula must produce the same ledger.
+
+  it('Test A: JSON round-trip of log+cfg produces identical netByPlayer and byBet', () => {
+    const bet = makeJunkBet({ stake: 100, junkMultiplier: 2 })
+    const log: ScoringEventLog = {
+      events: [makeJunkAwarded('bet-junk', { alice: 2, bob: -1, carol: -1 }, ['alice'])],
+      supersessions: {},
+    }
+    const cfg = makeRoundCfg([bet])
+
+    const ledger1 = aggregateRound(log, cfg)
+
+    const logCopy: ScoringEventLog = JSON.parse(JSON.stringify(log))
+    const cfgCopy: RoundConfig = JSON.parse(JSON.stringify(cfg))
+    const ledger2 = aggregateRound(logCopy, cfgCopy)
+
+    expect(ledger2.netByPlayer).toEqual(ledger1.netByPlayer)
+    expect(ledger2.byBet).toEqual(ledger1.byBet)
+  })
+
+  // ── Test B: deserialized roundCfg routes events by betId string ─────────────
+  //
+  // Two bets (skins + wolf). After JSON round-trip all BetSelection object
+  // references are broken. aggregateRound must still route each event to the
+  // correct per-bet slice by matching event.declaringBet against bet.id
+  // (string equality, not reference identity).
+
+  it('Test B: deserialized roundCfg routes events to correct per-bet slices by string betId', () => {
+    const skinsBet = makeSkinsBet('bet-skins', ['alice', 'bob', 'carol', 'dave'], 100)
+    const wolfBet = makeWolfBet('bet-wolf', ['alice', 'bob', 'carol', 'dave'], 100, 2, 3)
+    const log: ScoringEventLog = {
+      events: [
+        makeSkinWon('bet-skins', 2, 'alice', { alice: 300, bob: -100, carol: -100, dave: -100 }),
+        makeWolfHoleResolved(
+          'bet-wolf', 3, ['alice', 'bob'], ['carol', 'dave'],
+          { alice: 100, bob: 100, carol: -100, dave: -100 },
+        ),
+      ],
+      supersessions: {},
+    }
+    const cfg = makeRoundCfg([skinsBet, wolfBet])
+
+    const logCopy: ScoringEventLog = JSON.parse(JSON.stringify(log))
+    const cfgCopy: RoundConfig = JSON.parse(JSON.stringify(cfg))
+    const ledger = aggregateRound(logCopy, cfgCopy)
+
+    // skins slice — routed by string 'bet-skins'
+    expect(ledger.byBet['bet-skins']?.['alice']).toBe(300)
+    expect(ledger.byBet['bet-skins']?.['bob']).toBe(-100)
+
+    // wolf slice — routed by string 'bet-wolf'
+    expect(ledger.byBet['bet-wolf']?.['alice']).toBe(100)
+    expect(ledger.byBet['bet-wolf']?.['bob']).toBe(100)
+    expect(ledger.byBet['bet-wolf']?.['carol']).toBe(-100)
+    expect(ledger.byBet['bet-wolf']?.['dave']).toBe(-100)
+
+    // Cross-bet zero-sum
+    const total = Object.values(ledger.netByPlayer).reduce((a, b) => a + b, 0)
+    expect(total).toBe(0)
+  })
+})

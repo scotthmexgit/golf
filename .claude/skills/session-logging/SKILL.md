@@ -42,11 +42,9 @@ Example **not** skipped (log even though Active item stays open):
 ## Paths (today = 2026-04-20, DD-Month-YYYY = 20-April-2026)
 
 - Per-prompt: `./YYYY-MM-DD/NNN_<slug>.md`
-  NNN is zero-padded, 3 digits, resets daily; `<slug>` is kebab-case, ≤5 words.
+  NNN is a zero-padded 3-digit counter starting at `001`, reset daily; `<slug>` is kebab-case, ≤5 words.
 - Rolling EOD: `./EOD_20-April-2026.md`
 - EOD-FINAL (on request): `./EOD-FINAL_20-April-2026.md`
-
-`NNN` is a zero-padded 3-digit counter starting at `001`, reset daily.
 
 ## Per-prompt file template
 

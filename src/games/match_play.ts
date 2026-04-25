@@ -366,7 +366,7 @@ export function settleMatchPlayHole(
           actor: 'system',
           declaringBet,
           teamId,
-          remainingSize: 1,
+          remainingSize: 1, // 2-player-team invariant; validateTeams enforces team.length === 2
         })
       }
     }

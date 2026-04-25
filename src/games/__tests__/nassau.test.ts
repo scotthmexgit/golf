@@ -1089,8 +1089,9 @@ describe('§ 9 — missing-score forfeit (B-missing, symmetric)', () => {
 // Front tied 4-4 entering hole 9 (final hole of front match). A has no gross.
 // B wins the forfeit → front becomes B 5-4 (holesUp=1, holesRemaining=0) →
 // MatchClosedOut fires in the same call. Both events must emit; zero-sum must hold.
-// NassauHoleForfeited precedes the loop so it emits unconditionally; MatchClosedOut
-// emits inside the loop using forfeitWinner as the winner. No NassauHoleResolved.
+// NassauHoleForfeited emits once per active match inside the loop when a player has a
+// missing gross; MatchClosedOut emits in the same loop iteration when closeout conditions
+// are met. No NassauHoleResolved.
 
 describe('§ 9 — forfeit on a match final hole (NassauHoleForfeited + MatchClosedOut co-emit)', () => {
   const cfg = makeNassauCfg({ stake: 1 })

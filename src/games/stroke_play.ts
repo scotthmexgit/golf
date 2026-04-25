@@ -260,7 +260,7 @@ function finalizeBetEvents(
   }
 
   const passthrough = betEvents.filter((e) => !STROKE_EVENT_KINDS.has(e.kind))
-  const result: ScoringEvent[] = [...betEvents]
+  const result: ScoringEvent[] = []
 
   // § 9: fewer than 2 scoring players → FieldTooSmall, no settlement.
   if (scoringSet.length < 2) {

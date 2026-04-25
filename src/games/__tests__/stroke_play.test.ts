@@ -52,9 +52,9 @@ function makeSPCfg(overrides: Partial<StrokePlayCfg> = {}): StrokePlayCfg {
   }
 }
 
-function makeRoundCfg(cfg: StrokePlayCfg, betId = 'sp-1'): RoundConfig {
+function makeRoundCfg(cfg: StrokePlayCfg): RoundConfig {
   const bet: BetSelection = {
-    id: betId,
+    id: 'sp-1',
     type: 'strokePlay',
     stake: cfg.stake,
     participants: cfg.playerIds,
@@ -181,10 +181,21 @@ const WORKED_STROKES: Record<PlayerId, number> = {
 describe('game_stroke_play.md § 10 Worked Example verbatim', () => {
   const cfg = makeSPCfg()
   const round = makeRoundCfg(cfg)
-  const events = runRound(workedExampleHoles(), cfg, round, WORKED_STROKES)
+  const grossByHole = workedExampleHoles()
+  const holeEvents: ScoringEvent[] = []
+  for (let i = 0; i < grossByHole.length; i += 1) {
+    holeEvents.push(
+      ...settleStrokePlayHole(
+        makeHole(i + 1, grossByHole[i], { holeIndex: i + 1, strokes: WORKED_STROKES }),
+        cfg,
+        round,
+      ),
+    )
+  }
+  const events = finalizeStrokePlayRound(holeEvents, cfg)
 
   it('computes net totals { Alice:77, Bob:78, Carol:81, Dave:80 }', () => {
-    const recorded = events.filter(
+    const recorded = holeEvents.filter(
       (e): e is ScoringEvent & { kind: 'StrokePlayHoleRecorded' } =>
         e.kind === 'StrokePlayHoleRecorded',
     )
@@ -201,8 +212,8 @@ describe('game_stroke_play.md § 10 Worked Example verbatim', () => {
     assertZeroSum(events, ['Alice', 'Bob', 'Carol', 'Dave'])
   })
 
-  it('emits exactly 18 StrokePlayHoleRecorded and exactly 1 StrokePlaySettled', () => {
-    expect(events.filter((e) => e.kind === 'StrokePlayHoleRecorded')).toHaveLength(18)
+  it('finalizer output has 0 StrokePlayHoleRecorded and exactly 1 StrokePlaySettled', () => {
+    expect(events.filter((e) => e.kind === 'StrokePlayHoleRecorded')).toHaveLength(0)
     expect(events.filter((e) => e.kind === 'StrokePlaySettled')).toHaveLength(1)
   })
 })
@@ -329,8 +340,14 @@ describe('§ 12 Test 6: incomplete card excludes player from settlement', () => 
       Carol: 5,
       Dave: 5,
     }))
-    const events = runRound(holes, cfg, round, strokes)
-    const incomplete = events.filter(
+    const holeEvents: ScoringEvent[] = []
+    for (let i = 0; i < holes.length; i += 1) {
+      holeEvents.push(
+        ...settleStrokePlayHole(makeHole(i + 1, holes[i], { holeIndex: i + 1, strokes }), cfg, round),
+      )
+    }
+    const events = finalizeStrokePlayRound(holeEvents, cfg)
+    const incomplete = holeEvents.filter(
       (e): e is ScoringEvent & { kind: 'IncompleteCard' } => e.kind === 'IncompleteCard',
     )
     expect(incomplete).toHaveLength(1)

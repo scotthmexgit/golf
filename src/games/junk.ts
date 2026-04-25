@@ -86,6 +86,9 @@ function pushAward(
   timestamp: string,
   bet: { id: string; participants: PlayerId[] },
   winners: PlayerId[],
+  // Event-level point doubling only (e.g. Super Sandy). Phase 2 callers use default=1.
+  // `bet.junkMultiplier` is the money-rendering multiplier — must never be passed here.
+  // Verify multiplier propagation before #7b Phase 3 Sandy/Barkie/Polie/Arnie work.
   multiplier = 1,
 ): void {
   const N = bet.participants.length
@@ -114,6 +117,7 @@ export function settleJunkHole(
   junkCfg: JunkRoundConfig,
 ): ScoringEvent[] {
   const events: ScoringEvent[] = []
+  const ts = hole.timestamp ?? ''
   const ctpWinner = isCTP(hole, junkCfg)
 
   // ── Bookkeeping: CTPWinnerSelected fires once per hole, not per-bet ──────
@@ -125,7 +129,7 @@ export function settleJunkHole(
       // CTPCarried emitted with carryPoints: 0 as stub.
       events.push({
         kind: 'CTPCarried',
-        timestamp: hole.timestamp,
+        timestamp: ts,
         hole: hole.hole,
         actor: 'system',
         fromHole: hole.hole,
@@ -137,7 +141,7 @@ export function settleJunkHole(
     const girValue = (junkCfg.girEnabled ?? false) && (hole.gir[ctpWinner] === true)
     events.push({
       kind: 'CTPWinnerSelected',
-      timestamp: hole.timestamp,
+      timestamp: ts,
       hole: hole.hole,
       actor: 'system',
       winner: ctpWinner,
@@ -151,7 +155,7 @@ export function settleJunkHole(
     for (const bet of roundCfg.bets) {
       if (!bet.junkItems.includes('ctp')) continue
       if (!bet.participants.includes(ctpWinner)) continue
-      pushAward(events, 'ctp', hole.hole, hole.timestamp, bet, [ctpWinner])
+      pushAward(events, 'ctp', hole.hole, ts, bet, [ctpWinner])
     }
   }
 
@@ -161,7 +165,7 @@ export function settleJunkHole(
     if (!bet.junkItems.includes('greenie')) continue
     const greenieWinner = isGreenie(ctpWinner, hole, junkCfg, bet)
     if (greenieWinner === null) continue
-    pushAward(events, 'greenie', hole.hole, hole.timestamp, bet, [greenieWinner])
+    pushAward(events, 'greenie', hole.hole, ts, bet, [greenieWinner])
   }
 
   // ── LD bookkeeping: LongestDriveWinnerSelected fires once per hole ──────
@@ -169,7 +173,7 @@ export function settleJunkHole(
   if (hole.longestDriveWinners.length > 0) {
     events.push({
       kind: 'LongestDriveWinnerSelected',
-      timestamp: hole.timestamp,
+      timestamp: ts,
       hole: hole.hole,
       actor: 'system',
       winners: hole.longestDriveWinners,
@@ -182,7 +186,7 @@ export function settleJunkHole(
     if (!bet.junkItems.includes('longestDrive')) continue
     const ldWinners = isLongestDrive(hole, junkCfg)
     if (ldWinners === null) continue
-    pushAward(events, 'longestDrive', hole.hole, hole.timestamp, bet, ldWinners)
+    pushAward(events, 'longestDrive', hole.hole, ts, bet, ldWinners)
   }
 
   return events

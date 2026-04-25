@@ -1050,13 +1050,16 @@ describe('Phase 4d — team2 branch: carol withdraws, TeamSizeReduced fires with
   }
   const { events, match } = settleMatchPlayHole(h3, cfg, roundCfg, initialMatch(cfg))
 
-  it('TeamSizeReduced fires with teamId=team2, remainingSize=1; HoleResolved winner=team2', () => {
+  it('TeamSizeReduced fires with teamId=team2, remainingSize=1', () => {
     const tsr = events.filter(e => e.kind === 'TeamSizeReduced')
     expect(tsr).toHaveLength(1)
     const ev = tsr[0] as { teamId: string; remainingSize: number; hole: number }
     expect(ev.teamId).toBe('team2')
     expect(ev.remainingSize).toBe(1)
     expect(ev.hole).toBe(3)
+  })
+
+  it('HoleResolved emits with winner=team2; match.holesUp=-1', () => {
     const resolved = events.filter(e => e.kind === 'HoleResolved')
     expect(resolved).toHaveLength(1)
     expect((resolved[0] as { winner: string }).winner).toBe('team2')
@@ -1144,5 +1147,50 @@ describe('Phase 4d — singles format: TeamSizeReduced does NOT fire even when w
       return sum + Object.values(pts).reduce((s, v) => s + v, 0)
     }, 0)
     expect(total).toBe(0)
+  })
+})
+
+// ─── Inverted-concession: leading player concedes, trailing player wins ──────
+//
+// buildCloseoutEvent takes an explicit `winner` arg; the winner is derived from
+// who concedes, NOT who leads. When the leading player concedes, the trailing
+// player receives the win via the type-system decoupling.
+//
+// Fixture:
+//   holesUp = -3  (team2 = B leads by 3; A trails)
+//   B concedes at hole 10
+// Expected:
+//   winner = team1 (A) — conceder's side loses regardless of current lead
+//   points = { A: +1, B: -1 }
+//   MatchClosedOut.holesUp = Math.abs(-3) = 3
+// Parking-lot line 69.
+
+describe('concedeMatch — inverted-concession: leading player concedes, trailing player wins', () => {
+  const cfg = makeCfg({ playerIds: ['A', 'B'], stake: 1 })
+  const roundCfg = makeRoundCfg(cfg)
+  // holesUp = -3: B leads (team2), A trails (team1)
+  const preMatch: MatchState = { holesUp: -3, holesPlayed: 10, closedOut: false }
+  const { events, match } = concedeMatch(cfg, roundCfg, preMatch, 'B', 10)
+
+  it('A wins (team1): trailing player receives the win when leading B concedes', () => {
+    const co = events.find((e) => e.kind === 'MatchClosedOut') as
+      | (ScoringEvent & { points: Record<string, number> }) | undefined
+    expect(co).toBeDefined()
+    expect(co!.points['A']).toBe(1)
+    expect(co!.points['B']).toBe(-1)
+  })
+
+  it('MatchClosedOut.holesUp = 3 (Math.abs(-3)) regardless of sign', () => {
+    const co = events.find((e) => e.kind === 'MatchClosedOut') as
+      | (ScoringEvent & { holesUp: number }) | undefined
+    expect(co!.holesUp).toBe(3)
+  })
+
+  it('ConcessionRecorded.conceder = B; match.closedOut = true', () => {
+    const cr = events.find((e) => e.kind === 'ConcessionRecorded') as
+      | (ScoringEvent & { conceder: string }) | undefined
+    expect(cr).toBeDefined()
+    expect(cr!.conceder).toBe('B')
+    expect(match.closedOut).toBe(true)
   })
 })

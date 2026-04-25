@@ -61,12 +61,15 @@ interface MatchState {
 function holeResult(
   state: HoleState, cfg: NassauConfig, a: PlayerId, b: PlayerId,
 ): 'A' | 'B' | 'tie' {
-  const na = cfg.appliesHandicap
-    ? state.gross[a] - strokesOnHole(state.strokes[a], state.holeIndex)
-    : state.gross[a]
-  const nb = cfg.appliesHandicap
-    ? state.gross[b] - strokesOnHole(state.strokes[b], state.holeIndex)
-    : state.gross[b]
+  // Pair-wise USGA allocation (§ 2): only the higher-handicap player receives strokes.
+  // diff = |strokes[a] − strokes[b]|; higher-hcp player receives strokesOnHole(diff, holeIndex).
+  const strokesA = cfg.appliesHandicap ? (state.strokes[a] ?? 0) : 0
+  const strokesB = cfg.appliesHandicap ? (state.strokes[b] ?? 0) : 0
+  const diff = Math.abs(strokesA - strokesB)
+  const pairStrokes = strokesOnHole(diff, state.holeIndex)
+  const aIsHigher = strokesA > strokesB
+  const na = state.gross[a] - (aIsHigher ? pairStrokes : 0)
+  const nb = state.gross[b] - (aIsHigher ? 0 : pairStrokes)
   if (na < nb) return 'A'
   if (nb < na) return 'B'
   return 'tie'

@@ -4,6 +4,8 @@ Link: `.claude/skills/golf-betting-rules/SKILL.md` · Cross-cutting feature; app
 
 This document is authoritative for the Round Handicap field. Every game that applies handicap strokes reads the player's course handicap **plus** the Round Handicap before calling `strokesOnHole` from `src/games/handicap.ts`.
 
+> Cross-round group-handicap evolution context: see docs/product/north-star.md (Goal 3).
+
 ## 1. Overview
 
 Round Handicap is a per-player, per-round integer adjustment layered on top of the player's USGA course handicap. It exists because recreational groups often agree to an informal one-round modifier — a "game adjustment" that compensates for recent form, course familiarity, or group tradition — without touching the player's official handicap index.

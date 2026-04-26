@@ -143,16 +143,18 @@ export type PayoutMap = Record<string, number>
 
 export type HolesCount = '18' | '9front' | '9back'
 
-export const GAME_DEFS: { key: GameType; label: string; description: string; minPlayers?: number; maxPlayers?: number; requirementText?: string }[] = [
+// disabled?: true — UI park flag. Entries marked disabled are hidden from the game picker
+// (GameList.tsx) during the Stroke-Play-only phase. Engine files and tests are unaffected.
+export const GAME_DEFS: { key: GameType; label: string; description: string; minPlayers?: number; maxPlayers?: number; requirementText?: string; disabled?: boolean }[] = [
   { key: 'strokePlay', label: 'Stroke Play', description: 'Lowest net score wins' },
-  { key: 'matchPlay', label: 'Match Play', description: 'Win holes head-to-head — works with 2–5 players', minPlayers: 2 },
-  { key: 'stableford', label: 'Stableford', description: 'Points per hole based on net score' },
-  { key: 'skins', label: 'Skins', description: 'Win the hole outright to win the skin' },
-  { key: 'nassau', label: 'Nassau', description: 'Three bets: front 9, back 9, overall' },
-  { key: 'bestBall', label: 'Best Ball', description: 'Team best net score per hole', minPlayers: 4, maxPlayers: 4, requirementText: 'Requires exactly 4 betting players' },
-  { key: 'bingoBangoBongo', label: 'Bingo Bango Bongo', description: 'First on, closest, first in — one point each' },
-  { key: 'wolf', label: 'Wolf', description: 'Pick your partner or go solo', minPlayers: 4, maxPlayers: 5, requirementText: 'Requires 4–5 betting players' },
-  { key: 'vegas', label: 'Vegas', description: 'Team scores combine as a 2-digit number' },
+  { key: 'matchPlay', label: 'Match Play', description: 'Win holes head-to-head — works with 2–5 players', minPlayers: 2, disabled: true },
+  { key: 'stableford', label: 'Stableford', description: 'Points per hole based on net score', disabled: true },
+  { key: 'skins', label: 'Skins', description: 'Win the hole outright to win the skin', disabled: true },
+  { key: 'nassau', label: 'Nassau', description: 'Three bets: front 9, back 9, overall', disabled: true },
+  { key: 'bestBall', label: 'Best Ball', description: 'Team best net score per hole', minPlayers: 4, maxPlayers: 4, requirementText: 'Requires exactly 4 betting players', disabled: true },
+  { key: 'bingoBangoBongo', label: 'Bingo Bango Bongo', description: 'First on, closest, first in — one point each', disabled: true },
+  { key: 'wolf', label: 'Wolf', description: 'Pick your partner or go solo', minPlayers: 4, maxPlayers: 5, requirementText: 'Requires 4–5 betting players', disabled: true },
+  { key: 'vegas', label: 'Vegas', description: 'Team scores combine as a 2-digit number', disabled: true },
 ]
 
 export const COURSES: CourseData[] = [

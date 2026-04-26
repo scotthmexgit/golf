@@ -4,11 +4,13 @@ Link: `.claude/skills/golf-betting-rules/SKILL.md` · Scoring file: `src/games/s
 
 ## 1. Overview
 
-Skins awards one skin per hole to the player with the lowest net score on that hole. A tied hole carries the skin to the next hole. The final hole's carry resolves under the configured `tieRule`. This file specifies Skins for 2–5 players; `src/games/skins.ts` is the authority on behavior.
+Skins awards one skin per hole to the player with the lowest net score on that hole. A tied hole carries the skin to the next hole. The final hole's carry resolves under the configured `tieRule`. This file specifies Skins for 3–5 players, with 3 as the canonical form and 4–5 as documented variants; `src/games/skins.ts` is the authority on behavior.
 
 ## 2. Players & Teams
 
-Minimum 2 players, maximum 5. No teams. Every player plays for themselves. Handicap strokes apply per hole via `strokesOnHole(strokes, holeIndex)` in `src/games/handicap.ts`.
+Minimum 3 players, maximum 5. The canonical form is 3 players; 4–5 are documented variants. No teams. Every player plays for themselves. Handicap strokes apply per hole via `strokesOnHole(strokes, holeIndex)` in `src/games/handicap.ts`.
+
+2-player formats use match play, not skins (see `game_match_play.md`).
 
 ## 3. Unit of Wager
 
@@ -23,7 +25,7 @@ interface SkinsConfig {
   tieRuleFinalHole: 'carryover' | 'split' | 'no-points'
                                  // default 'split'
   appliesHandicap: boolean       // default true — uses net; false = gross
-  playerIds: PlayerId[]          // length 2..5
+  playerIds: PlayerId[]          // length 3..5
   junkItems: JunkKind[]          // default [] — Junk awards this bet declares in-play; see docs/games/game_junk.md
   junkMultiplier: number         // positive integer, default 1; applies to every event in junkItems
 }
@@ -226,9 +228,14 @@ Setup: two-way tie (A, B) on hole 18 with carry 2; stake 1.
 
 Assert: `delta[h18] = { A: 0, B: 0, C: 0, D: 0 }`; one `SkinCarryForfeit`; zero-sum holds.
 
-### Test 4 — Field of 2 players
+### Test 4 — Field of 3 players
 
-Stake 1, all defaults, 18 holes. Assert zero-sum holds. Assert `delta[winner][hole] + delta[loser][hole] === 0` on every settled hole.
+Three players — A, B, C. Stake 1, `escalating = true`, `tieRuleFinalHole = 'split'`, 18 holes. A wins odd-numbered holes (gross 3 vs B and C gross 4), B wins even-numbered holes (gross 3 vs A and C gross 4), C never wins.
+
+Assert:
+- Σ delta = 0 across the round.
+- Exactly 18 `SkinWon` events (no ties, no carry).
+- Per-event zero-sum: every `SkinWon` event has Σ points across all three players = 0.
 
 ### Test 5 — Missing score mid-round
 

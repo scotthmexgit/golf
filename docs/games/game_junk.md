@@ -59,6 +59,8 @@ function settleJunkHole(
   roundCfg: RoundConfig,
   junkCfg: JunkRoundConfig,
 ): JunkAwarded[] {
+  // Phase 1–2 single-winner calling pattern shown below.
+  // Phase 3 engineering extends this for multi-winner items (LD, Sandy, Barkie, Polie, Arnie).
   const events: JunkAwarded[] = []
   for (const bet of roundCfg.declaringBets) {
     for (const kind of bet.junkItems) {
@@ -89,15 +91,17 @@ function isCTP(state: HoleState, cfg: JunkRoundConfig): PlayerId | null {
   return state.ctpWinner ?? null
 }
 
-function isLongestDrive(state: HoleState, cfg: JunkRoundConfig): PlayerId | null {
+function isLongestDrive(state: HoleState, cfg: JunkRoundConfig): PlayerId[] | null {
   // Par-4 or par-5 only. Hole must appear in cfg.longestDriveHoles.
   // Winner: longest measured tee shot coming to rest in the fairway.
+  // Returns all tied winners (empty array → null) — see § 6 ("split evenly among tied winners").
   // Source: https://www.golfcompendium.com/2020/02/nicklauses-golf-bet.html
   //         https://help.18birdies.com/article/55-dots-junk
   if (!cfg.longestDriveEnabled) return null
   if (state.par < 4) return null
   if (!cfg.longestDriveHoles.includes(state.hole)) return null
-  return state.longestDriveWinner ?? null
+  const winners = state.longestDriveWinners
+  return winners.length > 0 ? winners : null
 }
 
 function isGreenie(state: HoleState, cfg: JunkRoundConfig): PlayerId | null {
@@ -112,40 +116,45 @@ function isGreenie(state: HoleState, cfg: JunkRoundConfig): PlayerId | null {
   return ctp
 }
 
-function isSandy(state: HoleState, cfg: JunkRoundConfig): PlayerId | null {
+function isSandy(state: HoleState, cfg: JunkRoundConfig): PlayerId[] | null {
   // Par or better after being in a sand bunker during the hole.
+  // Returns all tied winners — see § 6 ("all tied winners collect").
   // Super Sandy (fairway bunker) applies when superSandyEnabled — handled at
   // point emission, not winner selection.
   if (!cfg.sandyEnabled) return null
   const candidates = Object.keys(state.gross).filter(p =>
-    state.bunkerVisited[p] === true && state.gross[p] <= state.par)
-  return candidates.length === 1 ? (candidates[0] as PlayerId) : null
+    state.bunkerVisited[p] === true && state.gross[p] <= state.par) as PlayerId[]
+  return candidates.length > 0 ? candidates : null
 }
 
-function isBarkie(state: HoleState, cfg: JunkRoundConfig): PlayerId | null {
+function isBarkie(state: HoleState, cfg: JunkRoundConfig): PlayerId[] | null {
   // Par or better after hitting a tree. Solid wood only when barkieStrict.
+  // Returns all tied winners — see § 6 ("all tied winners collect").
   // Source: https://thegolfnewsnet.com/ryan_ballengee/2022/08/30/golf-terms-what-is-a-barky-or-barkie-in-golf-and-what-does-it-mean-to-get-one-126970/
   if (!cfg.barkieEnabled) return null
   const candidates = Object.keys(state.gross).filter(p => {
     const tree = cfg.barkieStrict ? state.treeSolidHit[p] : state.treeAnyHit[p]
     return tree === true && state.gross[p] <= state.par
-  })
-  return candidates.length === 1 ? (candidates[0] as PlayerId) : null
+  }) as PlayerId[]
+  return candidates.length > 0 ? candidates : null
 }
 
-function isPolie(state: HoleState, cfg: JunkRoundConfig): PlayerId | null {
+function isPolie(state: HoleState, cfg: JunkRoundConfig): PlayerId[] | null {
   // Sink a putt longer than the flagstick (approx 7 feet).
+  // Returns all tied winners — see § 6 ("all tied winners collect").
   // Automatic: any qualifying putt counts. Invoked: caller flags via state.polieInvoked.
   // Source: https://www.golfcompendium.com/2021/02/poley-golf-game.html
   if (!cfg.polieEnabled) return null
   const mode = cfg.polieMode
   const candidates = Object.keys(state.gross).filter(p =>
-    state.longPutt[p] === true && (mode === 'automatic' || state.polieInvoked[p] === true))
-  return candidates.length === 1 ? (candidates[0] as PlayerId) : null
+    state.longPutt[p] === true && (mode === 'automatic' || state.polieInvoked[p] === true)
+  ) as PlayerId[]
+  return candidates.length > 0 ? candidates : null
 }
 
-function isArnie(state: HoleState, cfg: JunkRoundConfig): PlayerId | null {
+function isArnie(state: HoleState, cfg: JunkRoundConfig): PlayerId[] | null {
   // Par on a par-4 or par-5 without hitting the fairway off the tee and without GIR.
+  // Returns all tied winners — see § 6 ("all tied winners collect").
   // Source: https://www.myscorecard.com/cgi-bin/knowledgecenter.pl?...
   //         https://help.18birdies.com/article/55-dots-junk
   if (!cfg.arnieEnabled) return null
@@ -153,13 +162,19 @@ function isArnie(state: HoleState, cfg: JunkRoundConfig): PlayerId | null {
   const candidates = Object.keys(state.gross).filter(p =>
     state.gross[p] === state.par &&
     state.fairwayHit[p] === false &&
-    state.gir[p] === false)
-  return candidates.length === 1 ? (candidates[0] as PlayerId) : null
+    state.gir[p] === false
+  ) as PlayerId[]
+  return candidates.length > 0 ? candidates : null
 }
 
+// `ctp` and `greenie` return PlayerId | null (single-winner items).
+// `longestDrive`, `sandy`, `barkie`, `polie`, and `arnie` return PlayerId[] | null
+// (multi-winner items — all tied winners collect per § 6).
+// Phase 3 engineering will finalize the calling convention for multi-winner items
+// in settleJunkHole. Do not restore PlayerId | null return types for multi-winner items.
 function resolveJunkWinner(
   kind: JunkKind, state: HoleState, cfg: JunkRoundConfig,
-): PlayerId | null {
+): PlayerId | PlayerId[] | null {
   switch (kind) {
     case 'ctp': return isCTP(state, cfg)
     case 'longestDrive': return isLongestDrive(state, cfg)
@@ -173,6 +188,8 @@ function resolveJunkWinner(
 ```
 
 `settleJunkHole` returns one `JunkAwarded` event per (declaringBet × junkKind) awarded. A CTP on a par 3 with GIR toggle ON, declared on two main bets, produces four events: two for CTP (one per declaring bet) and two for Greenie (one per declaring bet).
+
+> **Multi-winner invariant (§ 5 ↔ § 6 alignment).** `isLongestDrive`, `isSandy`, `isBarkie`, `isPolie`, and `isArnie` return `PlayerId[] | null` — a non-empty array of all tied winners, or `null` when no award fires. This matches § 6 ("all tied winners collect" for Sandy/Barkie/Polie/Arnie; "split evenly among tied winners" for LD). The prior `candidates.length === 1 ? candidates[0] : null` pattern voided tied awards rather than splitting them; it was a code-stub artifact that contradicted § 6 and has been removed from this spec. Phase 3 engineering in `src/games/junk.ts` must preserve `PlayerId[] | null` return types for these items.
 
 ## 6. Tie Handling
 

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import { useRoundStore } from '@/store/roundStore'
 import Header from '@/components/layout/Header'
 import LiveBar from '@/components/layout/LiveBar'
@@ -15,10 +15,29 @@ import { vsPar } from '@/lib/scoring'
 
 export default function ScorecardPage() {
   const router = useRouter()
+  const params = useParams()
   const store = useRoundStore()
-  const { course, players, holes, currentHole, setCurrentHole, games, roundId } = store
+  const { course, players, holes, currentHole, setCurrentHole, games, roundId, hydrateRound } = store
   const [showFinishConfirm, setShowFinishConfirm] = useState(false)
   const [notices, setNotices] = useState<string[]>([])
+  const [hydrating, setHydrating] = useState(false)
+  const hydratedRef = useRef(false)
+
+  // Step 3: Server-authoritative hydration on mount (Decision 1)
+  useEffect(() => {
+    // Derive roundId from URL param — handles page refresh case where Zustand is empty
+    const urlRoundId = parseInt(params.roundId as string, 10)
+    if (isNaN(urlRoundId) || hydratedRef.current) return
+    hydratedRef.current = true
+    setHydrating(true)
+    fetch(`/golf/api/rounds/${urlRoundId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) hydrateRound(data)
+      })
+      .catch(() => { /* silent — Zustand state is used as fallback */ })
+      .finally(() => setHydrating(false))
+  }, [params.roundId, hydrateRound])
 
   const holeRange = store.holeRange()
   const holeData = holes.find(h => h.number === currentHole)
@@ -70,13 +89,28 @@ export default function ScorecardPage() {
     setNotices(n)
   }
 
-  const handleSaveNext = () => {
-    if (!allScored) return
+  const handleSaveNext = async () => {
+    if (!allScored || !holeData) return
 
     detectNotices()
 
+    // Step 4: Persist scores for this hole before advancing (Decision 3)
+    if (roundId) {
+      const scorePayload = players.map(p => ({
+        playerId: Number(p.id),
+        gross: holeData.scores[p.id] || 0,
+        putts: null,
+        fromBunker: false,
+      }))
+      fetch(`/golf/api/rounds/${roundId}/scores/hole/${currentHole}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scores: scorePayload }),
+      }).catch(() => { /* fire-and-forget; Zustand holds score locally */ })
+    }
+
     // Check if par 3 with any game that has greenie junk
-    const isPar3 = holeData?.par === 3
+    const isPar3 = holeData.par === 3
     const anyGreenie = games.some(g => hasGreenieJunk(g.junk))
     const anyBBB = games.some(g => g.type === 'bingoBangoBongo')
 
@@ -97,21 +131,36 @@ export default function ScorecardPage() {
     setShowFinishConfirm(true)
   }
 
-  const confirmFinish = () => {
+  const confirmFinish = async () => {
     setShowFinishConfirm(false)
+    // Step 5: Mark round Complete before navigating (forward-only lifecycle)
+    if (roundId) {
+      await fetch(`/golf/api/rounds/${roundId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Complete' }),
+      }).catch(() => { /* best-effort; navigation proceeds regardless */ })
+    }
     router.push(`/results/${roundId}`)
   }
 
-  if (!course || !holeData) {
+  // While hydrating from server, show a loading state instead of the empty-round fallback
+  if (hydrating || !course || !holeData) {
     return (
       <div className="flex flex-col min-h-screen">
         <Header title="Scorecard" backHref="/" />
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="text-center space-y-3">
-            <p style={{ color: 'var(--muted)' }}>No active round found.</p>
-            <Link href="/round/new" className="text-sm font-semibold" style={{ color: 'var(--green-soft)' }}>
-              Start a new round →
-            </Link>
+            {hydrating ? (
+              <p style={{ color: 'var(--muted)' }}>Loading round...</p>
+            ) : (
+              <>
+                <p style={{ color: 'var(--muted)' }}>No active round found.</p>
+                <Link href="/round/new" className="text-sm font-semibold" style={{ color: 'var(--green-soft)' }}>
+                  Start a new round →
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>

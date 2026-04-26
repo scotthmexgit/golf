@@ -8,6 +8,7 @@ interface RecentRound {
   id: number
   playedAt: string
   holesCount: number
+  status: string
   course: { name: string; location: string }
   players: { player: { name: string } }[]
 }
@@ -63,27 +64,38 @@ export default function HomePage() {
 
           {loaded && rounds.length > 0 && (
             <div className="space-y-2">
-              {rounds.map(r => (
-                <Link
-                  key={r.id}
-                  href={`/results/${r.id}`}
-                  className="block rounded-xl border p-3 transition-colors"
-                  style={{ borderColor: 'var(--line)', background: 'white' }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                      {r.course?.name || 'Unknown Course'}
+              {rounds.map(r => {
+                // Step 6: InProgress rounds resume at scorecard; Complete rounds go to results
+                const href = r.status === 'InProgress' ? `/scorecard/${r.id}` : `/results/${r.id}`
+                return (
+                  <Link
+                    key={r.id}
+                    href={href}
+                    className="block rounded-xl border p-3 transition-colors"
+                    style={{ borderColor: 'var(--line)', background: 'white' }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                        {r.course?.name || 'Unknown Course'}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {r.status === 'InProgress' && (
+                          <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: 'var(--green-soft)', color: 'white' }}>
+                            In Progress
+                          </span>
+                        )}
+                        <div className="text-[10px] font-mono" style={{ color: 'var(--muted)' }}>
+                          {new Date(r.playedAt).toLocaleDateString()}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-[10px] font-mono" style={{ color: 'var(--muted)' }}>
-                      {new Date(r.playedAt).toLocaleDateString()}
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                      {r.players?.map(p => p.player?.name).filter(Boolean).join(', ') || 'No players'}
+                      {' · '}{r.holesCount} holes
                     </div>
-                  </div>
-                  <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                    {r.players?.map(p => p.player?.name).filter(Boolean).join(', ') || 'No players'}
-                    {' · '}{r.holesCount} holes
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                )
+              })}
             </div>
           )}
         </div>

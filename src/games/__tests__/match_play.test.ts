@@ -7,6 +7,7 @@ import {
   MatchPlayBetNotFoundError,
   type MatchState,
 } from '../match_play'
+import type { ScoringEvent } from '../events'
 import type {
   BetSelection,
   HoleState,

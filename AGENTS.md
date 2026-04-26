@@ -17,10 +17,9 @@ Next.js 16 has breaking changes from what appears in model training data. Before
 Skins, Wolf, Nassau, Match Play, Stroke Play. Junk is the side-bet engine (not a game). Canonical rules: `docs/games/game_<name>.md`. No agent may restate rules inline — link to the game file.
 
 Current status (live scope in `IMPLEMENTATION_CHECKLIST.md`):
-- Skins, Wolf, Stroke Play: landed under `src/games/`.
-- Nassau: in progress (see Active item in `IMPLEMENTATION_CHECKLIST.md`).
-- Match Play, Junk: pending per `REBUILD_PLAN.md`.
-- Old scoring in `src/lib/*` remains live via parallel-path until cutover (REBUILD_PLAN #11).
+- All five engines (Skins, Wolf, Nassau, Match Play, Stroke Play) landed under `src/games/` (#3–#8 closed 2026-04-24). Junk Phase 1–2 landed; Phase 3 deferred.
+- Active phase: Stroke-Play-only UI wiring — see `docs/plans/STROKE_PLAY_PLAN.md`. Current item: SP-6 (GAME_DEFS cleanup + GameList filter).
+- Old scoring in `src/lib/*` remains live; Stroke Play cutover is SP-4; full multi-bet cutover deferred.
 
 ## Source of truth
 
@@ -28,7 +27,7 @@ Current status (live scope in `IMPLEMENTATION_CHECKLIST.md`):
 - **Types:** `src/types/index.ts` and Prisma `schema.prisma`.
 - **Scoring (target path):** `src/games/<name>.ts`.
 - **Scoring (pre-cutover parallel path):** `src/lib/scoring.ts`, `payouts.ts`, `handicap.ts`, `junk.ts`.
-- **Active scope:** `IMPLEMENTATION_CHECKLIST.md` Active item → `REBUILD_PLAN.md` for that item's AC.
+- **Active scope:** `IMPLEMENTATION_CHECKLIST.md` Active item → active plan for that item's AC (currently `docs/plans/STROKE_PLAY_PLAN.md` for the Stroke-Play-only phase; `REBUILD_PLAN.md` retained for #3–#10 history).
 - **History (not a todo list):** `MIGRATION_NOTES.md`, `AUDIT.md`.
 - **Skill entry point for rule questions:** `.claude/skills/golf-betting-rules/SKILL.md`.
 
@@ -64,7 +63,7 @@ Unclear or multi-role intents route to `team-lead`. A single-role intent routes 
 A change that violates any of these fails `reviewer`.
 
 1. **Rules come from docs.** Rule answers live in `docs/games/game_<name>.md` or the `golf-betting-rules` skill. No agent answers rule questions from training data when a rule file exists. No agent restates rule content inline — link to the file.
-2. **Integer-unit math only.** Stakes are integers in minor units (cents). No `Float` in Prisma (pending migration #10). No `toFixed` in scoring. No floating-point arithmetic anywhere in `src/games/`. Tests assert `Number.isInteger` on every delta.
+2. **Integer-unit math only.** Stakes are integers in minor units (cents). No `Float` in Prisma. No `toFixed` in scoring. No floating-point arithmetic anywhere in `src/games/`. Tests assert `Number.isInteger` on every delta.
 3. **Settlement is zero-sum.** Per round, `Σ delta == 0` across all betting players, per game and in total. Unresolvable rounding emits a `RoundingAdjustment` event. Silent zero-pay on a tied hole is a correctness bug.
 4. **Portability.** Scoring code under `src/games/` imports zero of: `next/*`, `react`, `react-dom`, `fs`, `path`, `window`, `document`, `localStorage`. Targets a future React Native / Expo port.
 5. **Handicap-in-one-place.** Every course-handicap computation and every strokes-on-hole lookup goes through `src/games/handicap.ts`. No other file reimplements USGA allocation. Gross and net are explicit in every signature and variable name.
@@ -77,7 +76,7 @@ A change that violates any of these fails `reviewer`.
 Before the first tool call, every agent:
 
 - [ ] Reads this file.
-- [ ] Reads the Active item in `IMPLEMENTATION_CHECKLIST.md` and the matching AC in `REBUILD_PLAN.md`.
+- [ ] Reads the Active item in `IMPLEMENTATION_CHECKLIST.md` and the matching AC in the active plan (`docs/plans/STROKE_PLAY_PLAN.md` for the current phase).
 - [ ] Reads the relevant `docs/games/game_<name>.md` before writing scoring code.
 - [ ] Reads `.claude/skills/golf-betting-rules/SKILL.md` before answering a rule or settlement question.
 <!-- END:nextjs-agent-rules -->

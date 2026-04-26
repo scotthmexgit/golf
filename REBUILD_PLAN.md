@@ -1,5 +1,9 @@
 # Rebuild Plan — 2026-04-20
 
+> **Status as of 2026-04-25 — read this before the entries below:**
+> Items #3–#8 are complete (engine rebuild closed 2026-04-24). Items #9 and #10 carry forward as independent backlog. Item #11 (full multi-bet cutover) is **superseded for the Stroke-Play-only phase** by SP-4 in `docs/plans/STROKE_PLAY_PLAN.md`; the full cutover is deferred until the third bet unparks. Item #12 (HoleData ↔ HoleState bridge) is **split**: SP-2 + SP-3 in `docs/plans/STROKE_PLAY_PLAN.md` cover Stroke Play happy-path plumbing; the original #12 edge-case scope (`withdrew`, `conceded`, `pickedUp`, Wolf `PlayerWithdrew` writer, Nassau `settleNassauWithdrawal` caller) is deferred until parked bets unpark.
+> **Active plan: `docs/plans/STROKE_PLAY_PLAN.md`.**
+
 Drafted from `AUDIT.md` (9 Open items) plus the 7 Wolf follow-ups in `/tmp/round-5-notes.md` folded into #3 per user decision at prompt 002. Revised at prompts 003–004 with three user decisions: legacy Match Play mapping confirmed, cutover moved to parallel-path with grep gates, bet-id refactor included as new #4. Entries renumbered to sequential integers #3 through #11. Awaiting final user approval before any code changes begin on #3+.
 
 ## Scope

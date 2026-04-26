@@ -25,7 +25,8 @@ Multipliers: none.
 ## 4. Setup
 
 ```ts
-interface StrokePlayConfig {
+interface StrokePlayCfg {
+  id: BetId                        // unique bet identifier; used for event emission and bet-id lookups
   stake: number                    // integer minor units, default 100, min 1
   settlementMode: 'winner-takes-pot' | 'per-stroke' | 'places'
                                    // default 'winner-takes-pot'
@@ -55,16 +56,16 @@ Stroke Play does not produce a per-hole monetary delta. The per-hole event is a 
 import { strokesOnHole } from './handicap'
 import type { HoleState, ScoringEvent } from './types'
 
-function recordStrokePlayHole(
-  state: HoleState, cfg: StrokePlayConfig,
-): ScoringEvent {
+function settleStrokePlayHole(
+  state: HoleState, cfg: StrokePlayCfg,
+): ScoringEvent[] {
   const nets: Record<PlayerId, number> = {}
   for (const pid of cfg.playerIds) {
     const g = state.gross[pid]
     nets[pid] = cfg.appliesHandicap ? g - strokesOnHole(state.strokes[pid], state.holeIndex) : g
   }
   return { kind: 'StrokePlayHoleRecorded', hole: state.hole, actor: 'system',
-           timestamp: state.timestamp, delta: zero(cfg.playerIds), nets }
+           timestamp: state.timestamp, nets }
 }
 ```
 
@@ -151,7 +152,7 @@ The lexicographic fallback matches the `split` tie-rule's "lowest `playerId` abs
 - **`places` mode with N players and fewer than N place entries** — config invariant requires `placesPayout.length === playerIds.length`. Rejected at config validation.
 - **`per-stroke` with large stroke spread** — integer-only; no overflow concern at realistic tournament scales.
 - **Card-back tie all the way down** — emit `TieFallthrough` and resolve under `split`.
-- **Player withdraws mid-round** — withdrawing player is excluded from final rankings; remaining players settle per `settlementMode`. The withdrawn player's `stake` ante (in `places` mode) is redistributed: add `stake` evenly back to remaining players; remainder routes to `RoundingAdjustment`.
+- **Player withdraws mid-round** — out of scope for this engine. A withdrawn player who records no further gross scores is handled via IncompleteCard (see the Missing-score case above).
 
 ## 10. Worked Example
 
@@ -215,11 +216,11 @@ Settlement (`winner-takes-pot`, stake 10): Alice +30, Bob −10, Carol −10, Da
 
 ## 11. Implementation Notes
 
-Scoring file: `src/games/stroke_play.ts`. Emitted events: `StrokePlayHoleRecorded`, `StrokePlaySettled`, `CardBackResolved`, `ScorecardPlayoffResolved`, `TieFallthrough`, `RoundingAdjustment`, `IncompleteCard`, `FieldTooSmall`. Imports `strokesOnHole` from `src/games/handicap.ts` and `ScoringEvent` from `src/games/events.ts`.
+Scoring file: `src/games/stroke_play.ts`. Emitted events: `StrokePlayHoleRecorded`, `StrokePlaySettled`, `CardBackResolved`, `ScorecardPlayoffResolved`, `TieFallthrough`, `RoundingAdjustment`, `IncompleteCard`, `FieldTooSmall`. Imports `strokesOnHole` from `src/games/handicap.ts` and `ScoringEvent` from `./types`.
 
 `TieFallthrough` payload: `{ kind: 'TieFallthrough', hole: null, timestamp, actor, declaringBet, from, to }`. `from` is one of `'split' | 'card-back' | 'scorecard-playoff'` per § 6; `to` is always `'split'` in v1. The event is emitted once per tie that resolves to `'split'`, in the same order as the `StrokePlaySettled` event it precedes.
 
-`src/games/stroke_play.ts` is stateless at the hole level. `src/games/aggregate.ts` calls the per-hole recorder on every hole, then calls the round settler once at round end. `aggregate.ts` owns the `tieRule` dispatch.
+`src/games/stroke_play.ts` is stateless at the hole level. `src/games/aggregate.ts` calls the per-hole recorder on every hole, then calls the round settler once at round end. `stroke_play.ts` owns the `tieRule` dispatch (all branching on `config.tieRule`, all calls to `resolveTieByCardBack` / `resolveTieByScorecardPlayoff` / `emitSplitSettlement`). `aggregate.ts` is the caller; it invokes `finalizeStrokePlayRound` and forwards the result.
 
 `per-stroke` multiplies and sums integers only. `places` sums integers from `placesPayout`. `winner-takes-pot` multiplies `stake` by an integer player count. No floating-point arithmetic.
 
@@ -291,3 +292,39 @@ Assert:
 ### Test 7 — `places` config validation
 
 Setup: `placesPayout = [20, 10, 8, 0]` (sum = 38, not 40). Assert: config validation throws; no settlement runs.
+
+### Test 8 — Direct-split TieFallthrough ordering
+
+`tieRule = 'split'` directly (no upstream tiebreaker). Assert: `TieFallthrough { from: 'split', to: 'split' }` precedes `StrokePlaySettled` in the returned event list.
+
+### Test 9 — RoundingAdjustment, 3-way tie among 5 players
+
+3 tied winners, 2 losers, `stake = 1`. Loser pot = 2; `floor(2/3) = 0` per winner, remainder = 2. Assert: `RoundingAdjustment` emitted; lowest `playerId` winner absorbs remainder; Σ delta = 0.
+
+### Test 10 — Card-back multi-segment: back-9 tied, back-6 separates
+
+`cardBackOrder = [9, 6, 3, 1]`; back-9 net totals equal; back-6 totals differ. Assert: `CardBackResolved { segment: 6 }`; Σ delta = 0.
+
+### Test 11 — `tieRule = 'scorecard-playoff'`
+
+Tie on total net; back-9 segment separates. Assert: `ScorecardPlayoffResolved` emitted with correct winner; Σ delta = 0.
+
+### Test 12 — Round Handicap integration
+
+Same gross scores; different `roundHandicap` values on `PlayerSetup`. Assert: effective handicap (courseHcp + roundHandicap) changes net totals and winner correctly.
+
+### Test 13 — Config error throwing
+
+Assert `StrokePlayConfigError` thrown for: missing `settlementMode`, missing `tieRule`, `places` with wrong-length `placesPayout`, `places` with non-integer entry, bet not found in `roundCfg.bets` (throws `StrokePlayBetNotFoundError`).
+
+### Test 14 — Event ordering: every split resolution preceded by TieFallthrough
+
+MIGRATION_NOTES #15 fix. Assert for both direct-split path and card-back-fallthrough path that `TieFallthrough` appears before `StrokePlaySettled` in the event list.
+
+### Test 15 — FieldTooSmall: fewer than 2 players complete the round
+
+Three of four players have gross = 0 on every hole. Assert: `FieldTooSmall` emitted; no `StrokePlaySettled`; all deltas = 0.
+
+### Test 16 — `resolveTieByCardBack` helper (pure, exported)
+
+Direct unit test of the exported helper. Assert: returns `{ winner: null, events: [] }` when every segment is tied; returns `{ winner, events: [CardBackResolved] }` when a segment separates.

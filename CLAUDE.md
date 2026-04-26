@@ -70,12 +70,14 @@ doubt, create the D-class item.
 
 See `AGENTS.md` § User intent → agent routing. Default bias: explore before execute.
 
-## Rebuild context (temporary — remove when rebuild closes)
+## Active phase (Stroke-Play-only — remove when this phase closes)
+
+**Engine rebuild complete:** `src/games/` engines (#3–#8 closed 2026-04-24). Junk Phase 1–2 landed; Phase 3 deferred. `src/lib/*` parallel paths remain live; Stroke Play surgical cutover is SP-4; full multi-bet cutover deferred until the third bet unparks. `prisma/` Float→Int is independent backlog (REBUILD_PLAN #10).
+
+**Active plan:** `docs/plans/STROKE_PLAY_PLAN.md` (Stroke-Play-only phase). Supersedes REBUILD_PLAN.md items #11 and #12. `REBUILD_PLAN.md` retained for #3–#10 history.
 
 **Preserved, do not touch:** `AGENTS.md`, `.claude/agents/`, `.claude/skills/golf-betting-rules/`, `docs/games/` (rule files), `README.md`, `.gitignore`, `package.json`.
 
-**Under rebuild:** `src/games/` engines (Nassau in progress; Match Play, Junk pending), `src/lib/*` parallel paths (cutover at REBUILD_PLAN #11), `prisma/` Float→Int (REBUILD_PLAN #10).
-
-**History, not a todo list:** `MIGRATION_NOTES.md` (Rounds 1–5) and `AUDIT.md` (19-item classification). Live scope is `IMPLEMENTATION_CHECKLIST.md` + `REBUILD_PLAN.md`. Do not "fix" MIGRATION_NOTES items directly — route through the checklist.
+**History, not a todo list:** `MIGRATION_NOTES.md` (Rounds 1–5) and `AUDIT.md` (19-item classification). Live scope is `IMPLEMENTATION_CHECKLIST.md` + `docs/plans/STROKE_PLAY_PLAN.md`. Do not "fix" MIGRATION_NOTES items directly — route through the checklist.
 
 Safety branch: `pre-rebuild-snapshot` (marker only; does not preserve uncommitted working-tree state).

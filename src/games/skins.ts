@@ -78,8 +78,8 @@ function assertValidSkinsCfg(cfg: SkinsCfg): void {
   if (typeof cfg.escalating !== 'boolean') {
     throw new SkinsConfigError('escalating')
   }
-  if (!Array.isArray(cfg.playerIds) || cfg.playerIds.length < 2 || cfg.playerIds.length > 5) {
-    throw new SkinsConfigError('playerIds', 'length must be 2..5')
+  if (!Array.isArray(cfg.playerIds) || cfg.playerIds.length < 3 || cfg.playerIds.length > 5) {
+    throw new SkinsConfigError('playerIds', 'length must be 3..5')
   }
   if (!Array.isArray(cfg.junkItems)) {
     throw new SkinsConfigError('junkItems')

@@ -333,28 +333,30 @@ describe('tieRuleFinalHole: no-points — tied hole 18 refunds carry', () => {
   })
 })
 
-// ─── Test 5 — game_skins.md § 12 Test 5: field of 2 players ───────────────
+// ─── Test 5 — game_skins.md § 12 Test 4: field of 3 players ───────────────
 
-describe('field of 2 players — zero-sum per hole', () => {
+describe('field of 3 players — zero-sum per hole', () => {
   it('zero-sum holds on every settled hole over 18 holes', () => {
-    const cfg = makeSkinsCfg({ playerIds: ['A', 'B'] })
+    const cfg = makeSkinsCfg({ playerIds: ['A', 'B', 'C'], escalating: true })
     const round = makeRoundCfg(cfg)
+    // A wins odd holes (gross 3), B wins even holes (gross 3), C always gross 4.
+    // No ties → 18 SkinWon events, no SkinCarried.
     const holes = Array.from({ length: 18 }, (_, i) => ({
       hole: i + 1,
       gross:
         i % 2 === 0
-          ? { A: 4, B: 5 }
-          : { A: 5, B: 4 },
+          ? { A: 3, B: 4, C: 4 }  // A wins
+          : { A: 4, B: 3, C: 4 },  // B wins
     }))
     const events = runRound(holes, cfg, round)
     assertZeroSum(events, cfg.playerIds)
     // Every hole emits a SkinWon (alternating winners) — no ties.
     const wins = events.filter((e) => e.kind === 'SkinWon')
     expect(wins).toHaveLength(18)
-    // Per-hole events zero-sum: winner + loser = 0.
+    // Per-event zero-sum: winner collects from 2 losers; 3-way sum = 0.
     for (const e of wins) {
       if (e.kind === 'SkinWon') {
-        const s = (e.points.A ?? 0) + (e.points.B ?? 0)
+        const s = (e.points.A ?? 0) + (e.points.B ?? 0) + (e.points.C ?? 0)
         expect(s).toBe(0)
       }
     }
@@ -430,23 +432,23 @@ describe('edge case: two-way tie on hole 18 (no carry in)', () => {
 describe('edge case: handicap strokes produce a negative net', () => {
   it('accepts a negative net and the negative-net player wins the hole', () => {
     // A is scratch (0 strokes). B has 36 handicap — gets 2 strokes on every hole.
-    // On hole 1 (idx 1), A shoots 4 (net 4), B shoots 5 (net 5 - 2 = 3).
+    // C is scratch. On hole 1 (idx 1): A net 4, B net 5-2=3, C net 5.
     const cfg = makeSkinsCfg({
       appliesHandicap: true,
-      playerIds: ['A', 'B'],
+      playerIds: ['A', 'B', 'C'],
     })
     const round = makeRoundCfg(cfg)
     const hole = makeHole(
       1,
-      { A: 4, B: 3 },
+      { A: 4, B: 3, C: 5 },
       {
         holeIndex: 1,
         // B gets 2 strokes on hole index 1 when strokes=36 (36 >= 18+1).
-        strokes: { A: 0, B: 36 },
+        strokes: { A: 0, B: 36, C: 0 },
       },
     )
     const events = settleSkinsHole(hole, cfg, round)
-    // B's net = 3 - 2 = 1; A's net = 4. B wins.
+    // B's net = 3 - 2 = 1; A's net = 4; C's net = 5. B wins.
     const won = events.find(
       (e): e is ScoringEvent & { kind: 'SkinWon' } => e.kind === 'SkinWon',
     )
@@ -487,18 +489,18 @@ describe('carry accumulation across many tied holes', () => {
 
 describe('net-score handicap changes skin winner vs gross-score winner', () => {
   it('gross-low player loses skin when net-low opponent has strokes', () => {
-    // A is scratch (strokes=0); B has strokes=18 (one shot per hole).
-    // Hole 1 (idx 1): A gross 4, B gross 4. Gross winner: tie.
-    // B's net = 4 - 1 = 3. B wins the hole outright under net scoring.
+    // A scratch, B strokes=18 (one shot per hole), C scratch.
+    // Hole 1 (idx 1): A gross 4, B gross 4, C gross 6.
+    // Net: A=4, B=4-1=3, C=6. B wins outright under net scoring.
     const cfg = makeSkinsCfg({
       appliesHandicap: true,
-      playerIds: ['A', 'B'],
+      playerIds: ['A', 'B', 'C'],
     })
     const round = makeRoundCfg(cfg)
     const hole = makeHole(
       1,
-      { A: 4, B: 4 },
-      { holeIndex: 1, strokes: { A: 0, B: 18 } },
+      { A: 4, B: 4, C: 6 },
+      { holeIndex: 1, strokes: { A: 0, B: 18, C: 0 } },
     )
     const events = settleSkinsHole(hole, cfg, round)
     const won = events.find(
@@ -507,10 +509,11 @@ describe('net-score handicap changes skin winner vs gross-score winner', () => {
     expect(won).toBeDefined()
     if (won === undefined) return
     expect(won.winner).toBe('B')
-    // Contrast: without handicap the hole would tie → SkinCarried.
+    // Contrast: without handicap A and B tie at gross 4 → SkinCarried.
+    // C's gross 6 is higher; A–B gross tie still produces the carry.
     const cfgGross = makeSkinsCfg({
       appliesHandicap: false,
-      playerIds: ['A', 'B'],
+      playerIds: ['A', 'B', 'C'],
     })
     const roundGross = makeRoundCfg(cfgGross)
     const grossEvents = settleSkinsHole(hole, cfgGross, roundGross)
@@ -587,8 +590,8 @@ describe('typed errors: throw on invalid or missing config', () => {
     expect(() => settleSkinsHole(hole, badCfg, round)).toThrow(SkinsConfigError)
   })
 
-  it('throws SkinsConfigError on playerIds outside 2..5', () => {
-    const badCfg = { ...makeSkinsCfg(), playerIds: ['A'] }
+  it('throws SkinsConfigError on playerIds outside 3..5', () => {
+    const badCfg = { ...makeSkinsCfg(), playerIds: ['A', 'B'] }
     expect(() => settleSkinsHole(hole, badCfg, round)).toThrow(SkinsConfigError)
   })
 
@@ -650,12 +653,13 @@ describe('Round Handicap integration (item 16 × Skins)', () => {
     }
   }
 
-  const cfg = makeSkinsCfg({ appliesHandicap: true, playerIds: ['A', 'B'] })
+  const cfg = makeSkinsCfg({ appliesHandicap: true, playerIds: ['A', 'B', 'C'] })
   const round = makeRoundCfg(cfg)
-  const gross = { A: 4, B: 5 }
+  // C is always scratch (courseHcp=0, roundHandicap=0) with gross 6 — C never wins.
+  const gross = { A: 4, B: 5, C: 6 }
 
   it('same gross scores, roundHandicap = 0 → A wins outright (SkinWon)', () => {
-    const players = [basePlayer('A', 0, 0), basePlayer('B', 0, 0)]
+    const players = [basePlayer('A', 0, 0), basePlayer('B', 0, 0), basePlayer('C', 0, 0)]
     const hole = makeHole(1, gross, {
       holeIndex: 1,
       strokes: strokesFor(players),
@@ -667,18 +671,20 @@ describe('Round Handicap integration (item 16 × Skins)', () => {
     expect(won).toBeDefined()
     if (won) {
       expect(won.winner).toBe('A')
-      expect(won.points).toEqual({ A: 1, B: -1 })
+      // A wins 2 stakes (one from B, one from C) in a 3-player field.
+      expect(won.points).toEqual({ A: 2, B: -1, C: -1 })
     }
   })
 
   it('same gross scores, roundHandicap = +2 on B → hole ties (SkinCarried)', () => {
-    const players = [basePlayer('A', 0, 0), basePlayer('B', 0, 2)]
+    const players = [basePlayer('A', 0, 0), basePlayer('B', 0, 2), basePlayer('C', 0, 0)]
     const hole = makeHole(1, gross, {
       holeIndex: 1,
       strokes: strokesFor(players),
     })
     // effectiveCourseHcp(B) = 0 + 2 = 2; strokesOnHole(2, 1) = 1.
-    // B's net = 5 - 1 = 4 == A's net → tied → SkinCarried under escalating=true.
+    // B's net = 5 - 1 = 4 == A's net → A and B tied; C net 6 is worse.
+    // Tied best → SkinCarried under escalating=true.
     const events = settleSkinsHole(hole, cfg, round)
     expect(events.some((e) => e.kind === 'SkinCarried')).toBe(true)
     expect(events.some((e) => e.kind === 'SkinWon')).toBe(false)
@@ -689,10 +695,10 @@ describe('Round Handicap integration (item 16 × Skins)', () => {
     // If Skins read player.courseHcp directly (wrong path), both scenarios
     // would produce SkinWon for A. The tie in the +2 case proves strokes
     // flowed through the effectiveCourseHcp → state.strokes boundary.
-    const rh0 = [basePlayer('A', 0, 0), basePlayer('B', 0, 0)]
-    const rh2 = [basePlayer('A', 0, 0), basePlayer('B', 0, 2)]
-    expect(strokesFor(rh0)).toEqual({ A: 0, B: 0 })
-    expect(strokesFor(rh2)).toEqual({ A: 0, B: 2 })
+    const rh0 = [basePlayer('A', 0, 0), basePlayer('B', 0, 0), basePlayer('C', 0, 0)]
+    const rh2 = [basePlayer('A', 0, 0), basePlayer('B', 0, 2), basePlayer('C', 0, 0)]
+    expect(strokesFor(rh0)).toEqual({ A: 0, B: 0, C: 0 })
+    expect(strokesFor(rh2)).toEqual({ A: 0, B: 2, C: 0 })
   })
 })
 
@@ -703,11 +709,11 @@ describe('Round Handicap integration (item 16 × Skins)', () => {
 // Triage Section 2 Finding 1.
 
 describe('finalizeSkinsRound passes non-Skins events through unchanged', () => {
-  const cfg = makeSkinsCfg({ playerIds: ['A', 'B'], stake: 1, escalating: false })
+  const cfg = makeSkinsCfg({ playerIds: ['A', 'B', 'C'], stake: 1, escalating: false })
   const round = makeRoundCfg(cfg)
 
-  // One real Skins event from settleSkinsHole
-  const skinsEvents = settleSkinsHole(makeHole(1, { A: 3, B: 4 }), cfg, round)
+  // One real Skins event from settleSkinsHole (A wins outright over B and C)
+  const skinsEvents = settleSkinsHole(makeHole(1, { A: 3, B: 4, C: 4 }), cfg, round)
 
   // One foreign Wolf event (not in SKINS_EVENT_KINDS) — constructed directly
   const wolfEvent: ScoringEvent = {

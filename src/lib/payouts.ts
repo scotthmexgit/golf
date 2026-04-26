@@ -2,6 +2,8 @@ import type { HoleData, PlayerSetup, GameInstance, PayoutMap } from '@/types'
 import { strokesOnHole } from './handicap'
 import { vsPar } from './scoring'
 import { computeJunkPayouts, hasAnyJunk } from './junk'
+import { settleStrokePlayBet } from '../bridge/stroke_play_bridge'
+import { payoutMapFromLedger } from '../bridge/shared'
 
 function emptyPayouts(playerIds: string[]): PayoutMap {
   const m: PayoutMap = {}
@@ -13,34 +15,6 @@ function getStrokes(p: PlayerSetup): number {
   return (p as PlayerSetup & { strokes?: number }).strokes || 0
 }
 
-export function computeStrokePlay(holes: HoleData[], players: PlayerSetup[], game: GameInstance): PayoutMap {
-  const payouts = emptyPayouts(game.playerIds)
-  const inGame = players.filter(p => game.playerIds.includes(p.id))
-  if (inGame.length < 2) return payouts
-
-  const totals: Record<string, number> = {}
-  for (const p of inGame) {
-    let total = 0
-    for (const h of holes) {
-      const gross = h.scores[p.id] || 0
-      if (gross <= 0) continue
-      total += gross - strokesOnHole(getStrokes(p), h.index)
-    }
-    totals[p.id] = total
-  }
-
-  const sorted = inGame.map(p => ({ id: p.id, total: totals[p.id] })).sort((a, b) => a.total - b.total)
-  const best = sorted[0].total
-  const winners = sorted.filter(s => s.total === best)
-
-  if (winners.length === 1) {
-    for (const entry of sorted) {
-      payouts[entry.id] = entry.total === best ? game.stake * (inGame.length - 1) : -game.stake
-    }
-  }
-
-  return payouts
-}
 
 export function computeMatchPlay(holes: HoleData[], players: PlayerSetup[], game: GameInstance): PayoutMap {
   const payouts = emptyPayouts(game.playerIds)
@@ -157,12 +131,15 @@ export function computeStableford(holes: HoleData[], players: PlayerSetup[], gam
 
 function computeGamePayouts(holes: HoleData[], players: PlayerSetup[], game: GameInstance): PayoutMap {
   switch (game.type) {
-    case 'strokePlay': return computeStrokePlay(holes, players, game)
+    case 'strokePlay': {
+      const { ledger } = settleStrokePlayBet(holes, players, game)
+      return payoutMapFromLedger(ledger, game.playerIds)
+    }
     case 'matchPlay': return computeMatchPlay(holes, players, game)
     case 'nassau': return computeNassau(holes, players, game)
     case 'stableford': return computeStableford(holes, players, game)
     case 'skins': return computeSkins(holes, players, game)
-    default: return computeStrokePlay(holes, players, game)
+    default: return emptyPayouts(game.playerIds)
   }
 }
 

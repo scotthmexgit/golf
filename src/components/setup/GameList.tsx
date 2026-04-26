@@ -30,7 +30,7 @@ export default function GameList() {
           + Add a game
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {GAME_DEFS.map(def => {
+          {GAME_DEFS.filter(def => !def.disabled).map(def => {
             const blocked = (def.minPlayers != null && bettingCount < def.minPlayers) ||
               (def.maxPlayers != null && bettingCount > def.maxPlayers)
             return (

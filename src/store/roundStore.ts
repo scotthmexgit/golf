@@ -84,6 +84,13 @@ export interface RoundStore {
   // Round actions
   setRoundId: (id: number) => void
   initHoles: () => void
+  hydrateRound: (apiResponse: {
+    round: { id: number; holesCount: number; tee: string; status: string }
+    course: { name: string; location: string; holes: { hole: number; par: number; index: number }[] }
+    players: { id: number; playerId: number; name: string; handicapIdx: number; courseHcp: number; betting: boolean; tee: string }[]
+    games: { id: number; type: string; stake: number; playerIds: string[] }[]
+    scores: { playerId: number; hole: number; gross: number; putts: number | null; fromBunker: boolean }[]
+  }) => void
   setCurrentHole: (h: number) => void
   setScore: (playerId: string, hole: number, score: number) => void
   setDot: (playerId: string, hole: number, dot: keyof HoleDots, value: boolean) => void
@@ -189,6 +196,83 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
   })),
 
   setRoundId: (id) => set({ roundId: id }),
+
+  hydrateRound: (apiResponse) => set((state) => {
+    const { round, course: apiCourse, players: apiPlayers, games: apiGames, scores } = apiResponse
+
+    // Rebuild CourseData shape for the store
+    const courseData: CourseData = {
+      name: apiCourse.name,
+      location: apiCourse.location,
+      par: apiCourse.holes.map(h => h.par),
+      hcpIndex: apiCourse.holes.map(h => h.index),
+    }
+
+    // Determine holesCount string from the round
+    // round.holesCount is an int (9 or 18); we default to '18' since
+    // 9front/9back distinction is not stored — Turn 3 ships '18' only.
+    const holesCount: HolesCount = round.holesCount === 9 ? '9front' : '18'
+
+    // Rebuild PlayerSetup[]. id = String(playerId) per spec.
+    const players: PlayerSetup[] = apiPlayers.map((rp, i) => ({
+      id: String(rp.playerId),
+      name: rp.name,
+      hcpIndex: rp.handicapIdx,
+      tee: (rp.tee as TeeName) || state.selectedTee,
+      isCourseHcp: false,
+      courseHcp: rp.courseHcp,
+      betting: rp.betting,
+      isSelf: i === 0,
+      roundHandicap: 0,
+    }))
+
+    // Build a hole range from apiCourse.holes
+    const holeNums = apiCourse.holes.map(h => h.hole)
+
+    // Rebuild HoleData[]: one entry per hole in the range
+    const holes: HoleData[] = holeNums.map((hNum, idx) => {
+      const holeScores: Record<string, number> = {}
+      const holeDots: Record<string, HoleDots> = {}
+      for (const rp of apiPlayers) {
+        const key = String(rp.playerId)
+        holeDots[key] = defaultDots()
+        const s = scores.find(sc => sc.playerId === rp.playerId && sc.hole === hNum)
+        holeScores[key] = s ? s.gross : 0
+      }
+      return {
+        number: hNum,
+        par: apiCourse.holes[idx].par,
+        index: apiCourse.holes[idx].index,
+        scores: holeScores,
+        dots: holeDots,
+      }
+    })
+
+    // Determine currentHole: first hole with any missing score, or last hole
+    const firstIncomplete = holes.find(h => players.some(p => (h.scores[p.id] || 0) === 0))
+    const currentHole = firstIncomplete ? firstIncomplete.number : holes[holes.length - 1].number
+
+    // Rebuild GameInstance[]. Games from API have numeric id; keep as string for store compat.
+    // playerIds from DB is [] (known limitation PF-1), so we preserve that as-is.
+    const games: GameInstance[] = apiGames.map(g => ({
+      id: String(g.id),
+      type: g.type as GameType,
+      label: g.type,
+      stake: g.stake,
+      playerIds: g.playerIds as string[],
+      junk: defaultJunk(g.stake),
+    }))
+
+    return {
+      roundId: round.id,
+      course: courseData,
+      holesCount,
+      players,
+      games,
+      holes,
+      currentHole,
+    }
+  }),
 
   initHoles: () => set((state) => {
     const course = state.course

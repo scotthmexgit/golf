@@ -147,15 +147,15 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
       id: uuid(),
       type,
       label: gameLabel(type, state.games),
-      stake: 5,
+      stake: 500,
       playerIds: bettingIds,
-      junk: defaultJunk(5),
+      junk: defaultJunk(500),
     }
     if (type === 'wolf') inst.loneWolfMultiplier = 2
     if (type === 'matchPlay') inst.matchFormat = 'singles'
     if (type === 'skins') inst.escalating = false
     if (type === 'vegas') inst.maxExposure = 50
-    if (type === 'matchPlay' || type === 'nassau') inst.pressAmount = 5
+    if (type === 'matchPlay' || type === 'nassau') inst.pressAmount = 500
     return { games: [...state.games, inst] }
   }),
 

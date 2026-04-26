@@ -76,7 +76,7 @@ model Game {
   id        Int          @id @default(autoincrement())
   roundId   Int
   type      String
-  stake     Float
+  stake     Int
   playerIds Int[]
   round     Round        @relation(fields: [roundId], references: [id])
   results   GameResult[]
@@ -95,7 +95,7 @@ model SideBet {
   id        Int             @id @default(autoincrement())
   roundId   Int
   type      String
-  stake     Float           @default(0)
+  stake     Int             @default(0)
   playerIds Int[]
   round     Round           @relation(fields: [roundId], references: [id])
   results   SideBetResult[]

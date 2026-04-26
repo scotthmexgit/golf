@@ -5,7 +5,7 @@ import { useRoundStore } from '@/store/roundStore'
 import Header from '@/components/layout/Header'
 import BottomCta from '@/components/layout/BottomCta'
 import Pill from '@/components/ui/Pill'
-import { vsPar } from '@/lib/scoring'
+import { vsPar, formatMoneyDecimal } from '@/lib/scoring'
 import { hasGreenieJunk } from '@/lib/junk'
 
 export default function ResolvePage() {
@@ -97,7 +97,7 @@ export default function ResolvePage() {
             <div key={game.id} className="rounded-xl border p-4" style={{ borderColor: 'var(--line)', background: 'white' }}>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm font-semibold" style={{ color: 'var(--green-deep)' }}>Bango · {game.label}</span>
-                <span className="font-mono text-xs" style={{ color: 'var(--muted)' }}>${game.stake}/pt</span>
+                <span className="font-mono text-xs" style={{ color: 'var(--muted)' }}>{formatMoneyDecimal(game.stake)}/pt</span>
               </div>
               <p className="text-[11px] mb-3" style={{ color: 'var(--muted)' }}>Who was closest when all players were on the green?</p>
               <div className="flex flex-wrap gap-1.5">

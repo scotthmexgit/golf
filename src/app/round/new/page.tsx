@@ -10,6 +10,7 @@ import CourseSearch from '@/components/setup/CourseSearch'
 import PlayerList from '@/components/setup/PlayerList'
 import GameList from '@/components/setup/GameList'
 import { hasAnyJunk } from '@/lib/junk'
+import { formatMoneyDecimal } from '@/lib/scoring'
 
 const STEP_LABELS = ['Course', 'Players', 'Games', 'Review']
 
@@ -45,7 +46,7 @@ function ReviewStep() {
             <div key={g.id} className="py-1">
               <div className="flex items-center justify-between text-sm">
                 <span>{g.label}</span>
-                <span className="font-mono text-xs" style={{ color: 'var(--muted)' }}>${g.stake}/hole</span>
+                <span className="font-mono text-xs" style={{ color: 'var(--muted)' }}>{formatMoneyDecimal(g.stake)}/hole</span>
               </div>
               {hasAnyJunk(g.junk) && (
                 <div className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>

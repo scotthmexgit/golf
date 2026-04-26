@@ -34,5 +34,5 @@ export function formatMoney(amount: number): string {
 export function formatMoneyDecimal(amount: number): string {
   if (amount === 0) return '—'
   const sign = amount > 0 ? '+' : '-'
-  return `${sign}$${Math.abs(amount).toFixed(2)}`
+  return `${sign}$${(Math.abs(amount) / 100).toFixed(2)}`
 }

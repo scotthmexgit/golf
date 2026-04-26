@@ -63,7 +63,7 @@ export default function ResultsPage() {
             {games.map(g => (
               <div key={g.id} className="flex items-center justify-between py-1.5 border-b last:border-0 text-sm" style={{ borderColor: 'var(--line)' }}>
                 <span>{g.label}</span>
-                <span className="font-mono text-xs" style={{ color: 'var(--muted)' }}>${g.stake}/hole</span>
+                <span className="font-mono text-xs" style={{ color: 'var(--muted)' }}>{formatMoneyDecimal(g.stake)}/hole</span>
               </div>
             ))}
           </div>

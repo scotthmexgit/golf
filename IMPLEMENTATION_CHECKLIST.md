@@ -25,7 +25,9 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-PF-1 — Persistence floor v1 — CLOSED 2026-04-26 (all 3 turns complete). Turn 1: schema + migration. Turn 2: API routes. Turn 3: scorecard hydration + score writes + Finish lifecycle + home-page routing. Decisions: docs/sessions/2026-04-26-persistence-floor-decisions.md. Session log: docs/sessions/2026-04-26/004_PF1_TURN3_UI_WIRING.md.
+**Operator decision: next bet to unpark, or address known follow-ups (see Parked / Deferred).**
+
+Stroke-Play-only phase is structurally complete (SP-1 through SP-4 closed 2026-04-25; SP-5 deferred; SP-6 closed earlier). PF-1 (persistence floor v1) closed 2026-04-26. No engineer-ready active item. See Parked / Deferred for the verification agent (SP-5). See Parking Lot for backlog follow-ups. See Deferred / won't-do for parked bets.
 
 > Next-phase pick is informed by docs/product/north-star.md. The north-star is not an AC source.
 

@@ -44,7 +44,6 @@ model Round {
   course     Course        @relation(fields: [courseId], references: [id])
   players    RoundPlayer[]
   scores     Score[]
-  sideBets   SideBet[]
 }
 
 model RoundPlayer {
@@ -91,22 +90,3 @@ model GameResult {
   game     Game @relation(fields: [gameId], references: [id])
 }
 
-model SideBet {
-  id        Int             @id @default(autoincrement())
-  roundId   Int
-  type      String
-  stake     Int             @default(0)
-  playerIds Int[]
-  round     Round           @relation(fields: [roundId], references: [id])
-  results   SideBetResult[]
-}
-
-model SideBetResult {
-  id        Int     @id @default(autoincrement())
-  sideBetId Int
-  hole      Int?
-  winnerIds Int[]
-  amount    Float
-  detail    Json?
-  sideBet   SideBet @relation(fields: [sideBetId], references: [id])
-}

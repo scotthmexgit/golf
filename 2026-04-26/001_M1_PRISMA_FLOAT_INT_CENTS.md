@@ -52,8 +52,12 @@ All three routed through `formatMoneyDecimal` per operator directive:
 - After changes: 348/348 (no delta — engine tests use explicit integer amounts, not store defaults)
 - tsc: zero errors in `src/` (pre-existing `.next/types` errors unchanged)
 
+## Follow-up commit (2026-04-26)
+
+- Schema: SideBet and SideBetResult models deleted; migration 20260426161934_stake_int_and_drop_sidebets generated (DROP TABLE SideBet, DROP TABLE SideBetResult, ALTER COLUMN stake INTEGER)
+- GameInstanceCard.tsx: stake input `value={game.stake / 100}` (display), `onChange Math.round(parseFloat(e.target.value) * 100) || 0` (store)
+- roundStore.ts: pressAmount reverted to 5 (dollar-unit; operator-confirmed out of scope for M-1)
+
 ## Carry-forward / follow-ups
 
-- `GameInstanceCard.tsx` input: `value={game.stake}` now shows `500` when stake is 500 cents. User must type cents directly (e.g., `500` for $5). UX cleanup (show `game.stake/100`, store `value*100`) is deferred to #11 full cutover.
-- `resolve/[hole]/page.tsx:69` `${amount}` (junk amounts) — not in scope for Step 6 (operator specified only 3 sites). Same pattern; deferred to #11 or junk unpark.
-- `GameInstanceCard.tsx` press input (`pressAmount`) — same display issue; deferred.
+- `resolve/[hole]/page.tsx:69` `${amount}` (junk amounts) — filed as parking-lot item; see doc-only pass.

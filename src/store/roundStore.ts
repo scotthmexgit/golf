@@ -155,7 +155,7 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
     if (type === 'matchPlay') inst.matchFormat = 'singles'
     if (type === 'skins') inst.escalating = false
     if (type === 'vegas') inst.maxExposure = 50
-    if (type === 'matchPlay' || type === 'nassau') inst.pressAmount = 500
+    if (type === 'matchPlay' || type === 'nassau') inst.pressAmount = 5
     return { games: [...state.games, inst] }
   }),
 

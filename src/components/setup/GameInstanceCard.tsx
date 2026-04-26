@@ -38,8 +38,8 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
           <label className="text-[11px] font-semibold" style={{ color: 'var(--muted)' }}>Stake $</label>
           <input
             type="number"
-            value={game.stake}
-            onChange={(e) => updateGameStake(game.id, parseFloat(e.target.value) || 0)}
+            value={game.stake / 100}
+            onChange={(e) => updateGameStake(game.id, Math.round(parseFloat(e.target.value) * 100) || 0)}
             className="w-16 px-2 py-1 rounded text-sm border font-mono"
             style={{ borderColor: 'var(--line)' }}
             min="0" step="1"

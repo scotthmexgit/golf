@@ -21,6 +21,8 @@ export default function ScorecardPage() {
   const [showFinishConfirm, setShowFinishConfirm] = useState(false)
   const [notices, setNotices] = useState<string[]>([])
   const [hydrating, setHydrating] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [finishError, setFinishError] = useState<string | null>(null)
   const hydratedRef = useRef(false)
 
   // Step 3: Server-authoritative hydration on mount (Decision 1)
@@ -93,8 +95,9 @@ export default function ScorecardPage() {
     if (!allScored || !holeData) return
 
     detectNotices()
+    setSaveError(null)
 
-    // Step 4: Persist scores for this hole before advancing (Decision 3)
+    // Step 4: Persist scores for this hole before advancing (Decision 3 — sequential)
     if (roundId) {
       const scorePayload = players.map(p => ({
         playerId: Number(p.id),
@@ -102,11 +105,21 @@ export default function ScorecardPage() {
         putts: null,
         fromBunker: false,
       }))
-      fetch(`/golf/api/rounds/${roundId}/scores/hole/${currentHole}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scores: scorePayload }),
-      }).catch(() => { /* fire-and-forget; Zustand holds score locally */ })
+      let ok = false
+      try {
+        const res = await fetch(`/golf/api/rounds/${roundId}/scores/hole/${currentHole}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scores: scorePayload }),
+        })
+        ok = res.ok
+      } catch {
+        ok = false
+      }
+      if (!ok) {
+        setSaveError('Failed to save scores. Try again.')
+        return
+      }
     }
 
     // Check if par 3 with any game that has greenie junk
@@ -133,13 +146,29 @@ export default function ScorecardPage() {
 
   const confirmFinish = async () => {
     setShowFinishConfirm(false)
-    // Step 5: Mark round Complete before navigating (forward-only lifecycle)
+    setFinishError(null)
+    // Step 5: Mark round Complete before navigating (forward-only lifecycle — sequential)
     if (roundId) {
-      await fetch(`/golf/api/rounds/${roundId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'Complete' }),
-      }).catch(() => { /* best-effort; navigation proceeds regardless */ })
+      let status = 0
+      try {
+        const res = await fetch(`/golf/api/rounds/${roundId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'Complete' }),
+        })
+        status = res.status
+      } catch {
+        status = 0
+      }
+      if (status === 204 || status === 409) {
+        // 204: success; 409: already Complete — navigate in both cases
+        router.push(`/results/${roundId}`)
+      } else {
+        // Any other failure: do not navigate; show error
+        setShowFinishConfirm(true)
+        setFinishError('Failed to finish round. Try again.')
+      }
+      return
     }
     router.push(`/results/${roundId}`)
   }
@@ -216,6 +245,9 @@ export default function ScorecardPage() {
         )}
       </div>
 
+      {saveError && (
+        <p className="text-center text-sm font-medium text-red-500 px-4 pb-1">{saveError}</p>
+      )}
       <BottomCta label={isLastHole ? 'Finish Round →' : 'Save & Next Hole →'} onClick={handleSaveNext} disabled={!allScored} />
 
       {/* Finish confirmation overlay */}
@@ -228,6 +260,9 @@ export default function ScorecardPage() {
             <p className="text-sm" style={{ color: 'var(--muted)' }}>
               Scores through hole {currentHole} will be used for final results.
             </p>
+            {finishError && (
+              <p className="text-sm font-medium text-red-500">{finishError}</p>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"

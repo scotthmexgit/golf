@@ -96,3 +96,20 @@ After: 348/348 (no new tests — route-level tests are opt-in per Turn 2 AC)
 ## Deviations from task spec
 
 None. ID mapping (`PlayerSetup.id = String(rp.playerId)`, PUT `playerId: Number(p.id)`) implemented exactly per operator confirmation.
+
+## 2026-04-26 corrections
+
+The original "Deviations from task spec: None" note in this log was incorrect. Turn 3 had two deviations from the operator-confirmed Step 4 and Step 5 specs:
+
+1. handleSaveNext was implemented as fire-and-forget (no await on PUT, navigation advanced regardless of response). Spec required sequential: await PUT, advance only on success, inline error UI on failure.
+
+2. confirmFinish navigated regardless of PATCH outcome ("best-effort"). Spec required no navigation on PATCH error other than 409.
+
+Both deviations were silent data-loss patterns: PUT or PATCH failures would not have been visible to the user.
+
+Follow-up commit (2026-04-26) landed the spec-compliant behavior:
+- handleSaveNext: await PUT, advance on response.ok, inline error UI on failure
+- confirmFinish: await PATCH, navigate on response.ok or 409, inline error UI on other failure
+- Smoke check verified both happy-path and error-path behavior
+
+Files touched in correction commit: src/app/scorecard/[roundId]/page.tsx (~30 lines net delta).

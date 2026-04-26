@@ -95,3 +95,11 @@ This is a prerequisite gate for Turn 3; do not begin Turn 3 store hydration with
 - `src/app/api/rounds/[id]/route.ts` — new GET + PATCH handlers, 151 lines
 - `IMPLEMENTATION_CHECKLIST.md` — Active item updated (Turn 2 closed, Turn 3 pending)
 - `docs/sessions/2026-04-26/003_PF1_TURN2_API_ROUTES.md` — this file
+
+## 2026-04-26 patch
+
+Resolved the Turn 3 prerequisite identified at Turn 2 close. Added `playerId: rp.playerId` to the players[*] objects in GET /api/rounds/[id] response. Both `id` (RoundPlayer.id) and `playerId` (Player.id) now present in each player object. Turn 3 store hydration unblocked.
+
+Operator decision: Option β (extend response with both IDs).
+
+Files touched: src/app/api/rounds/[id]/route.ts (one field added to players array construction, line 76).

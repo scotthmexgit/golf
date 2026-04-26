@@ -73,6 +73,7 @@ export async function GET(
     },
     players: round.players.map((rp) => ({
       id: rp.id,
+      playerId: rp.playerId,
       name: rp.player.name,
       handicapIdx: rp.player.handicapIdx,
       courseHcp: rp.courseHcp,

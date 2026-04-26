@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { COURSES } from '@/types'
 
 export async function POST(request: Request) {
   try {
@@ -12,6 +13,22 @@ export async function POST(request: Request) {
       course = await prisma.course.create({
         data: { name: courseName, location: courseLocation || '' },
       })
+    }
+
+    // Populate CourseHole rows on-demand if missing (Decision 4)
+    const holeCountInt = holesCount === '9front' || holesCount === '9back' ? 9 : 18
+    const existingHoleCount = await prisma.courseHole.count({ where: { courseId: course.id } })
+    if (existingHoleCount < holeCountInt) {
+      const courseData = COURSES.find(c => c.name === courseName)
+      if (courseData) {
+        const holeRows = Array.from({ length: holeCountInt }, (_, i) => ({
+          courseId: course.id,
+          number: i + 1,
+          par: courseData.par[i],
+          index: courseData.hcpIndex[i],
+        }))
+        await prisma.courseHole.createMany({ data: holeRows, skipDuplicates: true })
+      }
     }
 
     // Create players first (find or create by name)

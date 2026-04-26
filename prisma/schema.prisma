@@ -39,6 +39,7 @@ model Round {
   holesCount Int           @default(18)
   playedAt   DateTime      @default(now())
   tee        String        @default("blue")
+  status     String        @default("InProgress")
   createdAt  DateTime      @default(now())
   games      Game[]
   course     Course        @relation(fields: [courseId], references: [id])
@@ -69,6 +70,8 @@ model Score {
   fromBunker Boolean @default(false)
   player     Player  @relation(fields: [playerId], references: [id])
   round      Round   @relation(fields: [roundId], references: [id])
+
+  @@unique([roundId, playerId, hole])
 }
 
 model Game {

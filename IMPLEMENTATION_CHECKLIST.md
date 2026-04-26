@@ -2,7 +2,9 @@
 
 Single source of truth for scope. Read the **Active item** before any work. Tangents → Parking Lot. Closed items → Done (append-only).
 
-## Project North Star
+**Active plan (Stroke-Play-only phase):** `docs/plans/STROKE_PLAY_PLAN.md`. This document defines SP-1 through SP-6 and is the single source of truth for AC during this phase. It supersedes `REBUILD_PLAN.md` items #11 and #12. `REBUILD_PLAN.md` is retained for #3–#10 history.
+
+## Project Scope Summary
 
 Golf betting app: a pure-TypeScript scoring engine under `src/games/` plus a Next.js 16 UI that collects per-hole scores, runs five canonical betting games (Skins, Wolf, Nassau, Match Play, Stroke Play) with Junk side bets, and settles zero-sum at round end. Portable to React Native.
 
@@ -16,43 +18,42 @@ Updated at EOD-FINAL.
 |---|---|---|
 | 1. Audit MIGRATION_NOTES.md | 2026-04-20 | **done** (closed 2026-04-20 at prompt 001; see `AUDIT.md`) |
 | 2. Rebuild plan approval | 2026-04-20 | **done** (closed 2026-04-20 at prompt 004; see `REBUILD_PLAN.md`) |
-| 3. Targeted rebuild (#3–#8: Wolf follow-ups, bet-id refactor, Nassau, Match Play, Junk, aggregate) | TBD | active (starting with #3) |
-| 4. `prisma/` Float→Int migration + GAME_DEFS cleanup (#9, #10) | TBD | independent of phase 3 |
-| 5. Cutover session (#11, delete `src/lib/*` parallel paths) | TBD | blocked on phase 3 |
-| 6. UI routes + hole-state builder (deferred beyond this rebuild) | TBD | blocked on phase 5 |
+| 3. Engine rebuild (#3–#8: Wolf follow-ups, bet-id refactor, Nassau, Match Play, Junk, aggregate) | 2026-04-24 | **done** (all phases closed; see Done section) |
+| 4. `prisma/` Float→Int migration (#10) | 2026-04-26 | **done** — closed 2026-04-26 — session log: `2026-04-26/001_M1_PRISMA_FLOAT_INT_CENTS.md` |
+| 5. Stroke-Play-only UI phase (SP-1–SP-6; see `docs/plans/STROKE_PLAY_PLAN.md`) | 2026-04-25 | **done** — SP-1–SP-4 closed 2026-04-25; SP-5 deferred; SP-6 closed 2026-04-25 |
+| 6. Full multi-bet cutover (#11) | TBD | deferred until third bet unparks (blocked on phase 5) |
 
 ## Active item
 
-### #8 — aggregate.ts — Done 2026-04-24
+PF-1 — Persistence floor v1 (Turn 1 of 3 closed; Turn 2 of 3 pending: API routes). Decisions: docs/sessions/2026-04-26-persistence-floor-decisions.md.
 
-All 4 phases closed. See Done section and `REBUILD_PLAN.md #8`.
+> Next-phase pick is informed by docs/product/north-star.md. The north-star is not an AC source.
+
+## Parked / Deferred
 
 ### Verification agent — src/verify/verifyRound.ts
 
-**Why**: Post-#8. `aggregateRound` is stable; use its `netByPlayer`, `byBet`, and
-finalized `MatchState` as primitives for a 10-invariant round verification pass.
-See parking-lot item for full scope description.
+**Disposition:** Parked to SP-5 in `docs/plans/STROKE_PLAY_PLAN.md`. Deferred to post-SP-4. When SP-5 activates: researcher pass to scope Stroke-Play-only invariants (1, 2, 4, 5, 6, 7, 8, 9); Invariants 3 and 10 deferred indefinitely; Invariant 11 partial (Stroke Play events only). No engineer work until the researcher pass produces a written AC.
 
-**Status**: Pre-scope (researcher pass next — no engineer work until scope is written).
+See parking-lot item (checklist line 95) for the verifier's full scope description.
 
 ## Backlog
 
-Ordered; rough sizing in parens. Backlog structure revised after audit and rebuild plan: Skins, Wolf, Stroke Play meet their merge decisions and are NOT rebuilt. See `REBUILD_PLAN.md` for full acceptance criteria per item. Backlog numbers here match `REBUILD_PLAN.md` numbers.
+Ordered; rough sizing in parens. Items #3–#8 are done (see Done section). Items D1–D4, #9, #10 carry forward. Items #11 and #12 are superseded/split — see the active plan. For AC during the Stroke-Play-only phase, see `docs/plans/STROKE_PLAY_PLAN.md`. Backlog numbers match `REBUILD_PLAN.md` numbers where applicable.
 
 - **D1** — Documenter: resolve Nassau rule-file ambiguities surfaced at prompt 012. Update `docs/games/game_nassau.md` § 5 pseudocode to show pair-wise USGA allocation (matching § 2 prose, which is authoritative per I1/I4 decision). Update § 9 N35 to clarify that "in favor of opposing player" applies only when a lead exists — tied in-flight matches on withdrawal get `MatchTied` zero-delta per § 6. Independent of all engine work; can be done any time. (XS) — **Partial closure 2026-04-25: sub-task A (§ 5 pair-wise pseudocode) executed.** Sub-task B (§ 9 N35 tied-withdrawal clarification) withdrawn as premature: the I3 decision record states tied-withdrawal = MatchTied, but `nassau.ts` emits no event for a tied in-flight match on withdrawal (silent close at zero delta); the Stage 1 implementation-eligibility filter applies. See parking-lot entry below for the two questions that must be resolved before § 9 back-propagation runs.
 - **D2** — Documenter: annotate `docs/games/game_junk.md` § 5 `isSandy`/`isBarkie`/`isPolie`/`isArnie` pseudocode as superseded for multi-candidate ties per REBUILD_PLAN.md Topic 2 (lines 637–645). Treatment: annotate-in-place (Option B) — HTML comment adjacent to the superseded functions; do not rewrite the pseudocode. Blocked on #7b Phase 3 landing: the engine consequence (full-array return + N-w/−w formula application) must be implemented before the annotation is authoritative. (XS)
 - **D3** — Documenter: add CTPCarried accumulation formula to `docs/games/game_junk.md` § 6 CTPCarried row per REBUILD_PLAN.md Topic 1 (lines 910–920). Treatment: additive fill (Option A) — § 6 is silent on the formula; no existing text to preserve or reconcile. Independent of all engine work; can be done any time. (XS) — **Withdrawn 2026-04-25 as premature.** Topic 1 formula and resolution logic are deferred per REBUILD_PLAN.md lines 1121–1122 (post-#8 implementation pass). Back-propagation runs after the code lands.
 - **D4** — Documenter: annotate `docs/games/game_nassau.md` §7 to note that presses inherit `junkItems` and `junkMultiplier` from the parent Nassau bet, per REBUILD_PLAN.md Topic 6 decision (lines 989–991). Treatment: additive annotation — §7 currently describes press mechanics without mentioning Junk; one clause notes that a press is "another declaring bet for Junk purposes" per `game_junk.md §7` and inherits the parent bet's `junkItems` list and `junkMultiplier`. Implementation is structural (presses share `declaringBet` with parent; `aggregate.ts` routes Junk fan-out by `declaringBet`, so inheritance is automatic). Independent of engine work; can be done any time. (XS) — Filed 2026-04-25 by FINAL EOD Gate 2 rule-relevant topic check.
-- **#9** — `GAME_DEFS` cleanup: mark 4 non-scope games as `disabled: true`. (XS)
-- **#10** — Prisma `Float` → `Int` cents migration; drop-and-recreate per disposable-data baseline. (S)
-- **#11** — Cutover session: parallel-path migration across ~7 commits with grep gates. Depends on #5, #6, #7, #8. (M)
-- **#12** — HoleData ↔ HoleState bridge: wire withdrew/pickedUp/conceded; covering-score field; setScore(0) guard; Wolf PlayerWithdrew writer; Nassau settleNassauWithdrawal caller. (L)
+- **#9** — `GAME_DEFS` cleanup: mark 4 non-scope games as `disabled: true`. (XS) — **Elevated to active item as SP-6** (see Active item above; SP-6 also adds `GameList.tsx` filter).
+- **#11** — Cutover session: parallel-path migration across ~7 commits with grep gates. (M) — **Superseded for the Stroke-Play-only phase by SP-4** in `docs/plans/STROKE_PLAY_PLAN.md` (surgical Stroke Play–only cutover). Full multi-bet #11 deferred until the third bet unparks.
+- **#12** — HoleData ↔ HoleState bridge: wire withdrew/pickedUp/conceded; covering-score field; setScore(0) guard; Wolf PlayerWithdrew writer; Nassau settleNassauWithdrawal caller. (L) — **Split:** SP-2 + SP-3 in `docs/plans/STROKE_PLAY_PLAN.md` cover Stroke Play happy-path plumbing (5 live fields, 14 stubbed). Edge-case scope (`withdrew`, `conceded`, `pickedUp`, Wolf writer, Nassau caller) deferred until parked bets unpark.
 
 Deferred beyond this rebuild plan (see REBUILD_PLAN.md "Deferred" section): ScoringEvent Prisma model, Final Adjustment engine logic + UI, hole-state builder, UI wiring, Player abandonment, Comeback Multiplier, PlayerDecision generic mechanism.
 
 ## Parking Lot
 
-Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit request.
+Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit request. For active-phase categorization (active vs deferred vs future-bucket), see `docs/plans/STROKE_PLAY_PLAN.md §5`.
 
 <!-- format: - [ ] <description> — YYYY-MM-DD — prompt NNN -->
 
@@ -104,6 +105,11 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 - [x] **Triage §2 Finding 2 — Wolf carryover + Lone Wolf multiplier boundary** — `max(carryMult, decMult)` boundary at the carryover-into-Lone transition was untested; wolf.ts:334–336 exercises this path. Filed and closed 2026-04-25 — test added in iteration 2 (wolf.test.ts) verifying max(carryMult, decMult) at the carryover-into-Lone boundary per rule doc §6. Source: TRIAGE_25-April-2026.md §2 Finding 2.
 - [x] **Triage §2 Finding 4 — Stroke Play finalizer return shape** — `stroke_play.ts:263` returned `[...betEvents, ...newEvents]` (passthrough) rather than new events only; the inconsistency was the aggregated content of checklist line 93. Filed and closed 2026-04-25 — fix landed in iteration 3 item 3 (stroke_play.ts:263 plus three stroke_play.test.ts updates). Finalizer now returns new events only. Source: TRIAGE_25-April-2026.md §2 Finding 4.
 - [x] **Triage §2 Finding 7 — Nassau allPairs through aggregateRound** — 3-player allPairs settlement through the full aggregateRound chain was untested; nassau.ts:124–147 + aggregate.ts finalizer chain exercised. Filed and closed 2026-04-25 — test added in iteration 2 (aggregate.test.ts) verifying 3-player allPairs Nassau through aggregateRound: 9 byBet keys, zero-sum per pair and overall. Source: TRIAGE_25-April-2026.md §2 Finding 7.
+- [ ] **`src/bridge/stroke_play_bridge.ts` `buildSpCfg` `appliesHandicap` hardcoded `true`** (line 100) — remove when Option β/γ scope expands beyond Option α Minimal and per-game handicap toggling is supported. See `STROKE_PLAY_PLAN.md` §2. — 2026-04-25
+- [ ] **`src/bridge/stroke_play_bridge.ts` `buildSpCfg` `junkMultiplier` hardcoded `1`** (line 103) — remove when junk re-enters Stroke Play scope (`GameInstance` gains a `junkMultiplier` field). See `STROKE_PLAY_PLAN.md` §1e. — 2026-04-25
+- [ ] `src/app/scorecard/[roundId]/resolve/[hole]/page.tsx:69` — bare `${amount}` template literal for junk award amounts. Same pattern as the three template literals fixed in M-1 Step 6 (`results/[roundId]:66`, `round/new:48`, `resolve/[hole]:100`). Not in M-1 scope (operator scoped Step 6 to three sites). After M-1, this template literal renders cents directly when junk awards display. Fix: route through `formatMoneyDecimal`. Trigger: when junk display surfaces are next touched, or when junk Phase 3 unparks. — 2026-04-26 — M-1 follow-up
+- [ ] **Backlog section header drift** — IMPLEMENTATION_CHECKLIST.md Backlog header sentence ("Items D1–D4, #9, #10 carry forward") is stale on three counts: #10 closed 2026-04-26 (M-1); #9 elevated to SP-6 and closed 2026-04-25; D1–D4 status is mixed (D1 partial, D2 open, D3 withdrawn, D4 open). Sentence needs revision to accurately describe what currently carries forward, or removal if no equivalent summary is needed. Trigger: next IMPLEMENTATION_CHECKLIST.md grooming pass. Flagged twice (M-1 doc-only pass close, glossary close) before being filed. — 2026-04-26 — glossary close
+- [ ] **Course schema slope/rating granularity** — current TEES constant in src/types/index.ts has five tee sets with hardcoded rating/slope values that are not course-specific (one set applies to all 8 courses). Real USGA handicap math requires slope rating per course, per tee box, per gender. Schema design implication: tee rating/slope likely belongs on a CourseTee or similar relational table keyed to (courseId, teeColor, gender), not on a flat constant. Out of scope for persistence floor (north-star defers course work). Trigger: course integration phase. — 2026-04-26 — persistence floor decisions session
 
 ## Done
 
@@ -119,6 +125,12 @@ Append-only. Close date + pointer to prompt NNN or EOD.
 - [x] #6 — Match Play engine — closed 2026-04-24 — prompts 016–010 (2026-04-22 to 2026-04-24). Phases 1a–4d complete. Engine-level: singles + best-ball; alternate-shot/foursomes deferred (product decision 2026-04-23). See REBUILD_PLAN.md §#6 for full AC.
 - [x] #7 — Junk engine (Phase 2 core) — closed 2026-04-24. Phases 1–2 complete: CTP, Greenie, Longest Drive fully implemented and tested (§12 Tests 1–5 pass, 273 tests at close). Schema widening: `JunkAwarded.winners` + `LongestDriveWinnerSelected.winners` → `PlayerId[]`; `HoleState.longestDriveWinners: PlayerId[]`. Phase 3 (#7b — Sandy/Barkie/Polie/Arnie) is backlog, gated on rules pass.
 - [x] #8 — src/games/aggregate.ts — closed 2026-04-24. Phases 1–4: scaffold + Junk reducer (Phase 1), Skins + Wolf validation (Phase 2), Nassau + Match Play with MatchState threading and compound keys (Phase 3), Stroke Play finalizer + all-5-games capstone (Phase 4). 292 tests. See REBUILD_PLAN.md #8 for full AC.
+- [x] SP-6 — GAME_DEFS cleanup + GameList filter — closed 2026-04-25 — session log: `2026-04-25/SP6_GAMEDEFS_PARK_25-April-2026.md`. `disabled: true` added to 8 entries in `src/types/index.ts` GAME_DEFS; `GameList.tsx` filter added. 307/307 tests. tsc baseline clean post-fix (3 pre-existing `ScoringEvent` import errors in `match_play.test.ts` resolved separately).
+- [x] SP-1 — Stroke Play rule doc check — closed 2026-04-25 — session log: `2026-04-25/SP1_STROKE_PLAY_RULE_DOC_CHECK_25-April-2026.md`. 9 findings, none blocking. Rule-doc follow-on edits (F2/F5/F6/F8) applied in `2026-04-25/SP1_RULE_DOC_EDITS_25-April-2026.md`.
+- [x] SP-2 — Stroke Play HoleState builder — closed 2026-04-25 — session log: `2026-04-25/SP2_STROKE_PLAY_BRIDGE_25-April-2026.md`. `src/bridge/stroke_play_bridge.ts` created; `buildStrokePlayHoleState` exported; 316/316 tests, tsc clean.
+- [x] SP-3 — Stroke Play bridge wiring — closed 2026-04-25 — session log: `2026-04-25/SP3_SP4_BRIDGE_CUTOVER_25-April-2026.md`. `settleStrokePlayBet` + `payoutMapFromLedger` exported; 326/326 tests, tsc clean.
+- [x] SP-4 — Stroke Play cutover — closed 2026-04-25 — session log: `2026-04-25/SP3_SP4_BRIDGE_CUTOVER_25-April-2026.md`. `computeStrokePlay` deleted; `computeGamePayouts` case 'strokePlay' routes through engine path; `default` fallthrough returns `emptyPayouts`; grep gate zero references. Programmatic playthrough across four scenarios (clean win, handicap tie at net 72, IncompleteCard exclusion, §10 worked example verbatim) all produced correct zero-sum settlements via the full `computeAllPayouts → computeGamePayouts → settleStrokePlayBet → payoutMapFromLedger` path. Browser rendering verification deferred (no browser access at close); not a closure gate because PayoutMap shape contract is unchanged from legacy path. Session log: `2026-04-25/SP3_SP4_BRIDGE_CUTOVER_25-April-2026.md`.
+- [x] #10 — Prisma `Float` → `Int` cents migration + SideBet/SideBetResult removal — closed 2026-04-26 — session log: `2026-04-26/001_M1_PRISMA_FLOAT_INT_CENTS.md`. Schema deletions of SideBet and SideBetResult included as authorized scope expansion. Two engineer commits: initial migration + display boundary, then schema deletion + GameInstanceCard input handler fix + pressAmount revert. Test count held at 348/348.
 
 ## Deferred / won't-do
 

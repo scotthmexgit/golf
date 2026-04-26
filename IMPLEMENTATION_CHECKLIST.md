@@ -25,7 +25,7 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-PF-1 — Persistence floor v1 (Turn 1 of 3 closed; Turn 2 of 3 pending: API routes). Decisions: docs/sessions/2026-04-26-persistence-floor-decisions.md.
+PF-1 — Persistence floor v1 (Turn 2 of 3 closed; Turn 3 of 3 pending: UI wiring). Decisions: docs/sessions/2026-04-26-persistence-floor-decisions.md.
 
 > Next-phase pick is informed by docs/product/north-star.md. The north-star is not an AC source.
 

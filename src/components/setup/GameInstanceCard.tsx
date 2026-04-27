@@ -119,43 +119,45 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
         </div>
 
         {/* Junk / Side Bets — collapsible */}
-        <div style={{ borderTop: '1px solid var(--line)', paddingTop: '8px' }}>
-          <button
-            type="button"
-            onClick={() => setJunkOpen(!junkOpen)}
-            className="text-[11px] font-semibold"
-            style={{ color: 'var(--green-soft)' }}
-          >
-            {junkOpen ? '− Junk / Side Bets' : '+ Junk / Side Bets'}
-          </button>
+        {game.type !== 'strokePlay' && (
+          <div style={{ borderTop: '1px solid var(--line)', paddingTop: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setJunkOpen(!junkOpen)}
+              className="text-[11px] font-semibold"
+              style={{ color: 'var(--green-soft)' }}
+            >
+              {junkOpen ? '− Junk / Side Bets' : '+ Junk / Side Bets'}
+            </button>
 
-          {junkOpen && (
-            <div className="mt-2 space-y-1.5">
-              <JunkRow label="Garbage" sub="Greenie + Sandy + Birdie" checked={j.garbage} amount={j.garbageAmount} unitLabel="/point"
-                onToggle={(v) => updateJunk(game.id, { garbage: v })}
-                onAmount={(v) => updateJunk(game.id, { garbageAmount: v })}
-              />
-              {!j.garbage && (
-                <>
-                  <JunkRow label="Greenie" sub="par 3s only" checked={j.greenie} amount={j.greenieAmount} unitLabel="/greenie"
-                    onToggle={(v) => updateJunk(game.id, { greenie: v })} onAmount={(v) => updateJunk(game.id, { greenieAmount: v })} />
-                  <JunkRow label="Sandy" checked={j.sandy} amount={j.sandyAmount} unitLabel="/sandy"
-                    onToggle={(v) => updateJunk(game.id, { sandy: v })} onAmount={(v) => updateJunk(game.id, { sandyAmount: v })} />
-                  <JunkRow label="Birdie" checked={j.birdie} amount={j.birdieAmount} unitLabel="/birdie"
-                    onToggle={(v) => updateJunk(game.id, { birdie: v })} onAmount={(v) => updateJunk(game.id, { birdieAmount: v })} />
-                </>
-              )}
-              <JunkRow label="Eagle" checked={j.eagle} amount={j.eagleAmount} unitLabel="/eagle"
-                onToggle={(v) => updateJunk(game.id, { eagle: v })} onAmount={(v) => updateJunk(game.id, { eagleAmount: v })} />
-              <JunkToggle label="Hammer" sub="doubles this game's stakes" checked={j.hammer}
-                onToggle={(v) => updateJunk(game.id, { hammer: v })} />
-              <JunkRow label="Snake" sub="last 3-putt owes everyone" checked={j.snake} amount={j.snakeAmount} unitLabel=""
-                onToggle={(v) => updateJunk(game.id, { snake: v })} onAmount={(v) => updateJunk(game.id, { snakeAmount: v })} />
-              <JunkRow label="Low Ball" sub="lowest gross for the round" checked={j.lowball} amount={j.lowballAmount} unitLabel=" pot"
-                onToggle={(v) => updateJunk(game.id, { lowball: v })} onAmount={(v) => updateJunk(game.id, { lowballAmount: v })} />
-            </div>
-          )}
-        </div>
+            {junkOpen && (
+              <div className="mt-2 space-y-1.5">
+                <JunkRow label="Garbage" sub="Greenie + Sandy + Birdie" checked={j.garbage} amount={j.garbageAmount} unitLabel="/point"
+                  onToggle={(v) => updateJunk(game.id, { garbage: v })}
+                  onAmount={(v) => updateJunk(game.id, { garbageAmount: v })}
+                />
+                {!j.garbage && (
+                  <>
+                    <JunkRow label="Greenie" sub="par 3s only" checked={j.greenie} amount={j.greenieAmount} unitLabel="/greenie"
+                      onToggle={(v) => updateJunk(game.id, { greenie: v })} onAmount={(v) => updateJunk(game.id, { greenieAmount: v })} />
+                    <JunkRow label="Sandy" checked={j.sandy} amount={j.sandyAmount} unitLabel="/sandy"
+                      onToggle={(v) => updateJunk(game.id, { sandy: v })} onAmount={(v) => updateJunk(game.id, { sandyAmount: v })} />
+                    <JunkRow label="Birdie" checked={j.birdie} amount={j.birdieAmount} unitLabel="/birdie"
+                      onToggle={(v) => updateJunk(game.id, { birdie: v })} onAmount={(v) => updateJunk(game.id, { birdieAmount: v })} />
+                  </>
+                )}
+                <JunkRow label="Eagle" checked={j.eagle} amount={j.eagleAmount} unitLabel="/eagle"
+                  onToggle={(v) => updateJunk(game.id, { eagle: v })} onAmount={(v) => updateJunk(game.id, { eagleAmount: v })} />
+                <JunkToggle label="Hammer" sub="doubles this game's stakes" checked={j.hammer}
+                  onToggle={(v) => updateJunk(game.id, { hammer: v })} />
+                <JunkRow label="Snake" sub="last 3-putt owes everyone" checked={j.snake} amount={j.snakeAmount} unitLabel=""
+                  onToggle={(v) => updateJunk(game.id, { snake: v })} onAmount={(v) => updateJunk(game.id, { snakeAmount: v })} />
+                <JunkRow label="Low Ball" sub="lowest gross for the round" checked={j.lowball} amount={j.lowballAmount} unitLabel=" pot"
+                  onToggle={(v) => updateJunk(game.id, { lowball: v })} onAmount={(v) => updateJunk(game.id, { lowballAmount: v })} />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -85,7 +85,7 @@ export default function HomePage() {
                           </span>
                         )}
                         <div className="text-[10px] font-mono" style={{ color: 'var(--muted)' }}>
-                          {new Date(r.playedAt).toLocaleDateString()}
+                          {new Date(r.playedAt).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                         </div>
                       </div>
                     </div>

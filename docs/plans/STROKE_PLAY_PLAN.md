@@ -1,7 +1,7 @@
 # Stroke-Play-Only Phase Plan
 
 **Authored:** 2026-04-25  
-**Status:** ACTIVE — single source of truth for AC during the Stroke-Play-only phase  
+**Status:** ACTIVE — single source of truth for AC during the Stroke-Play-only phase. SOD April 27 "structurally complete" characterization is superseded: open fence-violation items (SP-UI-1, SP-UI-2) and PF-2 correctness gates pending (see §3 PF-2, §3 SP-4 closure note, and Fence-Violation Items below).  
 **Source proposals:** `docs/proposals/ui-first-reframe.md`, `docs/proposals/ui-first-reframe-sod.md`, `docs/proposals/pending-items-evaluation.md`, `docs/proposals/stroke-play-only-scoping.md`, `docs/proposals/junk-architecture-evaluation.md`
 
 ---
@@ -28,6 +28,10 @@ Closing SP-4 does **not** automatically unpark any other bet. The next bet to un
 - `REBUILD_PLAN.md` item **#12** (HoleData ↔ HoleState bridge, edge-case field threading) is split: SP-2 covers happy-path plumbing for Stroke Play; the original #12 edge-case scope (`withdrew`, `conceded`, `pickedUp`, Wolf `PlayerWithdrew` writer, Nassau `settleNassauWithdrawal` caller) is superseded for Stroke Play (those fields are stubbed) and deferred for parked bets until they unpark.
 
 **Does not supersede:** `REBUILD_PLAN.md` items #3–#10. Items #3–#8 are done. Items #9 and #10 carry forward as independent backlog.
+
+**Fence-Violation Items (in scope for current phase, dispatchable independently of PF-2):**
+
+SP-UI-1 (`src/components/setup/GameInstanceCard.tsx` junk-block guard) and SP-UI-2 (`src/components/scorecard/ScoreRow.tsx` dot-button visibility) are fence-enforcement work — they fix junk UI surfaces visible in Stroke Play rounds in violation of §1e ("No junk side bets are wired, displayed, or settable on Stroke Play rounds"). SP-UI-3 (`src/app/page.tsx` playDate UTC display) fixes a date rendering defect. All three are dispatchable as separate engineer turns without waiting for PF-2 to begin or complete.
 
 ---
 
@@ -250,6 +254,8 @@ Stub values are empty/null/default. `stroke_play.ts` does not read any of these 
 - The `payoutMapFromLedger` adapter (from SP-3) must produce output whose shape is compatible with how `computeAllPayouts` aggregates results (summing `PayoutMap` values across games). Confirm during SP-4 that the adapter's output accumulates correctly in `computeAllPayouts`'s inner loop.
 - **Wolf silent-wrong behavior fix:** The `default:` case change to `emptyPayouts` means Wolf bets now display $0 while parked rather than (incorrect) Stroke Play numbers. This is the intended behavior; no regression.
 
+**Closure note (2026-04-27):** SP-4 was closed 2026-04-25 with all code gates passing and browser verification explicitly deferred (`2026-04-25/SP3_SP4_BRIDGE_CUTOVER_25-April-2026.md:123–125`). The §4 manual-playthrough closure condition is explicitly unmet: no 18-hole browser playthrough with correct settlement on the results page has been performed. SP-4 is **not reopened**; the manual playthrough is carried as a PF-2 gate. See §3 PF-2 below.
+
 ---
 
 ### SP-5 — Verifier (Deferred)
@@ -295,6 +301,32 @@ SP-5 requires a researcher pass to write the full AC before engineering begins. 
 ### #10 — Prisma Float→Int Migration (Deferred, Independent)
 
 Carried forward from REBUILD_PLAN.md item #10 as independent backlog. Not part of the SP-1 through SP-6 sequence. Can run any time before or after the Stroke-Play-only phase ends. Consult REBUILD_PLAN.md #10 for full AC.
+
+---
+
+### PF-2 — Persistence Floor v2 (Correctness Gates)
+
+**Type:** Mixed (PF-1-F4 phase (a) is a researcher/reviewer pass; subsequent items are engineer turns)  
+**Sizing:** M  
+**Dependencies:** SP-3 + SP-4 code landed (both closed 2026-04-25); PF-1 mechanism closed (2026-04-26).  
+**Status:** Active.
+
+**Scope:** End-to-end correctness gates that PF-1's mechanism-only AC did not cover. PF-1 verified the persistence mechanism (PUT 204, PATCH 204, scorecard hydration on mount, correct smoke-check substeps). PF-2 adds: non-empty `game.playerIds` at round creation, bets and results page hydration, server DB diagnosis, and the SP-4 §4 manual browser playthrough.
+
+**Items:**
+
+- **PF-1-F3** — Diagnose PUT 503s seen in the Cowork session on the Cowork host. No code change until root cause confirmed (migration status check first). Independent of F4; can run in parallel.
+- **PF-1-F4 (a)** — Type-contract verification pass (researcher or reviewer; not an engineer turn): verify full int-array round-trip chain from DB `Game.playerIds Int[]` through `hydrateRound` to `assertValidStrokePlayCfg`. Prerequisite for phase (b).
+- **PF-1-F4 (b)** — Edit `src/app/api/rounds/route.ts:66`: replace `playerIds: []` with integer IDs of betting players from `playerRecords`. Blocked on phase (a) confirming the chain is consistent. No other files changed.
+- **PF-1-F5A** — Fix null backHref in bets page: read `roundId` from `useParams().roundId`. Independent of F4; dispatchable any time.
+- **PF-1-F6** — Add server-authoritative `useEffect` hydration to results page, same pattern as scorecard page. Blocked on PF-1-F4 phase (b) landing first.
+- **SP-4 §4 manual playthrough** — SP-4 closed 2026-04-25 with browser verification deferred. The §4 closure condition is explicitly unmet (see SP-4 closure note above). SP-4 is not reopened; the playthrough is a PF-2 gate.
+
+**Acceptance criteria:**
+- Bets and results pages render correctly for a completed Stroke Play round in the browser (correct winner, monetary amounts, zero-sum verified by inspection).
+- SP-4 §4 manual-playthrough condition is met: at least one full 18-hole Stroke Play round played end-to-end through the new engine path on the running dev server, handicap applied (`appliesHandicap: true`), final settlement displayed on the results page, payouts correct.
+
+**Fence:** `src/app/api/rounds/route.ts` (F4b), `src/app/bets/[roundId]/page.tsx` (F5A), `src/app/results/[roundId]/page.tsx` (F6). No engine changes. No `src/games/` changes.
 
 ---
 

@@ -1,20 +1,22 @@
 'use client'
 
+import { useParams } from 'next/navigation'
 import { useRoundStore } from '@/store/roundStore'
 import Header from '@/components/layout/Header'
 import { vsPar, parLabel, parColor, formatMoney } from '@/lib/scoring'
 import { computeAllPayouts } from '@/lib/payouts'
 
 export default function BetsPage() {
+  const params = useParams()
   const store = useRoundStore()
-  const { players, holes, games, roundId } = store
+  const { players, holes, games } = store
 
   const payouts = computeAllPayouts(holes, players, games)
   const scoredHoles = holes.filter(h => players.every(p => (h.scores[p.id] || 0) > 0))
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Header title="Bet History" backHref={`/scorecard/${roundId}`} />
+      <Header title="Bet History" backHref={`/scorecard/${params.roundId}`} />
 
       <div className="px-4 py-3 flex gap-3 overflow-x-auto" style={{ background: 'var(--green-deep)' }}>
         {players.filter(p => p.betting).map(p => (

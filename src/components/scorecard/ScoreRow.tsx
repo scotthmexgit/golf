@@ -15,9 +15,10 @@ interface ScoreRowProps {
   score: number
   dots: HoleDotsType
   activeGames: string[]
+  showJunkDots: boolean
 }
 
-export default function ScoreRow({ player, hole, par, holeIndex, score, dots, activeGames }: ScoreRowProps) {
+export default function ScoreRow({ player, hole, par, holeIndex, score, dots, activeGames, showJunkDots }: ScoreRowProps) {
   const { setScore, setDot, games } = useRoundStore()
   const strokes = strokesOnHole((player as PlayerSetup & { strokes?: number }).strokes || 0, holeIndex)
 
@@ -67,10 +68,14 @@ export default function ScoreRow({ player, hole, par, holeIndex, score, dots, ac
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <DotButton type="sandy" active={dots.sandy} onClick={handleSandyToggle} rejected={sandyRejected} />
-          <DotButton type="chipIn" active={dots.chipIn} onClick={() => setDot(player.id, hole, 'chipIn', !dots.chipIn)} />
-          <DotButton type="threePutt" active={dots.threePutt} onClick={() => setDot(player.id, hole, 'threePutt', !dots.threePutt)} />
-          <DotButton type="onePutt" active={dots.onePutt} onClick={() => setDot(player.id, hole, 'onePutt', !dots.onePutt)} />
+          {showJunkDots && (
+            <>
+              <DotButton type="sandy" active={dots.sandy} onClick={handleSandyToggle} rejected={sandyRejected} />
+              <DotButton type="chipIn" active={dots.chipIn} onClick={() => setDot(player.id, hole, 'chipIn', !dots.chipIn)} />
+              <DotButton type="threePutt" active={dots.threePutt} onClick={() => setDot(player.id, hole, 'threePutt', !dots.threePutt)} />
+              <DotButton type="onePutt" active={dots.onePutt} onClick={() => setDot(player.id, hole, 'onePutt', !dots.onePutt)} />
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

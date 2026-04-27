@@ -10,7 +10,7 @@ import HoleHeader from '@/components/scorecard/HoleHeader'
 import HoleDots from '@/components/scorecard/HoleDots'
 import ScoreRow from '@/components/scorecard/ScoreRow'
 import Link from 'next/link'
-import { hasGreenieJunk } from '@/lib/junk'
+import { hasGreenieJunk, hasAnyJunk } from '@/lib/junk'
 import { vsPar } from '@/lib/scoring'
 
 export default function ScorecardPage() {
@@ -49,6 +49,7 @@ export default function ScorecardPage() {
   )
 
   const activeGameIds = games.map(g => g.id)
+  const showJunkDots = games.some(g => activeGameIds.includes(g.id) && hasAnyJunk(g.junk))
   const allScored = holeData ? players.every(p => (holeData.scores[p.id] || 0) > 0) : false
   const isLastHole = currentIdx === holeRange.length - 1
 
@@ -230,6 +231,7 @@ export default function ScorecardPage() {
             score={holeData.scores[p.id] || 0}
             dots={holeData.dots[p.id] || { sandy: false, chipIn: false, threePutt: false, onePutt: false }}
             activeGames={activeGameIds}
+            showJunkDots={showJunkDots}
           />
         ))}
 

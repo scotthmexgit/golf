@@ -63,6 +63,7 @@ Deferred beyond this rebuild plan (see REBUILD_PLAN.md "Deferred" section): Scor
 
 - **F8 — RSC prefetch 503s** (Cowork triage 2026-04-27): Intermittent 503s on `GET /golf/{scorecard,results,bets}/{N}?_rsc=...` routes. Next.js framework-level responses, not application code. Likely dev server memory pressure or cold-start on the Cowork host. No code path produces a 503 for RSC fetches; no proposed checklist item. Revisit if 503s persist on a production host.
 - **F10 — Money rendering coverage** (Cowork triage 2026-04-27): Only `+$5.00/hole` on Review step was verified (`formatMoneyDecimal` at `src/app/round/new/page.tsx:49` — correct). Bets and results pages were non-functional (F5/F6) during walkthrough so money rendering there could not be verified. Existing line 112 covers the known bare template site at `resolve/[hole]/page.tsx:69`. No new finding.
+- **[Ops procedure]** Production rebuilds must use `pm2 stop golf && npm run build && pm2 start golf` instead of `pm2 restart golf` to prevent EADDRINUSE restart storms (361+ errors observed during Apr27 rebuild). Persistent ops doc TBD. — 2026-04-27 — F3 v2 diagnosis
 
 ## Parking Lot
 
@@ -141,6 +142,10 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 - [ ] **PF-1-F6** [PF-2] — Add server-authoritative hydration to results page: `useEffect` on mount, same pattern as scorecard page hydration (PF-1 Turn 3). Prerequisite: PF-1-F4 phase (b) must land first (blocked). Fence: `src/app/results/[roundId]/page.tsx` only. AC: results page renders correct winner, player rows, and settlement amounts for a completed Stroke Play round after page reload. — 2026-04-27 — Cowork triage
 
 - **[Observation] roundStore.ts hydration cast audit** — F4 phase (a) found `as string[]` cast at `roundStore.ts:262` was silently lying to TypeScript about runtime types; other `as` casts on hydrated data in this file may have similar issues. Not blocking; file as observation for a future cleanup pass. — 2026-04-27 — F4 phase (a) verification
+
+- [ ] **F9-a-HOLE18-RACE** — F9-a par-default useEffect did not prevent hole 18 PUT from firing with `gross: undefined` in the Cowork verification walkthrough (1 occurrence). The useEffect either failed to fire on hole 18 or raced with the Finish Round save flow. Investigation needed before fix. Cross-reference: PF-1-F3 v2 diagnosis 012, Mode B. — 2026-04-27 — F3 v2 diagnosis
+
+- [ ] **PUT-HANDLER-400-ON-MISSING-FIELDS** [backlog] — `src/app/api/rounds/[id]/scores/hole/[hole]/route.ts` surfaces `PrismaClientValidationError` as 500 when required fields are missing in the request body. Should validate and return 400 with a clear error message. Hardening item; low priority. Cross-reference: PF-1-F3 v2 diagnosis 012, Mode B. — 2026-04-27 — F3 v2 diagnosis
 
 ## Done
 

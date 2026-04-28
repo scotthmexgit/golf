@@ -1,5 +1,7 @@
 'use client'
 
+import { useState, useEffect, useRef } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useRoundStore } from '@/store/roundStore'
 import Header from '@/components/layout/Header'
@@ -7,8 +9,36 @@ import { formatMoneyDecimal, vsPar } from '@/lib/scoring'
 import { computeAllPayouts } from '@/lib/payouts'
 
 export default function ResultsPage() {
+  const params = useParams()
+  const [hydrating, setHydrating] = useState(false)
+  const hydratedRef = useRef(false)
   const store = useRoundStore()
-  const { players, holes, games, course } = store
+  const { players, holes, games, course, hydrateRound } = store
+
+  useEffect(() => {
+    const urlRoundId = parseInt(params.roundId as string, 10)
+    if (isNaN(urlRoundId) || hydratedRef.current) return
+    hydratedRef.current = true
+    setHydrating(true)
+    fetch(`/golf/api/rounds/${urlRoundId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) hydrateRound(data)
+      })
+      .catch(() => { /* silent — Zustand state is used as fallback */ })
+      .finally(() => setHydrating(false))
+  }, [params.roundId, hydrateRound])
+
+  if (hydrating) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Header title="Results" />
+        <div className="flex-1 flex items-center justify-center px-4">
+          <p style={{ color: 'var(--muted)' }}>Loading results...</p>
+        </div>
+      </div>
+    )
+  }
 
   const payouts = computeAllPayouts(holes, players, games)
 

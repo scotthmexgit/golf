@@ -17,7 +17,7 @@ export default function ScorecardPage() {
   const router = useRouter()
   const params = useParams()
   const store = useRoundStore()
-  const { course, players, holes, currentHole, setCurrentHole, games, roundId, hydrateRound } = store
+  const { course, players, holes, currentHole, setCurrentHole, games, roundId, hydrateRound, setScore } = store
   const [showFinishConfirm, setShowFinishConfirm] = useState(false)
   const [notices, setNotices] = useState<string[]>([])
   const [hydrating, setHydrating] = useState(false)
@@ -52,6 +52,16 @@ export default function ScorecardPage() {
   const showJunkDots = games.some(g => activeGameIds.includes(g.id) && hasAnyJunk(g.junk))
   const allScored = holeData ? players.every(p => (holeData.scores[p.id] || 0) > 0) : false
   const isLastHole = currentIdx === holeRange.length - 1
+
+  // F9-a: write par to Zustand on hole mount so Save & Next is enabled at default scores
+  useEffect(() => {
+    if (!holeData) return
+    for (const p of players) {
+      if ((holeData.scores[p.id] || 0) === 0) {
+        setScore(p.id, currentHole, holeData.par)
+      }
+    }
+  }, [currentHole, holeData?.par, players, setScore])
 
   const detectNotices = () => {
     if (!holeData) return

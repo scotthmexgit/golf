@@ -14,3 +14,4 @@
 | — | 007_PF1_F4_PHASE_B | PF-1-F4 phase (b) | Populated game.playerIds at round creation; fixed Int→String hydration cast; 348/348 tests; tsc clean; committed 25839a9 | ✓ |
 | — | 008_F9_A | F9-a (line 74) | par written to Zustand on hole mount via useEffect; Save & Next enabled without user interaction; 348/348 tests; committed 108e629 | ✓ |
 | — | 009_BOOKKEEPING | Documenter | closed F9-b (closed-not-opened per 008 eval); revised PF-1-F4 AC (two-file scope, commits debd931/25839a9); filed roundStore as-cast audit observation; committed f57d326 | ✓ |
+| — | 010_PF1_F6 | PF-1-F6 [PF-2] | server-authoritative hydration on results page; useEffect + hydrateRound + loading guard; pattern matches scorecard page; 348/348 tests; committed 6150ba8 | ✓ |

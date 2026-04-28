@@ -253,13 +253,13 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
     const currentHole = firstIncomplete ? firstIncomplete.number : holes[holes.length - 1].number
 
     // Rebuild GameInstance[]. Games from API have numeric id; keep as string for store compat.
-    // playerIds from DB is [] (known limitation PF-1), so we preserve that as-is.
+    // playerIds from DB are integers; map to strings to match PlayerSetup.id = String(playerId).
     const games: GameInstance[] = apiGames.map(g => ({
       id: String(g.id),
       type: g.type as GameType,
       label: g.type,
       stake: g.stake,
-      playerIds: g.playerIds as string[],
+      playerIds: g.playerIds.map(String),
       junk: defaultJunk(g.stake),
     }))
 

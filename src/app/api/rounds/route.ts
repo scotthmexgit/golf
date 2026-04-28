@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     }
 
     // Create players first (find or create by name)
-    const playerRecords = []
+    const playerRecords: { id: number }[] = []
     for (const p of players || []) {
       let player = await prisma.player.findFirst({ where: { name: p.name || 'Golfer' } })
       if (!player) {
@@ -63,7 +63,9 @@ export async function POST(request: Request) {
           create: (gameInstances || []).map((g: { type: string; stake: number; playerIds: string[] }) => ({
             type: g.type,
             stake: g.stake,
-            playerIds: [],
+            playerIds: playerRecords
+              .filter((_, i) => players[i]?.betting !== false)
+              .map(pr => pr.id),
           })),
         },
       },

@@ -13,3 +13,4 @@
 | — | 006_BATCH_RUN_SUMMARY | meta | Batch run complete: four items landed; stop condition 5 triggered at item 4; 348/348 tests throughout; F4 phase (b) blocked pending operator | ⏸ |
 | — | 007_PF1_F4_PHASE_B | PF-1-F4 phase (b) | Populated game.playerIds at round creation; fixed Int→String hydration cast; 348/348 tests; tsc clean; committed 25839a9 | ✓ |
 | — | 008_F9_A | F9-a (line 74) | par written to Zustand on hole mount via useEffect; Save & Next enabled without user interaction; 348/348 tests; committed 108e629 | ✓ |
+| — | 009_BOOKKEEPING | Documenter | closed F9-b (closed-not-opened per 008 eval); revised PF-1-F4 AC (two-file scope, commits debd931/25839a9); filed roundStore as-cast audit observation; committed f57d326 | ✓ |

@@ -11,3 +11,4 @@
 | — | 005_SP_UI_2 | SP-UI-2 | showJunkDots prop gates four DotButtons in ScoreRow; 348/348 tests; committed 647520f | ✓ |
 | — | 005_F4_PHASE_A_VERIFICATION | PF-1-F4 phase (a) | Type-contract verification: chain INCONSISTENT; two files need changing (api/rounds/route.ts:66 + roundStore.ts:262); phase (b) not a one-line fix; committed debd931 | ⚠ |
 | — | 006_BATCH_RUN_SUMMARY | meta | Batch run complete: four items landed; stop condition 5 triggered at item 4; 348/348 tests throughout; F4 phase (b) blocked pending operator | ⏸ |
+| — | 007_PF1_F4_PHASE_B | PF-1-F4 phase (b) | Populated game.playerIds at round creation; fixed Int→String hydration cast; 348/348 tests; tsc clean; committed 25839a9 | ✓ |

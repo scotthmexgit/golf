@@ -27,7 +27,7 @@ Updated at EOD-FINAL.
 
 **SP-4 §4 manual browser playthrough (PF-2 phase-end gate).**
 
-All SP-UI fence-violation items (SP-UI-1/2/3/4) and all PF-2 code items (PF-1-F3/F4/F5A/F6) are closed. The sole remaining gate is the SP-4 §4 manual browser playthrough: one full 18-hole Stroke Play round on the running dev server, `appliesHandicap: true`, correct settlement on the results page, zero-sum verified by inspection. No code blocker; requires a browser session.
+All SP-UI fence-violation items (SP-UI-1/2/3/4/7) and all PF-2 code items (PF-1-F3/F4/F5A/F6) are closed. The sole remaining gate is the SP-4 §4 manual browser playthrough: one full 18-hole Stroke Play round on the running dev server, `appliesHandicap: true`, correct settlement on the results page, zero-sum verified by inspection. No code blocker; requires a browser session.
 
 **Prerequisite before Cowork playthrough:** production server at port 3000 is running a stale Apr26 12:39 build. Run `pm2 stop golf && npm run build && pm2 start golf` before the playthrough to deploy all Apr27 changes.
 
@@ -149,6 +149,8 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 
 - [ ] **PUT-HANDLER-400-ON-MISSING-FIELDS** [backlog] — `src/app/api/rounds/[id]/scores/hole/[hole]/route.ts` surfaces `PrismaClientValidationError` as 500 when required fields are missing in the request body. Should validate and return 400 with a clear error message. Hardening item; low priority. Cross-reference: PF-1-F3 v2 diagnosis 012, Mode B. — 2026-04-27 — F3 v2 diagnosis
 
+- [x] **SP-UI-7** [SP-UI] — IN PROGRESS badge persistence + ungated header Finish button. Two complementary defects in `src/app/scorecard/[roundId]/page.tsx`: (A) `handleSaveNext` omits `PATCH { status: 'Complete' }` on `isLastHole`, so rounds finished via the bottom button are never marked Complete in the DB; (B) header Finish button renders unconditionally on all holes, enabling premature round termination. Fix: extract `patchRoundComplete(roundId)` helper to `src/lib/roundApi.ts`; call from `handleSaveNext` (silent) and `confirmFinish` (error-display on failure); gate header button behind `isLastHole`. AC: (1) round finished via bottom "Finish Round →" has `DB status='Complete'` immediately after navigation to `/results`; (2) header Finish button absent on holes 1–17; (3) header Finish button present on hole 18 and finishes correctly; (4) Recent Rounds shows finished rounds without IN PROGRESS badge. Existing stuck rounds 12/13/14 are a separate ops step. Source: `docs/2026-04-29/011_in_progress_badge_research.md`. — 2026-04-29 — researcher pass 011 — closed 2026-04-29
+
 - [ ] **SP-UI-5** [SP-UI] — Stroke Play card defaults to only Golfer 1 selected in the Players row of the Games step (`GameInstanceCard.tsx` player pills), despite all golfers having Betting: Yes set on the Players step. Expected: all betting players pre-selected when a Stroke Play game instance is created. Observed by Cowork on walkthrough 2026-04-29 22:16. Source: findings-2026-04-29-2216.md §"Stroke Play card defaults to only Golfer 1." Investigation needed: confirm whether `addGame` is calling `state.players.filter(p => p.betting)` against a stale or single-player state (wizard step ordering; player count at the moment the Games step first renders vs. moment the user taps Stroke Play). Dispatch pending GM sequencing. — 2026-04-29 — Cowork walkthrough 2216
 
 ## Done
@@ -179,7 +181,8 @@ Append-only. Close date + pointer to prompt NNN or EOD.
 - [x] PF-1-F4 — `game.playerIds: []` fix — closed 2026-04-27 — phase (a) commit debd931, phase (b) commit 25839a9. `api/rounds/route.ts:66` populates `playerIds` from `playerRecords`; `roundStore.ts:262` fixes Int→String hydration cast. 348/348 tests. Phase-end closure pending SP-4 §4 manual playthrough.
 - [x] PF-1-F5A — Null backHref in bets page — closed 2026-04-27 — commit 5c36797. `useParams().roundId` replaces Zustand-sourced `roundId` for back link. 348/348 tests.
 - [x] PF-1-F6 — Server-authoritative hydration on results page — closed 2026-04-27 — commit 6150ba8. `useEffect` + `hydrateRound` + loading guard; pattern matches scorecard page. 348/348 tests.
-- [x] SP-UI-4 — Stake unit label defect — closed 2026-04-29 — commit f43d2db. `stakeUnitLabel(gameType)` added to `src/lib/scoring.ts`; conditional applied at `GameInstanceCard.tsx:47`, `round/new/page.tsx:49`, `results/[roundId]/page.tsx:96`. `scoring.test.ts` (6 cases) added; vitest include extended to `src/lib/**/*.test.ts`. 354/354 tests.
+- [x] SP-UI-4 — Stake unit label defect — closed 2026-04-29 — commit f43d2db.
+- [x] SP-UI-7 — IN PROGRESS badge + ungated header Finish button — closed 2026-04-29 — commit TBD. `patchRoundComplete` helper extracted to `src/lib/roundApi.ts`; called from `handleSaveNext` (Fix A) and `confirmFinish` (Fix B refactor); header Finish button gated behind `isLastHole`. `roundApi.test.ts` (4 cases). 358/358 tests. `stakeUnitLabel(gameType)` added to `src/lib/scoring.ts`; conditional applied at `GameInstanceCard.tsx:47`, `round/new/page.tsx:49`, `results/[roundId]/page.tsx:96`. `scoring.test.ts` (6 cases) added; vitest include extended to `src/lib/**/*.test.ts`. 354/354 tests.
 
 ## Deferred / won't-do
 

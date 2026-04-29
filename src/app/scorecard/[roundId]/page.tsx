@@ -12,6 +12,7 @@ import ScoreRow from '@/components/scorecard/ScoreRow'
 import Link from 'next/link'
 import { hasGreenieJunk, hasAnyJunk } from '@/lib/junk'
 import { vsPar } from '@/lib/scoring'
+import { patchRoundComplete } from '@/lib/roundApi'
 
 export default function ScorecardPage() {
   const router = useRouter()
@@ -144,6 +145,7 @@ export default function ScorecardPage() {
     }
 
     if (isLastHole) {
+      if (roundId) await patchRoundComplete(roundId)
       router.push(`/results/${roundId}`)
     } else {
       setCurrentHole(holeRange[currentIdx + 1])
@@ -158,24 +160,11 @@ export default function ScorecardPage() {
   const confirmFinish = async () => {
     setShowFinishConfirm(false)
     setFinishError(null)
-    // Step 5: Mark round Complete before navigating (forward-only lifecycle — sequential)
     if (roundId) {
-      let status = 0
-      try {
-        const res = await fetch(`/golf/api/rounds/${roundId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'Complete' }),
-        })
-        status = res.status
-      } catch {
-        status = 0
-      }
-      if (status === 204 || status === 409) {
-        // 204: success; 409: already Complete — navigate in both cases
+      const { ok } = await patchRoundComplete(roundId)
+      if (ok) {
         router.push(`/results/${roundId}`)
       } else {
-        // Any other failure: do not navigate; show error
         setShowFinishConfirm(true)
         setFinishError('Failed to finish round. Try again.')
       }
@@ -216,14 +205,16 @@ export default function ScorecardPage() {
             <Link href={`/bets/${roundId}`} className="text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'var(--green-mid)', color: 'var(--sand)' }}>
               Bets
             </Link>
-            <button
-              type="button"
-              onClick={handleFinish}
-              className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
-              style={{ background: 'var(--sand)', color: 'var(--green-deep)' }}
-            >
-              Finish
-            </button>
+            {isLastHole && (
+              <button
+                type="button"
+                onClick={handleFinish}
+                className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                style={{ background: 'var(--sand)', color: 'var(--green-deep)' }}
+              >
+                Finish
+              </button>
+            )}
           </div>
         }
       />

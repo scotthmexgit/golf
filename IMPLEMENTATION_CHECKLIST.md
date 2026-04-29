@@ -149,6 +149,8 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 
 - [ ] **PUT-HANDLER-400-ON-MISSING-FIELDS** [backlog] — `src/app/api/rounds/[id]/scores/hole/[hole]/route.ts` surfaces `PrismaClientValidationError` as 500 when required fields are missing in the request body. Should validate and return 400 with a clear error message. Hardening item; low priority. Cross-reference: PF-1-F3 v2 diagnosis 012, Mode B. — 2026-04-27 — F3 v2 diagnosis
 
+- [ ] **SP-UI-5** [SP-UI] — Stroke Play card defaults to only Golfer 1 selected in the Players row of the Games step (`GameInstanceCard.tsx` player pills), despite all golfers having Betting: Yes set on the Players step. Expected: all betting players pre-selected when a Stroke Play game instance is created. Observed by Cowork on walkthrough 2026-04-29 22:16. Source: findings-2026-04-29-2216.md §"Stroke Play card defaults to only Golfer 1." Investigation needed: confirm whether `addGame` is calling `state.players.filter(p => p.betting)` against a stale or single-player state (wizard step ordering; player count at the moment the Games step first renders vs. moment the user taps Stroke Play). Dispatch pending GM sequencing. — 2026-04-29 — Cowork walkthrough 2216
+
 ## Done
 
 Append-only. Close date + pointer to prompt NNN or EOD.

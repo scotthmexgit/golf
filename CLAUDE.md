@@ -37,6 +37,7 @@ When GM relays Cowork findings, record them as a numbered report (type: cowork-f
 
 Stack: Next.js 16 (App Router), TypeScript (strict: true), Vitest, Prisma + PostgreSQL
 Test command: npm run test:run (one-shot; the AC gate). npm run test for watch mode. Test scope: src/games/**/*.test.ts, src/bridge/**/*.test.ts, src/lib/**/*.test.ts. Currently 14 test files / ~358 cases (engine, bridge, lib).
+Playwright: available as an engineering verification tool. Use it when a bug or fix has a real browser-state component — Finish flow, navigation, DB-write-on-click, form submission, "does the click actually do the thing." Good candidates: reproducing a bug before planning a fix (Explore), smoke-testing a fix end-to-end before claiming done (Develop), including output as evidence in a report. Do NOT use for every fix — vitest is sufficient for most. Do NOT use for design or UX evaluation; that remains Cowork's role. Scripts saved under tests/playwright/; note in report when used. Target: http://localhost:3000/golf (PM2 production server) or http://localhost:3001 (dev server if running).
 Lint command: npm run lint (eslint with eslint-config-next/core-web-vitals + eslint-config-next/typescript).
 Format command: none — no Prettier configured. Don't add one as part of unrelated work.
 Typecheck: tsc --noEmit — run manually; required by SP-4 AC. No npm script for it.

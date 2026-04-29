@@ -177,7 +177,7 @@ Append-only. Close date + pointer to prompt NNN or EOD.
 - [x] PF-1-F4 — `game.playerIds: []` fix — closed 2026-04-27 — phase (a) commit debd931, phase (b) commit 25839a9. `api/rounds/route.ts:66` populates `playerIds` from `playerRecords`; `roundStore.ts:262` fixes Int→String hydration cast. 348/348 tests. Phase-end closure pending SP-4 §4 manual playthrough.
 - [x] PF-1-F5A — Null backHref in bets page — closed 2026-04-27 — commit 5c36797. `useParams().roundId` replaces Zustand-sourced `roundId` for back link. 348/348 tests.
 - [x] PF-1-F6 — Server-authoritative hydration on results page — closed 2026-04-27 — commit 6150ba8. `useEffect` + `hydrateRound` + loading guard; pattern matches scorecard page. 348/348 tests.
-- [x] SP-UI-4 — Stake unit label defect — closed 2026-04-29 — commit TBD. `stakeUnitLabel(gameType)` added to `src/lib/scoring.ts`; conditional applied at `GameInstanceCard.tsx:47`, `round/new/page.tsx:49`, `results/[roundId]/page.tsx:96`. `scoring.test.ts` (6 cases) added; vitest include extended to `src/lib/**/*.test.ts`. 354/354 tests.
+- [x] SP-UI-4 — Stake unit label defect — closed 2026-04-29 — commit f43d2db. `stakeUnitLabel(gameType)` added to `src/lib/scoring.ts`; conditional applied at `GameInstanceCard.tsx:47`, `round/new/page.tsx:49`, `results/[roundId]/page.tsx:96`. `scoring.test.ts` (6 cases) added; vitest include extended to `src/lib/**/*.test.ts`. 354/354 tests.
 
 ## Deferred / won't-do
 

@@ -1,164 +1,100 @@
-CLAUDE.md — Claude Code (DevFlow) for golf
-This is the workflow source of truth for this project. You are Claude Code, the developer in the DevFlow workflow. Read this on every session start.
-Your role
-You explore, plan, write code, run tests, report. You report to GM (Claude App). You do not talk to Cowork directly. You own all project documentation under docs/ and the session logs under /home/seadmin/golf/YYYY-MM-DD/.
-Chain of command (under DevFlow)
-
-GM (Claude App) is the only Claude that talks to the user about plans and decisions.
-You report to GM only — never directly to the user for work prompts, never to Cowork.
-Cowork findings reach you via GM after the user relays them.
-Direct user-to-Code chats are still acceptable for quick questions, but any work prompts use the 4-phase rule and produce reports.
-
-The 4-phase rule (mandatory)
+CLAUDE.md — Claude Code (DevFlow) for golfThis is the workflow source of truth for this project. You are Claude Code, the developer in the DevFlow workflow. Read this on every session start.Your role
+You explore, plan, write code, run tests, report. You report to GM (Claude App). You do not talk to Cowork directly. You own all project documentation under docs/.Note on prior workflow: this project previously had the user talking directly to Code via per-day session logs at /home/seadmin/golf/YYYY-MM-DD/NNN_<slug>.md. Under DevFlow, route through GM. Direct user-to-Code chats are still acceptable for quick questions, but any work prompts use the 4-phase rule and produce reports under docs/yyyy-mm-dd/.The 4-phase rule (mandatory)
 Every prompt from GM runs through:
 
 Explore — read relevant files, identify constraints, state what you found
 Plan — propose approach, list changes, risks, questions; stop here if approval needed
 Develop — make changes, run tests; if something breaks, fix or stop and report
-Report — write a session log per the convention below
-
-Tiny prompts collapse the phases to one or two sentences each, but never skip them.
-Documentation responsibilities
+Report — write to docs/yyyy-mm-dd/NN-<slug>.md using docs/templates/report.md, append to today's eod.md
+Tiny prompts collapse the phases to one or two sentences each, but never skip them.Documentation responsibilities
 You maintain:
 
-/home/seadmin/golf/YYYY-MM-DD/NNN_<slug>.md — per-prompt summaries (existing convention, preserved)
-/home/seadmin/golf/EOD_DD-Month-YYYY.md — rolling daily log (existing convention, preserved)
-/home/seadmin/golf/EOD-FINAL_DD-Month-YYYY.md — final EOD on explicit user request only
-docs/plans/ — active plan(s); current is STROKE_PLAY_PLAN.md
-docs/games/ — canonical rule docs per game (preserved, do not touch outside D-class items)
-docs/proposals/, docs/sessions/, docs/product/, docs/glossary.md
-IMPLEMENTATION_CHECKLIST.md — single source of truth for active scope
-REBUILD_PLAN.md, MIGRATION_NOTES.md, AUDIT.md — history, not todo lists
-CLAUDE.md (this file), AGENTS.md — kept current as project conventions evolve
-
+docs/yyyy-mm-dd/ — created at SOD each day; numbered prompt reports plus sod.md, eod.md. This supersedes the old /home/seadmin/golf/YYYY-MM-DD/NNN_<slug>.md location for new sessions.
+docs/templates/ — report, sod, eod templates
+docs/roadmap.md — derived from IMPLEMENTATION_CHECKLIST.md at SOD
+docs/issues.md — fallback only; the real tracker is IMPLEMENTATION_CHECKLIST.md
+CLAUDE.md (this file) — kept current as project conventions evolve
+AGENTS.md — keep "Active phase" / "Current item" line current after each grooming
 SOD
 When GM says "run SOD":
 
-GM owns the planning loop; SOD is a context-pull and summary report to GM, not an autonomous planning step.
-State the active checklist item from IMPLEMENTATION_CHECKLIST.md verbatim.
-Read yesterday's EOD_DD-Month-YYYY.md (or EOD-FINAL_* if user closed the day formally).
-Confirm STROKE_PLAY_PLAN.md phase end-condition and the active SP-item.
-Report SOD summary to GM: active item, yesterday's close-out, today's proposed first move.
-
-Start-of-day catch-up commit gate. If yesterday's FINAL EOD was skipped (working tree has uncommitted changes at session start), the first action of the new day is one or more catch-up commits — one per logically separable task if the working tree contains changes from multiple tasks — before any new edits land.
+Create docs/yyyy-mm-dd/
+Read yesterday's eod.md
+Refresh docs/roadmap.md from IMPLEMENTATION_CHECKLIST.md
+Confirm the current open item against IMPLEMENTATION_CHECKLIST.md and AGENTS.md
+Write docs/yyyy-mm-dd/sod.md
+Report SOD summary to GM
 EOD
 When GM says "run EOD":
 
-GM owns the planning loop; EOD is a summary report to GM, not an autonomous wrap-up step.
-Append today's per-prompt summaries to /home/seadmin/golf/EOD_DD-Month-YYYY.md.
-Note what Cowork should check tomorrow (UI-visible items only).
-Note what might require App or Cowork instruction updates.
-Report EOD summary to GM.
-
-FINAL EOD (only on explicit user request) triggers the commit process below.
+Finalize today's docs/yyyy-mm-dd/eod.md
+Note what Cowork should check tomorrow
+Note what might require App/Cowork instruction updates
+Stage and commit (no remote — local commit is the durability checkpoint)
+Report EOD summary to GM
 Cowork handoffs
-When GM relays Cowork findings, record them as a session-log entry per the existing convention (NNN_<slug>.md with a cowork-findings slug suffix or category in the body). Treat findings as the Explore input, then plan and develop normally.
-Reporting to GM
+When GM relays Cowork findings, record them as a numbered report (type: cowork-findings). Treat findings as the Explore input, then plan and develop normally.Project conventions
+
+Stack: Next.js 16 (App Router), TypeScript (strict: true), Vitest, Prisma + PostgreSQL
+Test command: npm run test:run (one-shot; the AC gate). npm run test for watch mode. Test scope: src/games/**/*.test.ts, src/bridge/**/*.test.ts, src/lib/**/*.test.ts. Currently 13 test files / ~354 cases (engine, bridge, lib).
+Lint command: npm run lint (eslint with eslint-config-next/core-web-vitals + eslint-config-next/typescript).
+Format command: none — no Prettier configured. Don't add one as part of unrelated work.
+Typecheck: tsc --noEmit — run manually; required by SP-4 AC. No npm script for it.
+Run/dev command: npm run dev. Production-ish run is PM2 on the Linux host; rebuild procedure documented in commit 51660c4.
+Branch strategy: local-only. main is active. pre-rebuild-snapshot is a historical checkpoint — don't merge to it, don't rebase it. No remote, no PRs.
+Commit style: freeform descriptive, prefixed with the internal ticket code from IMPLEMENTATION_CHECKLIST.md when applicable (e.g. SP-UI-2:, PF-1-F6:, F9-a:). One commit per productive session is normal. EOD doc commits are fine standalone.
+Issue tracker: IMPLEMENTATION_CHECKLIST.md is the single source of truth for active scope. docs/plans/STROKE_PLAY_PLAN.md is the phase plan. AGENTS.md carries the active-item pointer.
+Project structure
+src/
+  app/                  Next.js App Router routes
+    page.tsx            home (recent rounds + Start New Round)
+    round/new/          4-step setup wizard
+    scorecard/[roundId]/ live scorecard + per-hole resolve/[hole]
+    bets/[roundId]/     mid-round bets/settlement
+    results/[roundId]/  final results & payouts
+    api/                API routes
+  bridge/               2 bridge modules + 2 test files
+  components/           layout, scorecard, setup, ui (11 files)
+  games/                9 engines + 11 test files (incl. __tests__/)
+  lib/                  handicap, junk, payouts, prisma, scoring
+  store/                roundStore.ts (Zustand)
+  types/                index.ts (incl. GAME_DEFS w/ disabled flag)
+prisma/                 schema
+docs/
+  plans/STROKE_PLAY_PLAN.md         active phase plan
+  proposals/                         design notes
+  games/                             per-game rule docs
+  product/north-star.md              product vision
+.claude/agents/         5 sub-agents: researcher, documenter, engineer, reviewer, team-lead
+AGENTS.md               active-phase / current-item pointer
+IMPLEMENTATION_CHECKLIST.md   active scope SoT
+REBUILD_PLAN.md         history
+AUDIT.md                one-time classification
+MIGRATION_NOTES.md      history~15k LOC across ~59 TS/TSX files. App router only. No middleware.ts — auth is network-perimeter (Tailscale) only.Project-specific rules and conventionsPreserved from prior CLAUDE.md / AGENTS.md / plan docs (2026-04-29)Active phase and current item. Active phase: Stroke-Play-only UI wiring. Source of truth: docs/plans/STROKE_PLAY_PLAN.md. Active scope tracker: IMPLEMENTATION_CHECKLIST.md. After each grooming, update AGENTS.md line "Active phase: …" / "Current item: …" to match.Phase endpoint is SP-4 closure. From STROKE_PLAY_PLAN.md §Scope: "The Stroke-Play-only phase begins at adoption of this plan and ends when SP-4 closes." SP-4 closes when all five gates pass:
+
+git grep -rn "computeStrokePlay" src/ returns zero matches
+SP-2 builder tests pass (npm run test:run)
+SP-3 bridge integration tests pass (npm run test:run)
+Manual 18-hole playthrough on the running dev server (handicap applied, payouts verified)
+tsc --noEmit --strict passes
+SP-6 is independent. SP-6 is the GAME_DEFS disabled: true plumbing in src/types/index.ts and the GameList.tsx filter. It can run at any point and is recommended (not required) before SP-3 so the test environment is clean. It does not close the phase. Reject any framing that says the phase ends at SP-6.Do-not-touch fence (entire current phase):
+
+Skins, Wolf, Nassau, Match Play engines and their UI integration
+Junk wiring (Junk Phase 3 is parked; junk fields exist in schema but junkItems is intentionally empty in every Stroke Play BetSelection)
+Verifier (deferred)
+The fence is the whole current phase, not a per-file list. If a task seems to require crossing the fence, stop at Plan and report up.
+Known tech debt (recorded, do not casually fix):
+
+Reference-identity bet-id lookup anti-pattern — closed-out by REBUILD_PLAN.md #4
+Multi-bet cutover deferred — REBUILD_PLAN.md #11
+Multiple operator-only deferred decisions enumerated in STROKE_PLAY_PLAN.md §7
+Scoring file-path divergence: README points to target paths per MIGRATION_NOTES.md item 1; current scoring lives under src/lib/. Don't "fix" the README casually — the divergence is acknowledged.
+No consolidated runbook; PM2 rebuild procedure lives only in commit 51660c4. Future cleanup, not active-phase work.
+Sub-agents. Five sub-agents under .claude/agents/: researcher, documenter, engineer, reviewer, team-lead. You can invoke them. Their output is your work product — fold it into your report, don't pass it through raw.Cowork's findings format. Cowork files findings as findings-yyyy-mm-dd-HHMM.md on the desktop. GM relays. When you receive them, file a numbered cowork-findings report under today's docs/yyyy-mm-dd/. Recurring/known issues (e.g., the Recent Rounds "IN PROGRESS" stale-badge anomaly) may be recorded for continuity without re-flagging — Cowork already does this; mirror it.Code style. TypeScript strict mode is on. No Prettier — match surrounding style in each file. Eslint config is stock Next.js + TS, no custom rules.Commit hygiene. Tickets first (SP-UI-2:, PF-1-F6:, etc.). One sentence is fine. Session-log/EOD-only commits are acceptable and routine.Reporting to GM
 When you report back after a prompt cycle:
 
 One-sentence summary of what was done
-Path to the session-log file
+Path to the report file under docs/yyyy-mm-dd/
 Decisions or questions needing GM input
 Anything Cowork should check (if UI-visible)
-
-Keep messages short. Detail lives in the session-log file.
-Project conventions
-
-Stack: TypeScript, Next.js 16, React (App Router under src/app/), Vitest, Prisma with PostgreSQL (local DATABASE_URL points at golfapp@localhost:5432/golfdb).
-Test commands: npm test (vitest watch), npm run test:run (vitest run, one-shot). 348 tests across 12 files; all under src/games/__tests__/ and src/bridge/.
-Lint command: npm run lint — ESLint via eslint.config.mjs (next/core-web-vitals + next/typescript). No Prettier or Biome.
-Run/dev command: npm run dev starts Next.js on default port 3000 with basePath /golf. PM2 used for local process management; rebuild procedure documented in commit 51660c4.
-Branch strategy: Trunk-based on main. Safety branch pre-rebuild-snapshot is a marker only. No PR workflow, no remote configured.
-Commit style: Freeform with internal task-ID prefixes. Three observable patterns: <task-id>: <description>, Session log and EOD for <topic>, Bookkeeping YYYY-MM-DD: <description>. Not Conventional Commits.
-Issue tracker: IMPLEMENTATION_CHECKLIST.md is the single source of truth for active scope. No external tracker.
-CI/CD: None. No remote. Local dev only.
-Hosting: Local PM2 on a Linux host reached over Tailscale at http://100.71.214.25/golf from the Windows machine where Cowork operates.
-
-Test coverage shape (bimodal)
-
-Heavy: engines (src/games/__tests__/) and bridge (src/bridge/) — 348 tests across 12 files.
-Zero: UI (src/app/, src/components/), API routes (src/app/api/), Zustand store (src/store/), parallel scoring paths (src/lib/*).
-No coverage tooling installed (no @vitest/coverage-v8, c8, or nyc). Test-related guidance must distinguish the two halves.
-
-Project structure (high-level)
-
-src/games/ — pure-TS scoring engines + tests (heavy coverage)
-src/bridge/ — bridge code + tests
-src/lib/ — parallel scoring paths, still live pending SP-4 surgical cutover
-src/app/ — Next.js App Router (UI, API routes); zero direct test coverage
-src/components/, src/store/, src/verify/ — UI, Zustand store, verifier (verifier deferred to SP-5)
-docs/games/ — canonical rule docs (preserved)
-docs/plans/STROKE_PLAY_PLAN.md — active plan
-docs/proposals/, docs/sessions/, docs/product/
-.claude/agents/ — five role definitions (preserved)
-.claude/skills/ — focus-discipline, implementation-checklist, session-logging, golf-betting-rules
-
-Project-specific rules and conventions
-Preserved from prior CLAUDE.md (2026-04-29)
-The remainder of this section is preserved verbatim from the prior CLAUDE.md. The @AGENTS.md include is retained.
-@AGENTS.md
-## Session logging
-After every substantive prompt, append:
-
-per-prompt summary → /home/seadmin/golf/YYYY-MM-DD/NNN_<slug>.md
-one line → /home/seadmin/golf/EOD_DD-Month-YYYY.md
-
-EOD-FINAL_DD-Month-YYYY.md only on explicit user request. Skip logging for trivial clarifications (single-sentence Q&A with no artifact). Format and edge cases: .claude/skills/session-logging/SKILL.md.
-## Commit practice
-Commit as part of the FINAL EOD process the user calls. FINAL EOD is the
-canonical commit trigger — one commit per productive day covering all
-files modified since the prior commit: engines, rule docs,
-IMPLEMENTATION_CHECKLIST.md, REBUILD_PLAN.md, session logs, and EOD
-entries.
-The user may request additional mid-day commits when a phase closes or a
-logically separable unit of work completes. These are optional and do not
-replace FINAL EOD.
-Start-of-day gate: if yesterday's FINAL EOD was skipped (working tree has
-uncommitted changes at session start), the first action of the new day
-is one or more catch-up commits — one per logically separable task if
-the working tree contains changes from multiple tasks — before any new
-edits land.
-Pre-commit gate: before staging IMPLEMENTATION_CHECKLIST.md, confirm no
-[ ] rows exist for phases whose session logs record them as closed. If
-mismatched rows are found, stop and surface them — do not auto-correct
-and do not commit until the discrepancy is resolved.
-Rule-relevant topic check: after the IMPLEMENTATION_CHECKLIST.md
-consistency check and before staging any files, the documenter scans
-REBUILD_PLAN.md for Topic resolutions added since the last commit that
-touched a docs/games/ file. A Topic resolution is rule-relevant if its
-Source line cites a docs/games/ section by name, or if the Source or
-decision text uses the word "silent" to describe what the rule file lacks.
-When one or more rule-relevant Topics are found, the documenter appends a
-D-class item to IMPLEMENTATION_CHECKLIST.md before staging; the item names
-the Topic, its REBUILD_PLAN line range, the affected docs/games/ file and
-section, and a treatment hint — annotate-in-place when existing rule-file
-text is being superseded, or additive fill when the rule file is silent on
-the topic. A rule-relevant Topic is back-propagation-eligible only if the
-corresponding code path implements the decision; Topics that appear in a
-REBUILD_PLAN.md deferred-items section or whose implementation is a known
-stub or absent reducer path are not yet eligible. The documenter verifies
-implementation at Stage 1 of any back-propagation execution before
-producing the rule-doc edit; if implementation is absent, the D-class item
-is closed as premature and a forward-looking parking-lot entry is filed in
-its place. D-class items created by this check are deferred documenter
-tasks; they do not gate the FINAL EOD commit itself. Per-phase fence
-sentences in REBUILD_PLAN.md engineering ACs — such as "No changes to
-docs/games/game_junk.md" — constrain the engineer during that phase and
-release when the phase closes; this check runs after the engineering phase
-is done and those fences no longer apply. This gate covers Topics added
-from this point forward; Topics resolved before this gate was instituted
-require manual identification and backfill rather than gate detection, which
-is why D2 is filed directly in the same session that introduced this gate.
-A Topic may be rule-relevant even if its Source line does not cite a
-docs/games/ section and the decision text does not use "silent"; when in
-doubt, create the D-class item.
-## Scope and focus
-./IMPLEMENTATION_CHECKLIST.md is the single source of truth for scope. Before any task, read the current Active item. One active task at a time — new ideas, bugs, "while we're here" thoughts go to the Parking Lot, never into current work. Scope creep requires explicit user approval. Procedure: .claude/skills/focus-discipline/SKILL.md. At the start of each session and after any context switch, state the active checklist item verbatim before doing work.
-## Agent routing
-See AGENTS.md § User intent → agent routing. Default bias: explore before execute.
-## Active phase (Stroke-Play-only — remove when this phase closes)
-Engine rebuild complete: src/games/ engines (#3–#8 closed 2026-04-24). Junk Phase 1–2 landed; Phase 3 deferred. prisma/ Float→Int closed 2026-04-26 (REBUILD_PLAN #10). Stroke-Play-only phase: SP-1–SP-4 and SP-6 closed 2026-04-25; SP-5 (verifier) deferred post-SP-4; SP-UI-1/2/3 fence fixes and PF-2 code items (PF-1-F3/F4/F5A/F6) closed 2026-04-27. SP-4 §4 manual browser playthrough is the sole open phase-end gate. Parked bets (Skins, Match Play, Wolf, Nassau) are UI-hidden via GAME_DEFS disabled flag; engines remain on disk unchanged. src/lib/* parallel paths remain live; full multi-bet cutover deferred until the third bet unparks.
-Active plan: docs/plans/STROKE_PLAY_PLAN.md (Stroke-Play-only phase). Current active item in IMPLEMENTATION_CHECKLIST.md. REBUILD_PLAN.md retained for #3–#10 history.
-Preserved, do not touch: AGENTS.md, .claude/agents/, .claude/skills/golf-betting-rules/, docs/games/ (rule files), README.md, .gitignore, package.json.
-History, not a todo list: MIGRATION_NOTES.md (Rounds 1–5) and AUDIT.md (19-item classification). Live scope is IMPLEMENTATION_CHECKLIST.md + docs/plans/STROKE_PLAY_PLAN.md. Do not "fix" MIGRATION_NOTES items directly — route through the checklist.
-Safety branch: pre-rebuild-snapshot (marker only; does not preserve uncommitted working-tree state).
+Keep messages short. Detail lives in the report file.

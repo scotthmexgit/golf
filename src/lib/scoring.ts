@@ -36,3 +36,7 @@ export function formatMoneyDecimal(amount: number): string {
   const sign = amount > 0 ? '+' : '-'
   return `${sign}$${(Math.abs(amount) / 100).toFixed(2)}`
 }
+
+export function stakeUnitLabel(gameType: string): string {
+  return gameType === 'strokePlay' ? '/round' : '/hole'
+}

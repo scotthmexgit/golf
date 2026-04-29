@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useRoundStore } from '@/store/roundStore'
 import Header from '@/components/layout/Header'
-import { formatMoneyDecimal, vsPar } from '@/lib/scoring'
+import { formatMoneyDecimal, vsPar, stakeUnitLabel } from '@/lib/scoring'
 import { computeAllPayouts } from '@/lib/payouts'
 
 export default function ResultsPage() {
@@ -93,7 +93,7 @@ export default function ResultsPage() {
             {games.map(g => (
               <div key={g.id} className="flex items-center justify-between py-1.5 border-b last:border-0 text-sm" style={{ borderColor: 'var(--line)' }}>
                 <span>{g.label}</span>
-                <span className="font-mono text-xs" style={{ color: 'var(--muted)' }}>{formatMoneyDecimal(g.stake)}/hole</span>
+                <span className="font-mono text-xs" style={{ color: 'var(--muted)' }}>{formatMoneyDecimal(g.stake)}{stakeUnitLabel(g.type)}</span>
               </div>
             ))}
           </div>

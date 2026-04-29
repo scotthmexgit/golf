@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { GameInstance, JunkConfig } from '@/types'
 import { useRoundStore } from '@/store/roundStore'
 import Pill from '@/components/ui/Pill'
+import { stakeUnitLabel } from '@/lib/scoring'
 
 interface GameInstanceCardProps {
   game: GameInstance
@@ -44,7 +45,7 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
             style={{ borderColor: 'var(--line)' }}
             min="0" step="1"
           />
-          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>/hole</span>
+          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>{stakeUnitLabel(game.type)}</span>
         </div>
 
         {/* Game-specific config */}

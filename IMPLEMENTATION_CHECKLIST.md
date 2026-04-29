@@ -182,7 +182,7 @@ Append-only. Close date + pointer to prompt NNN or EOD.
 - [x] PF-1-F5A — Null backHref in bets page — closed 2026-04-27 — commit 5c36797. `useParams().roundId` replaces Zustand-sourced `roundId` for back link. 348/348 tests.
 - [x] PF-1-F6 — Server-authoritative hydration on results page — closed 2026-04-27 — commit 6150ba8. `useEffect` + `hydrateRound` + loading guard; pattern matches scorecard page. 348/348 tests.
 - [x] SP-UI-4 — Stake unit label defect — closed 2026-04-29 — commit f43d2db.
-- [x] SP-UI-7 — IN PROGRESS badge + ungated header Finish button — closed 2026-04-29 — commit TBD. `patchRoundComplete` helper extracted to `src/lib/roundApi.ts`; called from `handleSaveNext` (Fix A) and `confirmFinish` (Fix B refactor); header Finish button gated behind `isLastHole`. `roundApi.test.ts` (4 cases). 358/358 tests. `stakeUnitLabel(gameType)` added to `src/lib/scoring.ts`; conditional applied at `GameInstanceCard.tsx:47`, `round/new/page.tsx:49`, `results/[roundId]/page.tsx:96`. `scoring.test.ts` (6 cases) added; vitest include extended to `src/lib/**/*.test.ts`. 354/354 tests.
+- [x] SP-UI-7 — IN PROGRESS badge + ungated header Finish button — closed 2026-04-29 — commit 55ceb02. `patchRoundComplete` helper extracted to `src/lib/roundApi.ts`; called from `handleSaveNext` (Fix A) and `confirmFinish` (Fix B refactor); header Finish button gated behind `isLastHole`. `roundApi.test.ts` (4 cases). 358/358 tests. `stakeUnitLabel(gameType)` added to `src/lib/scoring.ts`; conditional applied at `GameInstanceCard.tsx:47`, `round/new/page.tsx:49`, `results/[roundId]/page.tsx:96`. `scoring.test.ts` (6 cases) added; vitest include extended to `src/lib/**/*.test.ts`. 354/354 tests.
 
 ## Deferred / won't-do
 

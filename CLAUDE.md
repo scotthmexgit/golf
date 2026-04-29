@@ -36,7 +36,7 @@ Cowork handoffs
 When GM relays Cowork findings, record them as a numbered report (type: cowork-findings). Treat findings as the Explore input, then plan and develop normally.Project conventions
 
 Stack: Next.js 16 (App Router), TypeScript (strict: true), Vitest, Prisma + PostgreSQL
-Test command: npm run test:run (one-shot; the AC gate). npm run test for watch mode. Test scope: src/games/**/*.test.ts, src/bridge/**/*.test.ts, src/lib/**/*.test.ts. Currently 13 test files / ~354 cases (engine, bridge, lib).
+Test command: npm run test:run (one-shot; the AC gate). npm run test for watch mode. Test scope: src/games/**/*.test.ts, src/bridge/**/*.test.ts, src/lib/**/*.test.ts. Currently 14 test files / ~358 cases (engine, bridge, lib).
 Lint command: npm run lint (eslint with eslint-config-next/core-web-vitals + eslint-config-next/typescript).
 Format command: none — no Prettier configured. Don't add one as part of unrelated work.
 Typecheck: tsc --noEmit — run manually; required by SP-4 AC. No npm script for it.

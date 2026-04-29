@@ -25,17 +25,21 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-**SP-4 §4 manual browser playthrough (PF-2 phase-end gate).**
+**Stroke-Play-only phase COMPLETE — 2026-04-29. No active item.**
 
-All SP-UI fence-violation items (SP-UI-1/2/3/4/7) and all PF-2 code items (PF-1-F3/F4/F5A/F6) are closed. The sole remaining gate is the SP-4 §4 manual browser playthrough: one full 18-hole Stroke Play round on the running dev server, `appliesHandicap: true`, correct settlement on the results page, zero-sum verified by inspection. No code blocker; requires a browser session.
+SP-4 closed 2026-04-29. All five SP-4 closure gates are met:
 
-**Prerequisite before Cowork playthrough:** production server at port 3000 is running a stale Apr26 12:39 build. Run `pm2 stop golf && npm run build && pm2 start golf` before the playthrough to deploy all Apr27 changes.
+1. `git grep -rn "computeStrokePlay" src/` → zero matches (since 2026-04-25)
+2. SP-2 builder tests pass — `npm run test:run` (358/358)
+3. SP-3 bridge integration tests pass — `npm run test:run` (358/358)
+4. Manual 18-hole playthrough — Cowork human verification: `findings-2026-04-29-2301.md`; machine verification: `tests/playwright/stroke-play-finish-flow.spec.ts` (commit 2cd2b39, all 5 assertions pass: header gate, DB Complete, settlement zero-sum, no IN PROGRESS badge, fence)
+5. `tsc --noEmit --strict` passes (verified at each build throughout the phase)
 
-**Open investigations:** F9-a-HOLE18-RACE — one `gross: undefined` payload observed on round 12 hole 18 during F3 v2 diagnosis; F9-a `useEffect` may race with Finish Round save on last hole. Researcher pass pending.
+Per `docs/plans/STROKE_PLAY_PLAN.md §Scope`: *"The Stroke-Play-only phase begins at adoption of this plan and ends when SP-4 closes."*
 
-**Backlog:** PUT-HANDLER-400 — PUT handler surfaces `PrismaClientValidationError` as 500; should return 400. Low priority; does not block playthrough.
+**Next phase not yet decided.** Candidates for GM/operator to choose: (a) unpark next engine — Skins is the natural first candidate per unpark ordering; (b) address small-cleanup backlog (PUT-HANDLER-400, camelCase strokePlay label, Recent Rounds ordering, no-mid-round-home-nav); (c) investigate 21 Uncaught promise exceptions on `/round/new` (18→21 count increase observed 2026-04-29).
 
-> Active plan: `docs/plans/STROKE_PLAY_PLAN.md`. PF-2 AC: bets and results pages render correctly for a completed Stroke Play round in the browser; SP-4 §4 manual-playthrough condition is met. Current state sourced from `2026-04-29/001_gm_context_pull.md`.
+**Backlog (carry-forward):** PUT-HANDLER-400 — PUT handler surfaces `PrismaClientValidationError` as 500; should return 400. Low priority.
 
 ## Parked / Deferred
 
@@ -147,11 +151,19 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 
 - [x] **F9-a-HOLE18-RACE** — Ruled out 2026-04-29 (session 006): Finish button is disabled while `allScored=false`, `|| 0` fallback suppresses `gross:undefined` at the PUT call site, and `fromBunker:undefined` in the one observed error is inconsistent with all code versions in git history — likely a stale bundle during the PM2 restart storm, not a reproducible race. No code defect; no fix needed. — 2026-04-27 (filed) / 2026-04-29 (closed) — session 006
 
+- [ ] **camelCase strokePlay label in Game Breakdown** — `hydrateRound` in `roundStore.ts:261` sets `label: g.type` for hydrated games, so the Game Breakdown section on the Results page shows "strokePlay" instead of "Stroke Play" for rounds loaded from the DB (i.e., on page refresh). The wizard flow sets the correct label via `gameLabel()` in `addGame`. Fix: map `g.type` to the GAME_DEFS label string at hydration time. Small, independent, no engine changes. — 2026-04-29 — Cowork walkthrough observation
+
+- [ ] **Recent Rounds ordering** — home page fetches with `orderBy: { playedAt: 'desc' }`. Same-date rounds may render in non-deterministic order (rounds 15/16/17 all share `playedAt = today`). Whether this matters depends on product intent; could add secondary `orderBy: { id: 'desc' }` as tiebreaker. Cosmetic. — 2026-04-29 — observed during Playwright runs
+
+- [ ] **No mid-round home navigation from scorecard** — the scorecard header has no back/home button during an active round. A player who wants to leave mid-round must use browser back, which bypasses the Finish flow. No standard "Exit Round" or "Pause" surface exists. Future UX work. — 2026-04-29 — Cowork walkthrough observation
+
+- [ ] **Stepper par-default affordance** — F9-a (commit 108e629) writes par scores to Zustand on hole mount so "Save & Next" is immediately enabled, but the stepper input visually shows `0` until the user interacts with it (the Zustand state and the stepper's local state are not synchronised). Users may be confused by "Save & Next" being enabled while the stepper shows 0. Low-friction issue; requires Stepper component to accept an initial value from parent. — 2026-04-29 — Cowork walkthrough observation
+
 - [ ] **PUT-HANDLER-400-ON-MISSING-FIELDS** [backlog] — `src/app/api/rounds/[id]/scores/hole/[hole]/route.ts` surfaces `PrismaClientValidationError` as 500 when required fields are missing in the request body. Should validate and return 400 with a clear error message. Hardening item; low priority. Cross-reference: PF-1-F3 v2 diagnosis 012, Mode B. — 2026-04-27 — F3 v2 diagnosis
 
 - [x] **SP-UI-7** [SP-UI] — IN PROGRESS badge persistence + ungated header Finish button. Two complementary defects in `src/app/scorecard/[roundId]/page.tsx`: (A) `handleSaveNext` omits `PATCH { status: 'Complete' }` on `isLastHole`, so rounds finished via the bottom button are never marked Complete in the DB; (B) header Finish button renders unconditionally on all holes, enabling premature round termination. Fix: extract `patchRoundComplete(roundId)` helper to `src/lib/roundApi.ts`; call from `handleSaveNext` (silent) and `confirmFinish` (error-display on failure); gate header button behind `isLastHole`. AC: (1) round finished via bottom "Finish Round →" has `DB status='Complete'` immediately after navigation to `/results`; (2) header Finish button absent on holes 1–17; (3) header Finish button present on hole 18 and finishes correctly; (4) Recent Rounds shows finished rounds without IN PROGRESS badge. Existing stuck rounds 12/13/14 are a separate ops step. Source: `docs/2026-04-29/011_in_progress_badge_research.md`. — 2026-04-29 — researcher pass 011 — closed 2026-04-29
 
-- [ ] **SP-UI-5** [SP-UI] — Stroke Play card defaults to only Golfer 1 selected in the Players row of the Games step (`GameInstanceCard.tsx` player pills), despite all golfers having Betting: Yes set on the Players step. Expected: all betting players pre-selected when a Stroke Play game instance is created. Observed by Cowork on walkthrough 2026-04-29 22:16. Source: findings-2026-04-29-2216.md §"Stroke Play card defaults to only Golfer 1." Investigation needed: confirm whether `addGame` is calling `state.players.filter(p => p.betting)` against a stale or single-player state (wizard step ordering; player count at the moment the Games step first renders vs. moment the user taps Stroke Play). Dispatch pending GM sequencing. — 2026-04-29 — Cowork walkthrough 2216
+- [ ] **SP-UI-5** [SP-UI] — Stroke Play card defaults to only Golfer 1 selected in the Players row of the Games step. **Could not reproduce in subsequent runs.** Original observation: Cowork 2026-04-29 22:16 (1 occurrence). Four subsequent runs showed all chips pre-selected: Cowork 22:38, Cowork 23:01, Playwright spec (prompt 013, rounds 15–17). `addGame` in `roundStore.ts:151` reads `state.players.filter(p => p.betting)` at call time — code is correct. Root cause of the single occurrence is unknown (possibly step-state timing in the 22:16 session). **Disposition: keep filed; investigate only if it resurfaces.** The Playwright spec's player-add sequence (add Golfer 2/3/4 then tap Stroke Play pill) is the known-good baseline. — 2026-04-29 — filed on Cowork 2216 walkthrough; downgraded 2026-04-29 after 4 non-reproductions
 
 ## Done
 
@@ -182,7 +194,8 @@ Append-only. Close date + pointer to prompt NNN or EOD.
 - [x] PF-1-F5A — Null backHref in bets page — closed 2026-04-27 — commit 5c36797. `useParams().roundId` replaces Zustand-sourced `roundId` for back link. 348/348 tests.
 - [x] PF-1-F6 — Server-authoritative hydration on results page — closed 2026-04-27 — commit 6150ba8. `useEffect` + `hydrateRound` + loading guard; pattern matches scorecard page. 348/348 tests.
 - [x] SP-UI-4 — Stake unit label defect — closed 2026-04-29 — commit f43d2db.
-- [x] SP-UI-7 — IN PROGRESS badge + ungated header Finish button — closed 2026-04-29 — commit 55ceb02. `patchRoundComplete` helper extracted to `src/lib/roundApi.ts`; called from `handleSaveNext` (Fix A) and `confirmFinish` (Fix B refactor); header Finish button gated behind `isLastHole`. `roundApi.test.ts` (4 cases). 358/358 tests. `stakeUnitLabel(gameType)` added to `src/lib/scoring.ts`; conditional applied at `GameInstanceCard.tsx:47`, `round/new/page.tsx:49`, `results/[roundId]/page.tsx:96`. `scoring.test.ts` (6 cases) added; vitest include extended to `src/lib/**/*.test.ts`. 354/354 tests.
+- [x] SP-UI-7 — IN PROGRESS badge + ungated header Finish button — closed 2026-04-29 — commit 55ceb02.
+- [x] SP-4 §4 — Manual 18-hole Stroke Play playthrough — closed 2026-04-29. Human verification: Cowork `findings-2026-04-29-2301.md` (full 18-hole round, handicap applied, settlement correct, zero-sum verified). Machine verification: `tests/playwright/stroke-play-finish-flow.spec.ts` (commit 2cd2b39, 5/5 assertions: header gate, `Round.status = Complete`, settlement `+$15/$-5/$-5/$-5`, no IN PROGRESS badge, fence). SP-4 closure triggers phase end per `STROKE_PLAY_PLAN.md §Scope`. `patchRoundComplete` helper extracted to `src/lib/roundApi.ts`; called from `handleSaveNext` (Fix A) and `confirmFinish` (Fix B refactor); header Finish button gated behind `isLastHole`. `roundApi.test.ts` (4 cases). 358/358 tests. `stakeUnitLabel(gameType)` added to `src/lib/scoring.ts`; conditional applied at `GameInstanceCard.tsx:47`, `round/new/page.tsx:49`, `results/[roundId]/page.tsx:96`. `scoring.test.ts` (6 cases) added; vitest include extended to `src/lib/**/*.test.ts`. 354/354 tests.
 
 ## Deferred / won't-do
 

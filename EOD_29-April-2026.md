@@ -14,3 +14,24 @@
 | — | 011_in_progress_badge_research | Researcher | IN PROGRESS badge root cause: handleSaveNext (bottom "Finish Round →" button) omits PATCH on isLastHole; Round.status never written to Complete. Header Finish button correctly calls PATCH but is ungated (SP-UI-6). DB confirmed: rounds 12, 13, 14 all InProgress. Fix A: add PATCH in handleSaveNext. Fix B: gate header button behind isLastHole. Recommend one ticket covering both; note 3 stuck DB rows as ops step. | ✓ |
 | — | 012_sp_ui7_finish_flow | SP-UI-7 | patchRoundComplete() extracted to roundApi.ts; handleSaveNext calls it silently before router.push on isLastHole (Fix A); confirmFinish refactored to use helper (Fix B refactor); header Finish button gated behind isLastHole (Fix B gate). roundApi.test.ts 4 cases. 358/358 tests; build clean; PM2 PID 1507066; HTTP 200. commit 55ceb02. Stuck rows 12/13/14 not touched — ops step pending. | ✓ |
 | — | 013_playwright_shakedown | Engineer | Playwright shakedown: 3 friction items (missing @playwright/test devDep, browser version mismatch, basePath convention). All resolved. stroke-play-finish-flow.spec.ts passes all 5 assertions (header gate, DB Complete, settlement zero-sum, no IN PROGRESS badge, fence). Round 17 Complete in DB. 358/358 vitest green. SP-UI-5 did not surface as blocker. | ✓ |
+| — | 014_closeout | Engineer | Closeout: test:e2e script added; DB cleanup ran (rounds 9/12/13/14 → Complete, query: fully-scored InProgress); SP-4 §4 closed in checklist with dual evidence (Cowork + Playwright); phase declared complete; SP-UI-5 downgraded; 4 future-cleanup items filed; CLAUDE.md health-checked (Playwright conventions updated, settlement/Zustand arch note added). | ✓ |
+
+---
+
+## Tomorrow SOD seed — 2026-04-30
+
+**Phase state:** Stroke-Play-only phase closed 2026-04-29. SP-4 §4 verified. No active item.
+
+**What Cowork should verify:**
+- Recent Rounds: rounds 9, 12, 13, 14 now show without IN PROGRESS badge and link to `/results/{N}` (DB cleanup ran)
+- The new `npm run test:e2e` command runs the Playwright spec (takes ~3s)
+
+**What Code opens with tomorrow:**
+The phase is done. GM/operator sequences what's next. Three candidate directions:
+1. **Unpark next engine** — Skins is the natural first candidate per unpark ordering in `STROKE_PLAY_PLAN.md §7`. Pre-work: researcher pass to scope the Skins bridge prompt; resolve Decision A (player count 3-only vs 3–5) and Decision B (rule-doc scope) before engineer turn.
+2. **Small-cleanup backlog** — all independent, low-risk: camelCase strokePlay label (hydration `g.type → label`), Recent Rounds tiebreaker sort, mid-round home nav, stepper par-default affordance, PUT-HANDLER-400.
+3. **Console exception investigation** — 18→21 Uncaught promise exceptions on `/round/new`, line 0:0. Lightweight researcher pass; likely cancelled fetch or prefetch abort.
+
+**No instruction updates needed for Cowork.** The IN PROGRESS badge on old rounds is the one known carry-over visual change after the DB cleanup.
+
+**Code conventions stable.** CLAUDE.md current. AGENTS.md current item should be updated at next SOD to reflect phase complete.

@@ -2,7 +2,7 @@
 
 Single source of truth for scope. Read the **Active item** before any work. Tangents → Parking Lot. Closed items → Done (append-only).
 
-**Active phase: Wolf.** Plan: `docs/plans/WOLF_PLAN.md`. WF-1–WF-5 closed 2026-04-30. Current item: WF-6 (Playwright wolf-flow.spec.ts). Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history.
+**Wolf phase COMPLETE.** Plan: `docs/plans/WOLF_PLAN.md`. WF-0–WF-7 all closed 2026-04-30; Cowork 7/7 PASS. **Active phase: TBD — GM selects at next SOD.** Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history.
 
 ## Project Scope Summary
 
@@ -26,15 +26,17 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-**Wolf phase — WF-6 (Playwright wolf-flow.spec.ts). See `docs/plans/WOLF_PLAN.md`.**
+**Wolf phase — COMPLETE 2026-04-30. All WF-0 through WF-7 closed. See `docs/plans/WOLF_PLAN.md`.**
 
-**Wolf phase closure evidence (in progress):**
+**Wolf phase closure evidence:**
 - WF-0 — CLOSED 2026-04-30. Deliverable: `docs/plans/WOLF_PLAN.md`. Report: `docs/2026-04-30/02-wolf-phase-plan.md`.
 - WF-1 — CLOSED 2026-04-30. Deliverable: `src/bridge/wolf_bridge.ts` + cutover + guard. Report: `docs/2026-04-30/03-wf1-wolf-bridge.md`. Reviewer: APPROVED. 439/439 tests, tsc clean. Grep gate: zero wolf `disabled` matches.
 - WF-2 — CLOSED 2026-04-30. Deliverable: `BetDetailsSheet.tsx` + roundStore sheet slice + scorecard trigger + SKINS-1 fix. Report: `docs/2026-04-30/04-wf2-bet-details-sheet.md`. Reviewer: APPROVED. 441/441 tests, tsc clean. E2E 2/2 pass.
 - WF-3 — CLOSED 2026-04-30. Deliverable: ScoreRow accordion removed; Bet-row → openSheet(); skins-flow.spec.ts §4 migrated to sheet; both E2E fence checks updated for Wolf unpark. Report: `docs/2026-04-30/05-wf3-skins-accordion-migration.md`. Reviewer: APPROVED. 441/441 tests, tsc clean. E2E 2/2 pass.
 - WF-4 — CLOSED 2026-04-30. Deliverable: Exit Round surface in BetDetailsSheet header; confirmation overlay; router.push('/') on confirm; no DB write. Report: `docs/2026-04-30/06-wf4-exit-round.md`. Reviewer: APPROVED. 441/441 tests, tsc clean. E2E 2/2 pass.
 - WF-5 — CLOSED 2026-04-30. Deliverable: `WolfDeclare.tsx` (captain display + partner/lone/blind declaration); SKINS-2 suppressBetDelta suppression; Stepper `initialValue?` prop. Report: `docs/2026-04-30/07-wf5-wolf-declaration.md`. Reviewer: APPROVED. 441/441 tests, tsc clean. E2E 2/2 pass. PM2 rebuilt.
+- WF-6 — CLOSED 2026-04-30. Deliverable: `tests/playwright/wolf-flow.spec.ts` (§1–§6 assertion groups: setup, partner declaration, lone wolf, blind lone, two fence checks). Report: `docs/2026-04-30/10-wf6-wolf-flow-spec.md`. Reviewer: APPROVED. Playwright 3/3. No source files changed. Commit: 7de52c6.
+- WF-7 — CLOSED 2026-04-30. Deliverable: Cowork visual verification. Source: findings-2026-04-30-1400.md. 7/7 PASS (WolfDeclare panel; declaration persistence; bet-row SKINS-2 suppression; 75vh height confirmed; Exit Round flow; game picker fence; sheet animation + backdrop). Report: `docs/2026-04-30/11-wf7-cowork-phase-end.md`. 0 blocking findings. Wolf phase declared closed.
 
 **Skins phase closure evidence:**
 - SK-0 — CLOSED 2026-04-29. Deliverable: `docs/plans/SKINS_PLAN.md`.

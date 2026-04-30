@@ -233,3 +233,116 @@ describe('Test S5: payoutMapFromLedger produces complete PayoutMap', () => {
     expect(game.playerIds.reduce((s, pid) => s + payout[pid], 0)).toBe(0)
   })
 })
+
+// ─── Test S6 — R5: empty-ledger when all skins are forfeited ─────────────────
+// 3 players, 9 holes, escalating=true, all holes tied → SkinCarried everywhere.
+// finalHole (hole 9) also ties → SkinCarryForfeit. No SkinWon events emitted.
+// payoutMapFromLedger({}, game.playerIds) must return all-zeros for all players
+// (not an empty object missing player IDs), preserving the zero-sum invariant.
+
+describe('Test S6: all-skins-forfeited round — empty ledger produces all-zero PayoutMap', () => {
+  const players = [makePlayer('A'), makePlayer('B'), makePlayer('C')]
+  const game = makeSkinsGame(['A', 'B', 'C'], 5, true)
+
+  // All 9 holes tied (all players score the same gross).
+  const holes = Array.from({ length: 9 }, (_, i) =>
+    makeHoleData(i + 1, { A: 4, B: 4, C: 4 }),
+  )
+
+  const { events, ledger } = settleSkinsBet(holes, players, game)
+  const payout = payoutMapFromLedger(ledger, game.playerIds)
+
+  it('ledger is empty (no SkinWon events emitted)', () => {
+    expect(ledger).toEqual({})
+  })
+
+  it('emits one SkinCarryForfeit on the final hole (hole 9) and no SkinWon', () => {
+    const forfeits = events.filter(e => e.kind === 'SkinCarryForfeit')
+    const wins = events.filter(e => e.kind === 'SkinWon')
+    expect(forfeits).toHaveLength(1)
+    expect(wins).toHaveLength(0)
+    const f = forfeits[0]
+    if (f.kind === 'SkinCarryForfeit') {
+      // 9 carried holes × stake 5 = 45
+      expect(f.carryPoints).toBe(45)
+    }
+  })
+
+  it('payoutMapFromLedger returns all-zero entry for every player (not missing)', () => {
+    for (const pid of game.playerIds) {
+      expect(pid in payout).toBe(true)
+      expect(payout[pid]).toBe(0)
+    }
+  })
+
+  it('PayoutMap is zero-sum', () => {
+    expect(game.playerIds.reduce((s, pid) => s + payout[pid], 0)).toBe(0)
+  })
+})
+
+// ─── Test S7 — R4: partial-round reload does not prematurely finalize carry ──
+// Architectural verification: when holes 1–6 are scored and holes 7–9 have no
+// scores (gross=0 for all players), settleSkinsHole emits FieldTooSmall for
+// holes 7–9. finalizeSkinsRound determines finalHole = max(holeNumbers) = 9
+// (from the FieldTooSmall events), so a SkinCarried on hole 6 is NOT resolved
+// as a final-hole tie. Carry remains accumulated, not applied.
+// This test protects against regressions in the FieldTooSmall sentinel path.
+
+describe('Test S7: R4 — partial round does not trigger premature final-hole resolution', () => {
+  const players = [makePlayer('A'), makePlayer('B'), makePlayer('C')]
+  const game = makeSkinsGame(['A', 'B', 'C'], 5, true)
+
+  // Holes 1–5 scored. Hole 6 tied (carry). Holes 7–9 have no scores (gross=0).
+  const holes = [
+    makeHoleData(1, { A: 3, B: 4, C: 4 }),  // A wins
+    makeHoleData(2, { A: 4, B: 3, C: 4 }),  // B wins
+    makeHoleData(3, { A: 4, B: 4, C: 3 }),  // C wins
+    makeHoleData(4, { A: 4, B: 4, C: 4 }),  // tie → carry
+    makeHoleData(5, { A: 3, B: 4, C: 4 }),  // A wins (absorbs hole-4 carry)
+    makeHoleData(6, { A: 4, B: 4, C: 4 }),  // tie → carry (unresolved mid-round)
+    makeHoleData(7, { A: 0, B: 0, C: 0 }),  // no scores → FieldTooSmall
+    makeHoleData(8, { A: 0, B: 0, C: 0 }),  // no scores → FieldTooSmall
+    makeHoleData(9, { A: 0, B: 0, C: 0 }),  // no scores → FieldTooSmall
+  ]
+
+  const { events } = settleSkinsBet(holes, players, game)
+
+  it('emits FieldTooSmall events for holes 7, 8, 9 (no-score holes)', () => {
+    const fts = events.filter(e => e.kind === 'FieldTooSmall')
+    expect(fts.map(e => e.hole).filter((h): h is number => h !== null).sort((a, b) => a - b)).toEqual([7, 8, 9])
+  })
+
+  it('hole 6 SkinCarried is NOT resolved as a final-hole tie (carry stays accumulated)', () => {
+    // Under premature finalization, hole 6 would be treated as finalHole and
+    // receive tieRuleFinalHole ('split') resolution, emitting SkinWon or
+    // SkinCarryForfeit. Neither must appear on hole 6.
+    const h6Wins = events.filter(e => e.kind === 'SkinWon' && e.hole === 6)
+    const h6Forfeits = events.filter(e => e.kind === 'SkinCarryForfeit' && e.hole === 6)
+    expect(h6Wins).toHaveLength(0)
+    expect(h6Forfeits).toHaveLength(0)
+  })
+
+  it('hole 6 SkinCarried event is preserved (carry unresolved, awaiting future holes)', () => {
+    const h6Carries = events.filter(e => e.kind === 'SkinCarried' && e.hole === 6)
+    expect(h6Carries).toHaveLength(1)
+  })
+
+  it('settled holes (1–5) produce correct SkinWon events and zero-sum', () => {
+    const wins = events.filter(e => e.kind === 'SkinWon')
+    // Holes 1, 2, 3: 1 skin each. Hole 5: 1 skin + hole-4 carry = 2×stake per opponent.
+    const winHoles = wins.map(e => e.hole).filter((h): h is number => h !== null).sort((a, b) => a - b)
+    expect(winHoles).toEqual([1, 2, 3, 5])
+    // Zero-sum across settled events (hole 6 carry is open — not yet zero-sum)
+    const settled = events.filter(e => 'points' in e)
+    const totals: Record<string, number> = {}
+    for (const e of settled) {
+      if ('points' in e) {
+        for (const [pid, pts] of Object.entries(e.points)) {
+          totals[pid] = (totals[pid] ?? 0) + pts
+        }
+      }
+    }
+    const sum = Object.values(totals).reduce((s, v) => s + v, 0)
+    expect(sum).toBe(0)
+  })
+})

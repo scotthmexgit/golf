@@ -2,7 +2,7 @@
 
 Single source of truth for scope. Read the **Active item** before any work. Tangents → Parking Lot. Closed items → Done (append-only).
 
-**Active plan (Stroke-Play-only phase):** `docs/plans/STROKE_PLAY_PLAN.md`. This document defines SP-1 through SP-6 and is the single source of truth for AC during this phase. It supersedes `REBUILD_PLAN.md` items #11 and #12. `REBUILD_PLAN.md` is retained for #3–#10 history.
+**No active phase (phase boundary).** Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30. `docs/plans/SKINS_PLAN.md` is the completed Skins plan; retained for history alongside `docs/plans/STROKE_PLAY_PLAN.md`. Next phase TBD at SOD.
 
 ## Project Scope Summary
 
@@ -20,24 +20,29 @@ Updated at EOD-FINAL.
 | 2. Rebuild plan approval | 2026-04-20 | **done** (closed 2026-04-20 at prompt 004; see `REBUILD_PLAN.md`) |
 | 3. Engine rebuild (#3–#8: Wolf follow-ups, bet-id refactor, Nassau, Match Play, Junk, aggregate) | 2026-04-24 | **done** (all phases closed; see Done section) |
 | 4. `prisma/` Float→Int migration (#10) | 2026-04-26 | **done** — closed 2026-04-26 — session log: `2026-04-26/001_M1_PRISMA_FLOAT_INT_CENTS.md` |
-| 5. Stroke-Play-only UI phase (SP-1–SP-6 + PF-2; see `docs/plans/STROKE_PLAY_PLAN.md`) | 2026-04-25 | **in progress** — SP-1–SP-4 + SP-6 closed 2026-04-25; SP-5 deferred; SP-UI-1/2/3 + PF-2 code items closed 2026-04-27; SP-4 §4 manual playthrough open |
-| 6. Full multi-bet cutover (#11) | TBD | deferred until third bet unparks (blocked on phase 5) |
+| 5. Stroke-Play-only UI phase (SP-1–SP-6 + PF-2; see `docs/plans/STROKE_PLAY_PLAN.md`) | 2026-04-25 | **done** — closed 2026-04-29 — all five SP-4 gates met; Cowork + Playwright verified |
+| 6. Skins phase (SK-0–SK-5; see `docs/plans/SKINS_PLAN.md`) | 2026-04-30 | **done** — closed 2026-04-30 — Cowork findings-2026-04-30-0246.md: round 55 zero-sum (+$55/−$5/−$50), all 8 SK-5 verification points PASS |
+| 7. Full multi-bet cutover (#11) | TBD | deferred until third bet unparks (blocked on phase 6) |
 
 ## Active item
 
-**Stroke-Play-only phase COMPLETE — 2026-04-29. No active item.**
+**No active item — phase boundary. Skins phase COMPLETE as of 2026-04-30. Next phase TBD at SOD.**
 
-SP-4 closed 2026-04-29. All five SP-4 closure gates are met:
+**Skins phase closure evidence:**
+- SK-0 — CLOSED 2026-04-29. Deliverable: `docs/plans/SKINS_PLAN.md`.
+- SK-1a — CLOSED 2026-04-30. Report: `docs/2026-04-30/001_sk1a_scorecard_two_row.md`.
+- SK-1b — CLOSED 2026-04-30. Report: `docs/2026-04-30/002_sk1b_accordion.md`.
+- SK-2 — CLOSED 2026-04-30. Report: `docs/2026-04-30/003_sk2_skins_cutover.md`.
+- SK-3 — CLOSED 2026-04-30. Report: `docs/2026-04-30/004_sk3_player_count_guard.md`.
+- SK-4 — CLOSED 2026-04-30. Report: `docs/2026-04-30/005_sk4_playwright_spec.md`. 1/1 Playwright.
+- SK-5 — CLOSED 2026-04-30. Cowork findings-2026-04-30-0246.md: round 55 (+$55/−$5/−$50, zero-sum), all 8 verification points PASS, zero blocking findings. Report: `docs/2026-04-30/006_sk5_closeout.md`.
 
+**Stroke-Play-only phase closure evidence (archived):**
 1. `git grep -rn "computeStrokePlay" src/` → zero matches (since 2026-04-25)
-2. SP-2 builder tests pass — `npm run test:run` (358/358)
-3. SP-3 bridge integration tests pass — `npm run test:run` (358/358)
-4. Manual 18-hole playthrough — Cowork human verification: `findings-2026-04-29-2301.md`; machine verification: `tests/playwright/stroke-play-finish-flow.spec.ts` (commit 2cd2b39, all 5 assertions pass: header gate, DB Complete, settlement zero-sum, no IN PROGRESS badge, fence)
-5. `tsc --noEmit --strict` passes (verified at each build throughout the phase)
-
-Per `docs/plans/STROKE_PLAY_PLAN.md §Scope`: *"The Stroke-Play-only phase begins at adoption of this plan and ends when SP-4 closes."*
-
-**Next phase not yet decided.** Candidates for GM/operator to choose: (a) unpark next engine — Skins is the natural first candidate per unpark ordering; (b) address small-cleanup backlog (PUT-HANDLER-400, camelCase strokePlay label, Recent Rounds ordering, no-mid-round-home-nav); (c) investigate 21 Uncaught promise exceptions on `/round/new` (18→21 count increase observed 2026-04-29).
+2. SP-2 builder tests pass — 358/358
+3. SP-3 integration tests pass — 358/358
+4. Manual 18-hole playthrough: Cowork `findings-2026-04-29-2301.md` + `stroke-play-finish-flow.spec.ts` (commit 2cd2b39)
+5. `tsc --noEmit --strict` passes throughout
 
 **Backlog (carry-forward):** PUT-HANDLER-400 — PUT handler surfaces `PrismaClientValidationError` as 500; should return 400. Low priority.
 
@@ -151,9 +156,9 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 
 - [x] **F9-a-HOLE18-RACE** — Ruled out 2026-04-29 (session 006): Finish button is disabled while `allScored=false`, `|| 0` fallback suppresses `gross:undefined` at the PUT call site, and `fromBunker:undefined` in the one observed error is inconsistent with all code versions in git history — likely a stale bundle during the PM2 restart storm, not a reproducible race. No code defect; no fix needed. — 2026-04-27 (filed) / 2026-04-29 (closed) — session 006
 
-- [ ] **camelCase strokePlay label in Game Breakdown** — `hydrateRound` in `roundStore.ts:261` sets `label: g.type` for hydrated games, so the Game Breakdown section on the Results page shows "strokePlay" instead of "Stroke Play" for rounds loaded from the DB (i.e., on page refresh). The wizard flow sets the correct label via `gameLabel()` in `addGame`. Fix: map `g.type` to the GAME_DEFS label string at hydration time. Small, independent, no engine changes. — 2026-04-29 — Cowork walkthrough observation
+- [x] **camelCase strokePlay label in Game Breakdown** — closed SK-2 2026-04-30. `hydrateRound` in `roundStore.ts` now uses `GAME_DEFS.find(d => d.key === g.type)?.label ?? g.type` instead of `g.type`. Hydrated rounds show "Stroke Play" and "Skins" (capitalized) in the scorecard accordion. Verified on both fresh wizard rounds and hydrated rounds.
 
-- [ ] **Recent Rounds ordering** — home page fetches with `orderBy: { playedAt: 'desc' }`. Same-date rounds may render in non-deterministic order (rounds 15/16/17 all share `playedAt = today`). Whether this matters depends on product intent; could add secondary `orderBy: { id: 'desc' }` as tiebreaker. Cosmetic. — 2026-04-29 — observed during Playwright runs
+- [x] **Recent Rounds ordering** — closed SK-2 2026-04-30. Added `{ id: 'desc' }` as a tiebreaker in `src/app/api/rounds/route.ts` `orderBy`. Same-date rounds now sort by descending ID, ensuring the most recently created round is always first. Required to make `stroke-play-finish-flow.spec.ts` deterministic when many rounds share the same `playedAt` date.
 
 - [ ] **No mid-round home navigation from scorecard** — the scorecard header has no back/home button during an active round. A player who wants to leave mid-round must use browser back, which bypasses the Finish flow. No standard "Exit Round" or "Pause" surface exists. Future UX work. — 2026-04-29 — Cowork walkthrough observation
 
@@ -164,6 +169,12 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 - [x] **SP-UI-7** [SP-UI] — IN PROGRESS badge persistence + ungated header Finish button. Two complementary defects in `src/app/scorecard/[roundId]/page.tsx`: (A) `handleSaveNext` omits `PATCH { status: 'Complete' }` on `isLastHole`, so rounds finished via the bottom button are never marked Complete in the DB; (B) header Finish button renders unconditionally on all holes, enabling premature round termination. Fix: extract `patchRoundComplete(roundId)` helper to `src/lib/roundApi.ts`; call from `handleSaveNext` (silent) and `confirmFinish` (error-display on failure); gate header button behind `isLastHole`. AC: (1) round finished via bottom "Finish Round →" has `DB status='Complete'` immediately after navigation to `/results`; (2) header Finish button absent on holes 1–17; (3) header Finish button present on hole 18 and finishes correctly; (4) Recent Rounds shows finished rounds without IN PROGRESS badge. Existing stuck rounds 12/13/14 are a separate ops step. Source: `docs/2026-04-29/011_in_progress_badge_research.md`. — 2026-04-29 — researcher pass 011 — closed 2026-04-29
 
 - [ ] **SP-UI-5** [SP-UI] — Stroke Play card defaults to only Golfer 1 selected in the Players row of the Games step. **Could not reproduce in subsequent runs.** Original observation: Cowork 2026-04-29 22:16 (1 occurrence). Four subsequent runs showed all chips pre-selected: Cowork 22:38, Cowork 23:01, Playwright spec (prompt 013, rounds 15–17). `addGame` in `roundStore.ts:151` reads `state.players.filter(p => p.betting)` at call time — code is correct. Root cause of the single occurrence is unknown (possibly step-state timing in the 22:16 session). **Disposition: keep filed; investigate only if it resurfaces.** The Playwright spec's player-add sequence (add Golfer 2/3/4 then tap Stroke Play pill) is the known-good baseline. — 2026-04-29 — filed on Cowork 2216 walkthrough; downgraded 2026-04-29 after 4 non-reproductions
+
+- [ ] **PARKING-LOT-SKINS-1** — Bet-row tap target height ~23 px, below mobile touch-target guidelines (Apple HIG: 44 pt, Material: 48 dp). Affected element: the `<button>` on the scorecard's per-hole bet row (`hole-bet-total-{pid}`). Fix: bump vertical padding so rendered height is ≥ 40 px. XS sizing; no logic change. Related to accordion tap-target UX. — 2026-04-30 — Cowork findings-2026-04-30-0246.md §parking-lot #1
+
+- [ ] **PARKING-LOT-SKINS-2** — Hole-1 shows non-zero bet-row deltas immediately on scorecard load before the user has entered any score. Cause: F9-a (par-default on mount) + Alice's handicap index = 18 produces Alice net 3 ≠ par 4 immediately, so `computePerHoleDeltas` returns non-zero for hole 1. Users may be surprised to see "$+5.00" before entering a stroke. Consider: (a) suppress bet-row display until at least one score has been edited on the current hole; or (b) show a "pending" state. Related to existing PARKING-LOT item "Stepper par-default affordance" — consider folding both when the stepper item is addressed. — 2026-04-30 — Cowork findings-2026-04-30-0246.md §parking-lot #2
+
+- [ ] **PARKING-LOT-SKINS-3** [documentation only] — Stake unit label `/hole` for Skins differs from `/round` for Stroke Play. This is intentional per engine semantics (SP-UI-4 fix 2026-04-29) and correct: skins are won per hole. The label is accurate. Filing as a documentation note so future engineers do not "fix" it back to `/hole` for both. No code change needed. — 2026-04-30 — Cowork findings-2026-04-30-0246.md §parking-lot #4
 
 ## Done
 
@@ -196,6 +207,7 @@ Append-only. Close date + pointer to prompt NNN or EOD.
 - [x] SP-UI-4 — Stake unit label defect — closed 2026-04-29 — commit f43d2db.
 - [x] SP-UI-7 — IN PROGRESS badge + ungated header Finish button — closed 2026-04-29 — commit 55ceb02.
 - [x] SP-4 §4 — Manual 18-hole Stroke Play playthrough — closed 2026-04-29. Human verification: Cowork `findings-2026-04-29-2301.md` (full 18-hole round, handicap applied, settlement correct, zero-sum verified). Machine verification: `tests/playwright/stroke-play-finish-flow.spec.ts` (commit 2cd2b39, 5/5 assertions: header gate, `Round.status = Complete`, settlement `+$15/$-5/$-5/$-5`, no IN PROGRESS badge, fence). SP-4 closure triggers phase end per `STROKE_PLAY_PLAN.md §Scope`. `patchRoundComplete` helper extracted to `src/lib/roundApi.ts`; called from `handleSaveNext` (Fix A) and `confirmFinish` (Fix B refactor); header Finish button gated behind `isLastHole`. `roundApi.test.ts` (4 cases). 358/358 tests. `stakeUnitLabel(gameType)` added to `src/lib/scoring.ts`; conditional applied at `GameInstanceCard.tsx:47`, `round/new/page.tsx:49`, `results/[roundId]/page.tsx:96`. `scoring.test.ts` (6 cases) added; vitest include extended to `src/lib/**/*.test.ts`. 354/354 tests.
+- [x] Skins phase (SK-0–SK-5) — closed 2026-04-30. SK-5 (Cowork visual verification): findings-2026-04-30-0246.md; round 55 settled correctly (+$55/−$5/−$50, zero-sum); all 8 verification points PASS; zero blocking findings. 3 parking-lot items filed (SKINS-1 tap target, SKINS-2 immediate settlement display, SKINS-3 documentation note). Engineer report: `docs/2026-04-30/006_sk5_closeout.md`. Per `SKINS_PLAN.md §Scope`: "the phase ends when SK-5 closes." Vitest: 396/396. tsc: clean.
 
 ## Deferred / won't-do
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useRoundStore } from '@/store/roundStore'
 import Header from '@/components/layout/Header'
@@ -13,6 +13,7 @@ import Link from 'next/link'
 import { hasGreenieJunk, hasAnyJunk } from '@/lib/junk'
 import { vsPar } from '@/lib/scoring'
 import { patchRoundComplete } from '@/lib/roundApi'
+import { computePerHoleDeltas } from '@/lib/perHoleDeltas'
 
 export default function ScorecardPage() {
   const router = useRouter()
@@ -51,6 +52,27 @@ export default function ScorecardPage() {
 
   const activeGameIds = games.map(g => g.id)
   const showJunkDots = games.some(g => activeGameIds.includes(g.id) && hasAnyJunk(g.junk))
+
+  // Per-hole monetary deltas across all active games. Recomputes whenever
+  // any score changes (holes dep). Memoized to avoid re-running bridges on
+  // every render (e.g. on each keystroke in the stepper).
+  // SP contributes nothing to the per-hole map (StrokePlaySettled has hole:null);
+  // all holes display "—" for SP-only rounds (Choice B, SKINS_PLAN.md §1B).
+  const { totals: perHoleTotals, byGame: perHoleByGame } = useMemo(
+    () => computePerHoleDeltas(holes, players, games),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [holes, players, games],
+  )
+  // Pass an empty map (rather than undefined) when games exist — this signals
+  // ScoreRow to render the bet row even when a game produces no per-hole events.
+  const holeTotalForCurrentHole = games.length > 0
+    ? (perHoleTotals[currentHole] ?? {})
+    : undefined
+  // Per-game breakdown for the current hole: { gameId → { playerId → delta } }.
+  // Empty object when games exist but no per-hole events (e.g. SP-only round).
+  const holeBreakdownForCurrentHole = games.length > 0
+    ? (perHoleByGame[currentHole] ?? {})
+    : undefined
   const allScored = holeData ? players.every(p => (holeData.scores[p.id] || 0) > 0) : false
   const isLastHole = currentIdx === holeRange.length - 1
 
@@ -228,11 +250,13 @@ export default function ScorecardPage() {
 
       <div className="flex-1 max-w-[480px] mx-auto w-full px-4 py-3 space-y-2">
         {players.map(p => (
-          <ScoreRow key={p.id} player={p} hole={currentHole} par={holeData.par} holeIndex={holeData.index}
+          <ScoreRow key={`${p.id}-${currentHole}`} player={p} hole={currentHole} par={holeData.par} holeIndex={holeData.index}
             score={holeData.scores[p.id] || 0}
             dots={holeData.dots[p.id] || { sandy: false, chipIn: false, threePutt: false, onePutt: false }}
             activeGames={activeGameIds}
             showJunkDots={showJunkDots}
+            holeTotal={holeTotalForCurrentHole}
+            holeBreakdown={holeBreakdownForCurrentHole}
           />
         ))}
 

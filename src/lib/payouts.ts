@@ -3,6 +3,7 @@ import { strokesOnHole } from './handicap'
 import { vsPar } from './scoring'
 import { computeJunkPayouts, hasAnyJunk } from './junk'
 import { settleStrokePlayBet } from '../bridge/stroke_play_bridge'
+import { settleSkinsBet } from '../bridge/skins_bridge'
 import { payoutMapFromLedger } from '../bridge/shared'
 
 function emptyPayouts(playerIds: string[]): PayoutMap {
@@ -46,31 +47,6 @@ export function computeMatchPlay(holes: HoleData[], players: PlayerSetup[], game
   return payouts
 }
 
-export function computeSkins(holes: HoleData[], players: PlayerSetup[], game: GameInstance): PayoutMap {
-  const payouts = emptyPayouts(game.playerIds)
-  const inGame = players.filter(p => game.playerIds.includes(p.id))
-  let carry = 0
-
-  for (const h of holes) {
-    const scores = inGame.map(p => {
-      const gross = h.scores[p.id] || 0
-      return { id: p.id, net: gross <= 0 ? 99 : gross - strokesOnHole(getStrokes(p), h.index) }
-    })
-    const best = Math.min(...scores.map(s => s.net))
-    const winners = scores.filter(s => s.net === best)
-
-    if (winners.length === 1) {
-      const pot = game.stake + (game.escalating ? carry : 0)
-      for (const p of inGame) {
-        payouts[p.id] += p.id === winners[0].id ? pot * (inGame.length - 1) : -pot
-      }
-      carry = 0
-    } else {
-      carry += game.stake
-    }
-  }
-  return payouts
-}
 
 export function computeNassau(holes: HoleData[], players: PlayerSetup[], game: GameInstance): PayoutMap {
   const payouts = emptyPayouts(game.playerIds)
@@ -138,7 +114,10 @@ function computeGamePayouts(holes: HoleData[], players: PlayerSetup[], game: Gam
     case 'matchPlay': return computeMatchPlay(holes, players, game)
     case 'nassau': return computeNassau(holes, players, game)
     case 'stableford': return computeStableford(holes, players, game)
-    case 'skins': return computeSkins(holes, players, game)
+    case 'skins': return payoutMapFromLedger(
+      settleSkinsBet(holes, players, game).ledger,
+      game.playerIds,
+    )
     default: return emptyPayouts(game.playerIds)
   }
 }

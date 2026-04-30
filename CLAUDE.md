@@ -44,7 +44,7 @@ Typecheck: tsc --noEmit — run manually; required by SP-4 AC. No npm script for
 Run/dev command: npm run dev. Production-ish run is PM2 on the Linux host; rebuild procedure documented in commit 51660c4.
 Branch strategy: local-only. main is active. pre-rebuild-snapshot is a historical checkpoint — don't merge to it, don't rebase it. No remote, no PRs.
 Commit style: freeform descriptive, prefixed with the internal ticket code from IMPLEMENTATION_CHECKLIST.md when applicable (e.g. SP-UI-2:, PF-1-F6:, F9-a:). One commit per productive session is normal. EOD doc commits are fine standalone.
-Issue tracker: IMPLEMENTATION_CHECKLIST.md is the single source of truth for active scope. docs/plans/STROKE_PLAY_PLAN.md is the phase plan. AGENTS.md carries the active-item pointer.
+Issue tracker: IMPLEMENTATION_CHECKLIST.md is the single source of truth for active scope. Completed phase plans: `docs/plans/STROKE_PLAY_PLAN.md`, `docs/plans/SKINS_PLAN.md`. AGENTS.md carries the active-item pointer.
 Project structure
 src/
   app/                  Next.js App Router routes
@@ -71,26 +71,20 @@ AGENTS.md               active-phase / current-item pointer
 IMPLEMENTATION_CHECKLIST.md   active scope SoT
 REBUILD_PLAN.md         history
 AUDIT.md                one-time classification
-MIGRATION_NOTES.md      history~15k LOC across ~59 TS/TSX files. App router only. No middleware.ts — auth is network-perimeter (Tailscale) only.Project-specific rules and conventionsPreserved from prior CLAUDE.md / AGENTS.md / plan docs (2026-04-29)Active phase and current item. Active phase: Stroke-Play-only UI wiring. Source of truth: docs/plans/STROKE_PLAY_PLAN.md. Active scope tracker: IMPLEMENTATION_CHECKLIST.md. After each grooming, update AGENTS.md line "Active phase: …" / "Current item: …" to match.Phase endpoint is SP-4 closure. From STROKE_PLAY_PLAN.md §Scope: "The Stroke-Play-only phase begins at adoption of this plan and ends when SP-4 closes." SP-4 closes when all five gates pass:
-
-git grep -rn "computeStrokePlay" src/ returns zero matches
-SP-2 builder tests pass (npm run test:run)
-SP-3 bridge integration tests pass (npm run test:run)
-Manual 18-hole playthrough on the running dev server (handicap applied, payouts verified)
-tsc --noEmit --strict passes
-SP-6 is independent. SP-6 is the GAME_DEFS disabled: true plumbing in src/types/index.ts and the GameList.tsx filter. It can run at any point and is recommended (not required) before SP-3 so the test environment is clean. It does not close the phase. Reject any framing that says the phase ends at SP-6.Do-not-touch fence (entire current phase):
-
-Skins, Wolf, Nassau, Match Play engines and their UI integration
-Junk wiring (Junk Phase 3 is parked; junk fields exist in schema but junkItems is intentionally empty in every Stroke Play BetSelection)
-Verifier (deferred)
-The fence is the whole current phase, not a per-file list. If a task seems to require crossing the fence, stop at Plan and report up.
-Known tech debt (recorded, do not casually fix):
+MIGRATION_NOTES.md      history~15k LOC across ~59 TS/TSX files. App router only. No middleware.ts — auth is network-perimeter (Tailscale) only.Project-specific rules and conventionsActive phase and current item. No active phase (phase boundary as of 2026-04-30 — Skins phase complete). Next phase TBD at SOD. Active scope tracker: IMPLEMENTATION_CHECKLIST.md. After each grooming, update AGENTS.md line "Active phase: …" / "Current item: …" to match.Known tech debt (recorded, do not casually fix):
 
 Reference-identity bet-id lookup anti-pattern — closed-out by REBUILD_PLAN.md #4
 Multi-bet cutover deferred — REBUILD_PLAN.md #11
-Multiple operator-only deferred decisions enumerated in STROKE_PLAY_PLAN.md §7
 Scoring file-path divergence: README points to target paths per MIGRATION_NOTES.md item 1; current scoring lives under src/lib/. Don't "fix" the README casually — the divergence is acknowledged.
 No consolidated runbook; PM2 rebuild procedure lives only in commit 51660c4. Future cleanup, not active-phase work.
+
+Architectural notes — load-bearing assumptions (do not change without a rule-doc pass):
+
+FieldTooSmall sentinel (Skins engine): `settleSkinsHole` emits `FieldTooSmall` with `hole: number` (not null) for all-zero-score holes. This means `finalHole = max(holeNumbers)` always equals the declared `holesToPlay` even on partial rounds. Consequence: `finalizeSkinsRound` always scales correctly from the true final hole; no early carry resolution occurs. Locked by `skins_bridge.test.ts` Test S7 (R4 regression test). Any future bet engine that needs "reload at hole N shows correct carry state" must ensure its incomplete-hole events also carry a non-null `hole` number.
+
+hydrateRound label convention: When hydrating game instances from the DB in `roundStore.ts`, always resolve the human-readable label via `GAME_DEFS.find(d => d.key === g.type)?.label ?? g.type`. Never use `g.type` directly as the label — it produces camelCase ("strokePlay", "skins") instead of display-ready strings ("Stroke Play", "Skins"). This pattern was introduced in SK-2 (2026-04-30) and applies to any future game type that adds a GAME_DEFS entry.
+
+Two-phase Skins settlement: `settleSkinsHole` (per-hole, provisional) + `finalizeSkinsRound` (carry-scaling + tie resolution). Per-hole events emitted by `settleSkinsHole` are `SkinWon` (with `hole` and `points`) or `SkinCarried` (carry accumulates). `finalizeSkinsRound` re-scales `SkinWon.points` by `(1 + carryCount)` when escalating. The bridge (`settleSkinsBet`) calls both phases and returns a merged event list + ledger. `computePerHoleDeltas` in `src/lib/perHoleDeltas.ts` reads `SkinWon.hole` to build the per-hole delta map; `SkinCarried` events produce zero delta (displayed as "—" via `formatMoneyDecimal(0) = '—'`).
 Architecture note — settlement is computed from Zustand state, not the DB. `computeAllPayouts` in `src/lib/payouts.ts` is called from `ResultsPage` using `holes` and `games` from the Zustand store (or hydrated via `GET /api/rounds/{id}`). The DB has no settlement/payout columns. Consequence: settlement always renders correctly in the same session that completed the round, even if `Round.status` was never written to Complete (which was the SP-UI-7 bug). The badge and routing were the only observable symptoms of the status bug, not the settlement numbers. Keep this in mind when debugging "wrong settlement" reports: the DB is not the source; follow the Zustand state or the `hydrateRound` data path.Sub-agents. Five sub-agents under .claude/agents/: researcher, documenter, engineer, reviewer, team-lead. You can invoke them. Their output is your work product — fold it into your report, don't pass it through raw.Cowork's findings format. Cowork files findings as findings-yyyy-mm-dd-HHMM.md on the desktop. GM relays. When you receive them, file a numbered cowork-findings report under today's docs/yyyy-mm-dd/. Recurring/known issues (e.g., the Recent Rounds "IN PROGRESS" stale-badge anomaly) may be recorded for continuity without re-flagging — Cowork already does this; mirror it.Code style. TypeScript strict mode is on. No Prettier — match surrounding style in each file. Eslint config is stock Next.js + TS, no custom rules.Commit hygiene. Tickets first (SP-UI-2:, PF-1-F6:, etc.). One sentence is fine. Session-log/EOD-only commits are acceptable and routine.Reporting to GM
 When you report back after a prompt cycle:
 

@@ -5,6 +5,7 @@ import type { GameInstance, JunkConfig } from '@/types'
 import { useRoundStore } from '@/store/roundStore'
 import Pill from '@/components/ui/Pill'
 import { stakeUnitLabel } from '@/lib/scoring'
+import { skinsTooFewPlayers } from '@/lib/gameGuards'
 
 interface GameInstanceCardProps {
   game: GameInstance
@@ -15,10 +16,19 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
   const [junkOpen, setJunkOpen] = useState(false)
   const j = game.junk
 
+  // Live player-count guard for Skins. Reacts whenever game.playerIds changes
+  // (e.g., when the user toggles player chips or adds/removes players on the
+  // Players step). The engine's assertValidSkinsCfg is the backstop; this is
+  // the user-facing feedback surface.
+  const playerCountError = skinsTooFewPlayers(game)
+
   return (
     <div
       className="rounded-xl border overflow-hidden"
-      style={{ borderColor: 'var(--green-soft)', background: 'white' }}
+      style={{
+        borderColor: playerCountError ? 'var(--red-card)' : 'var(--green-soft)',
+        background: 'white',
+      }}
     >
       {/* Header */}
       <div className="px-3 py-2.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--line)' }}>
@@ -118,6 +128,17 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
             })}
           </div>
         </div>
+
+        {/* Player-count error — Skins-specific live guard */}
+        {playerCountError && (
+          <p
+            className="text-[11px] font-semibold"
+            style={{ color: 'var(--red-card)' }}
+            data-testid={`skins-player-count-error-${game.id}`}
+          >
+            Skins requires at least 3 players
+          </p>
+        )}
 
         {/* Junk / Side Bets — collapsible */}
         {game.type !== 'strokePlay' && (

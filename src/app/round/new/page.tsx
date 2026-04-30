@@ -11,6 +11,7 @@ import PlayerList from '@/components/setup/PlayerList'
 import GameList from '@/components/setup/GameList'
 import { hasAnyJunk } from '@/lib/junk'
 import { formatMoneyDecimal, stakeUnitLabel } from '@/lib/scoring'
+import { hasInvalidGames } from '@/lib/gameGuards'
 
 const STEP_LABELS = ['Course', 'Players', 'Games', 'Review']
 
@@ -79,13 +80,18 @@ export default function NewRoundPage() {
   const canContinue = () => {
     if (setupStep === 0) return !!course
     if (setupStep === 1) return store.players.length >= 1
-    return true
+    // Steps 2 (Games) and 3 (Review): block if any game instance is invalid.
+    // Currently: Skins with fewer than 3 players.
+    return !hasInvalidGames(store.games)
   }
 
   const handleNext = async () => {
     if (setupStep < STEP_LABELS.length - 1) {
       setSetupStep(setupStep + 1)
     } else {
+      // Belt-and-suspenders: re-check game validity at submit time in case
+      // canContinue was bypassed or state changed between steps.
+      if (hasInvalidGames(store.games)) return
       setLoading(true)
       try {
         const res = await fetch('/golf/api/rounds', {

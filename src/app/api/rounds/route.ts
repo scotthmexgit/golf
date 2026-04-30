@@ -86,7 +86,7 @@ export async function GET() {
         course: true,
         players: { include: { player: true } },
       },
-      orderBy: { playedAt: 'desc' },
+      orderBy: [{ playedAt: 'desc' }, { id: 'desc' }],
       take: 20,
     })
     return NextResponse.json({ rounds })

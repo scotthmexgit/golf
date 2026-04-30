@@ -257,7 +257,7 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
     const games: GameInstance[] = apiGames.map(g => ({
       id: String(g.id),
       type: g.type as GameType,
-      label: g.type,
+      label: GAME_DEFS.find(d => d.key === g.type)?.label ?? g.type,
       stake: g.stake,
       playerIds: g.playerIds.map(String),
       junk: defaultJunk(g.stake),

@@ -149,7 +149,7 @@ export const GAME_DEFS: { key: GameType; label: string; description: string; min
   { key: 'strokePlay', label: 'Stroke Play', description: 'Lowest net score wins' },
   { key: 'matchPlay', label: 'Match Play', description: 'Win holes head-to-head — works with 2–5 players', minPlayers: 2, disabled: true },
   { key: 'stableford', label: 'Stableford', description: 'Points per hole based on net score', disabled: true },
-  { key: 'skins', label: 'Skins', description: 'Win the hole outright to win the skin', disabled: true },
+  { key: 'skins', label: 'Skins', description: 'Win the hole outright to win the skin' },
   { key: 'nassau', label: 'Nassau', description: 'Three bets: front 9, back 9, overall', disabled: true },
   { key: 'bestBall', label: 'Best Ball', description: 'Team best net score per hole', minPlayers: 4, maxPlayers: 4, requirementText: 'Requires exactly 4 betting players', disabled: true },
   { key: 'bingoBangoBongo', label: 'Bingo Bango Bongo', description: 'First on, closest, first in — one point each', disabled: true },

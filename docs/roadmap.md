@@ -1,5 +1,5 @@
 # Roadmap: golf
-Refreshed at: 2026-05-01 (SOD Day 2)
+Refreshed at: 2026-04-30 (EOD Day 1 correction)
 Source: IMPLEMENTATION_CHECKLIST.md + docs/plans/WOLF_PLAN.md
 
 ## High priority

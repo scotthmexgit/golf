@@ -1,8 +1,8 @@
 # Report: Cowork followup — Bet-row scope investigation + sheet height + console-exception close
 
 ## Header
-- **Date:** 2026-05-01
-- **Number:** 04
+- **Date:** 2026-04-30
+- **Number:** 08
 - **Type:** cowork-findings
 - **Title slug:** cowork-followup
 - **Linked issues:** PARKING-LOT-SKINS-2 (related, not fixed here); CONSOLE-EXCEPTION-SCORECARD-LOAD (closed); BetDetailsSheet height (WF-2 spec gap)
@@ -10,7 +10,7 @@
 
 ## Prompt (verbatim)
 
-> Three small items from Cowork verification of WF-1 through WF-5 (findings-2026-05-01-1330.md): (1) investigate the per-row "Bet" total scope — is Skins contributing to per-hole totals alongside Wolf? (2) adjust BetDetailsSheet.tsx height to ~75vh per WOLF_PLAN.md WF-2 spec. (3) close CONSOLE-EXCEPTION-SCORECARD-LOAD parking-lot item.
+> Three small items from Cowork verification of WF-1 through WF-5 (findings-2026-05-01-1330.md — date-misnamed by Cowork session; actual session date 2026-04-30): (1) investigate the per-row "Bet" total scope — is Skins contributing to per-hole totals alongside Wolf? (2) adjust BetDetailsSheet.tsx height to ~75vh per WOLF_PLAN.md WF-2 spec. (3) close CONSOLE-EXCEPTION-SCORECARD-LOAD parking-lot item.
 
 ## Scope boundaries
 - **In scope:** Investigation (no code change); BetDetailsSheet.tsx height; IMPLEMENTATION_CHECKLIST.md parking-lot close
@@ -110,8 +110,8 @@ Inner structure is unchanged: `flex-shrink-0` header + `flex-1 overflow-y-auto` 
 
 Updated IMPLEMENTATION_CHECKLIST.md line 187:
 - `- [ ]` → `- [x]`
-- Added resolution: "Not reproducing in PM2 build at 2026-05-01; Cowork findings-2026-05-01-1330.md confirmed only Chrome password-manager extension noise unrelated to /golf, no application exceptions."
-- Original observation date and source preserved. Closure date 2026-05-01.
+- Added resolution: "Not reproducing in PM2 build at 2026-04-30; Cowork findings-2026-05-01-1330.md (date-misnamed) confirmed only Chrome password-manager extension noise unrelated to /golf."
+- Original observation date and source preserved. Closure date 2026-04-30.
 
 ---
 

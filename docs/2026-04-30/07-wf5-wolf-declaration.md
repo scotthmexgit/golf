@@ -1,12 +1,12 @@
 # Report: WF-5 Lone Wolf declaration gesture + SKINS-2 + Stepper affordance
 
 ## Header
-- **Date:** 2026-05-01
-- **Number:** 03
+- **Date:** 2026-04-30
+- **Number:** 07
 - **Type:** prompt
 - **Title slug:** wf5-wolf-declaration
 - **Linked issues:** SKINS-2 (hole-1 non-zero delta suppression); stepper-affordance (par-default display)
-- **Pipeline item:** Today #3 (stretch — Day +1-2 pull-forward, noted in WF-5 issuance)
+- **Pipeline item:** Today #7 (SOD 2026-04-30 — stretch pull-forward from Day+1-2)
 
 ## Prompt (verbatim)
 

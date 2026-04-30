@@ -1,5 +1,5 @@
 # Pipeline: golf
-Last updated: 2026-05-01 (SOD Day 2)
+Last updated: 2026-04-30 (EOD Day 1 correction)
 
 ## Today (Day 0)
 

@@ -1,10 +1,12 @@
-# SOD: 2026-05-01
+# SOD: 2026-04-30 (mid-session recalibration)
+
+> **Note:** This document was generated mid-session on 2026-04-30 due to date drift in the AI context. It is NOT a Day 2 SOD — there was only one calendar day (2026-04-30). Preserved as-is (content remains accurate) with this header note added during EOD date-correction. The prior sod.md at docs/2026-04-30/sod.md is the authoritative Day 1 SOD.
 
 ## Header
-- **Date:** 2026-05-01
-- **Day index:** 2 (second DevFlow work session)
+- **Date:** 2026-04-30 (corrected from 2026-05-01)
+- **Day index:** 1 (single DevFlow work session — date drift caused incorrect "Day 2" label)
 - **Prior EOD:** docs/2026-04-30/eod.md
-- **Generated at:** 2026-05-01
+- **Generated at:** 2026-04-30 (corrected)
 
 ---
 
@@ -54,7 +56,7 @@ Pulled from docs/roadmap.md (refreshed at this SOD from IMPLEMENTATION_CHECKLIST
 
 ### Beyond +5 — backlog reference
 
-- See IMPLEMENTATION_CHECKLIST.md for active scope, parking lot, and backlog. Last reviewed 2026-05-01.
+- See IMPLEMENTATION_CHECKLIST.md for active scope, parking lot, and backlog. Last reviewed 2026-04-30.
 
 ---
 

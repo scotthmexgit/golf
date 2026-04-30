@@ -1,12 +1,12 @@
 # Report: WF-4 Exit Round surface
 
 ## Header
-- **Date:** 2026-05-01
-- **Number:** 02
+- **Date:** 2026-04-30
+- **Number:** 06
 - **Type:** prompt
 - **Title slug:** wf4-exit-round
 - **Linked issues:** parking-lot no-mid-round-nav (own slot, now closed)
-- **Pipeline item:** Today #2 (SOD 2026-05-01)
+- **Pipeline item:** Today #6 (SOD 2026-04-30 — mid-session pull-forward)
 
 ## Prompt (verbatim)
 

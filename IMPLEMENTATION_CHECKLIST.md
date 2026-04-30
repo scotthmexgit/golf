@@ -2,7 +2,7 @@
 
 Single source of truth for scope. Read the **Active item** before any work. Tangents → Parking Lot. Closed items → Done (append-only).
 
-**Active phase: Wolf.** Plan: `docs/plans/WOLF_PLAN.md`. WF-1–WF-5 closed 2026-04-30/2026-05-01. Current item: WF-6 (Playwright wolf-flow.spec.ts). Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history.
+**Active phase: Wolf.** Plan: `docs/plans/WOLF_PLAN.md`. WF-1–WF-5 closed 2026-04-30. Current item: WF-6 (Playwright wolf-flow.spec.ts). Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history.
 
 ## Project Scope Summary
 
@@ -32,9 +32,9 @@ Updated at EOD-FINAL.
 - WF-0 — CLOSED 2026-04-30. Deliverable: `docs/plans/WOLF_PLAN.md`. Report: `docs/2026-04-30/02-wolf-phase-plan.md`.
 - WF-1 — CLOSED 2026-04-30. Deliverable: `src/bridge/wolf_bridge.ts` + cutover + guard. Report: `docs/2026-04-30/03-wf1-wolf-bridge.md`. Reviewer: APPROVED. 439/439 tests, tsc clean. Grep gate: zero wolf `disabled` matches.
 - WF-2 — CLOSED 2026-04-30. Deliverable: `BetDetailsSheet.tsx` + roundStore sheet slice + scorecard trigger + SKINS-1 fix. Report: `docs/2026-04-30/04-wf2-bet-details-sheet.md`. Reviewer: APPROVED. 441/441 tests, tsc clean. E2E 2/2 pass.
-- WF-3 — CLOSED 2026-05-01. Deliverable: ScoreRow accordion removed; Bet-row → openSheet(); skins-flow.spec.ts §4 migrated to sheet; both E2E fence checks updated for Wolf unpark. Report: `docs/2026-05-01/01-wf3-skins-accordion-migration.md`. Reviewer: APPROVED. 441/441 tests, tsc clean. E2E 2/2 pass.
-- WF-4 — CLOSED 2026-05-01. Deliverable: Exit Round surface in BetDetailsSheet header; confirmation overlay; router.push('/') on confirm; no DB write. Report: `docs/2026-05-01/02-wf4-exit-round.md`. Reviewer: APPROVED. 441/441 tests, tsc clean. E2E 2/2 pass.
-- WF-5 — CLOSED 2026-05-01. Deliverable: `WolfDeclare.tsx` (captain display + partner/lone/blind declaration); SKINS-2 suppressBetDelta suppression; Stepper `initialValue?` prop. Report: `docs/2026-05-01/03-wf5-wolf-declaration.md`. Reviewer: APPROVED. 441/441 tests, tsc clean. E2E 2/2 pass. PM2 rebuilt.
+- WF-3 — CLOSED 2026-04-30. Deliverable: ScoreRow accordion removed; Bet-row → openSheet(); skins-flow.spec.ts §4 migrated to sheet; both E2E fence checks updated for Wolf unpark. Report: `docs/2026-04-30/05-wf3-skins-accordion-migration.md`. Reviewer: APPROVED. 441/441 tests, tsc clean. E2E 2/2 pass.
+- WF-4 — CLOSED 2026-04-30. Deliverable: Exit Round surface in BetDetailsSheet header; confirmation overlay; router.push('/') on confirm; no DB write. Report: `docs/2026-04-30/06-wf4-exit-round.md`. Reviewer: APPROVED. 441/441 tests, tsc clean. E2E 2/2 pass.
+- WF-5 — CLOSED 2026-04-30. Deliverable: `WolfDeclare.tsx` (captain display + partner/lone/blind declaration); SKINS-2 suppressBetDelta suppression; Stepper `initialValue?` prop. Report: `docs/2026-04-30/07-wf5-wolf-declaration.md`. Reviewer: APPROVED. 441/441 tests, tsc clean. E2E 2/2 pass. PM2 rebuilt.
 
 **Skins phase closure evidence:**
 - SK-0 — CLOSED 2026-04-29. Deliverable: `docs/plans/SKINS_PLAN.md`.
@@ -184,7 +184,7 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 
 - [ ] **PARKING-LOT-SKINS-3** [documentation only] — Stake unit label `/hole` for Skins differs from `/round` for Stroke Play. This is intentional per engine semantics (SP-UI-4 fix 2026-04-29) and correct: skins are won per hole. The label is accurate. Filing as a documentation note so future engineers do not "fix" it back to `/hole` for both. No code change needed. — 2026-04-30 — Cowork findings-2026-04-30-0246.md §parking-lot #4
 
-- [x] **CONSOLE-EXCEPTION-SCORECARD-LOAD** — Console exception observed on scorecard load during Skins Cowork verification (findings-2026-04-30-0246.md §parking-lot #3). Not reproducing in PM2 build at 2026-05-01; Cowork findings-2026-05-01-1330.md confirmed only Chrome password-manager extension noise unrelated to /golf, no application exceptions. Closed 2026-05-01 per Cowork findings-2026-05-01-1330.md. — 2026-04-30 (observed) / 2026-05-01 (closed) — SK-5 Cowork + WF-3 triage / WF-5 Cowork
+- [x] **CONSOLE-EXCEPTION-SCORECARD-LOAD** — Console exception observed on scorecard load during Skins Cowork verification (findings-2026-04-30-0246.md §parking-lot #3). Not reproducing in PM2 build at 2026-04-30; Cowork findings-2026-05-01-1330.md (date-misnamed by Cowork session; actual session date 2026-04-30) confirmed only Chrome password-manager extension noise unrelated to /golf, no application exceptions. Closed 2026-04-30 per Cowork findings. — 2026-04-30 (observed and closed) — SK-5 Cowork + WF-3 triage / WF-5 Cowork
 
 ## Done
 

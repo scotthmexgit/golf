@@ -1,12 +1,12 @@
 # Report: WF-3 Skins accordion → pop-up migration + console-exception triage
 
 ## Header
-- **Date:** 2026-05-01
-- **Number:** 01
+- **Date:** 2026-04-30
+- **Number:** 05
 - **Type:** prompt
 - **Title slug:** wf3-skins-accordion-migration
 - **Linked issues:** CONSOLE-EXCEPTION-SCORECARD-LOAD (filed this prompt)
-- **Pipeline item:** Today #1 (SOD 2026-05-01)
+- **Pipeline item:** Today #5 (SOD 2026-04-30 — mid-session pull-forward)
 
 ## Prompt (verbatim)
 

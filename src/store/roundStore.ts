@@ -100,6 +100,11 @@ export interface RoundStore {
   setBangoWinner: (hole: number, playerId: string | null) => void
   addHoleResult: (result: HoleResult) => void
 
+  // Sheet state
+  sheetOpen: boolean
+  openSheet: () => void
+  closeSheet: () => void
+
   // Helpers
   bettingPlayers: () => PlayerSetup[]
   holeRange: () => number[]
@@ -121,6 +126,7 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
   holes: [],
   currentHole: 1,
   holeResults: [],
+  sheetOpen: false,
 
   setCourse: (c) => set({ course: c }),
   setHolesCount: (h) => set({ holesCount: h }),
@@ -336,6 +342,9 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
     ].sort((a, b) => a.hole - b.hole),
   })),
 
+  openSheet: () => set({ sheetOpen: true }),
+  closeSheet: () => set({ sheetOpen: false }),
+
   bettingPlayers: () => get().players.filter(p => p.betting),
 
   holeRange: () => {
@@ -348,6 +357,6 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
   reset: () => set({
     course: null, holesCount: '18', playDate: today, selectedTee: 'blue',
     players: [makePlayer(0, true)], games: [], setupStep: 0,
-    roundId: null, holes: [], currentHole: 1, holeResults: [],
+    roundId: null, holes: [], currentHole: 1, holeResults: [], sheetOpen: false,
   }),
 }))

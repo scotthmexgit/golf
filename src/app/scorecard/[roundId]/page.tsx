@@ -9,6 +9,7 @@ import BottomCta from '@/components/layout/BottomCta'
 import HoleHeader from '@/components/scorecard/HoleHeader'
 import HoleDots from '@/components/scorecard/HoleDots'
 import ScoreRow from '@/components/scorecard/ScoreRow'
+import BetDetailsSheet from '@/components/scorecard/BetDetailsSheet'
 import Link from 'next/link'
 import { hasGreenieJunk, hasAnyJunk } from '@/lib/junk'
 import { vsPar } from '@/lib/scoring'
@@ -19,7 +20,7 @@ export default function ScorecardPage() {
   const router = useRouter()
   const params = useParams()
   const store = useRoundStore()
-  const { course, players, holes, currentHole, setCurrentHole, games, roundId, hydrateRound, setScore } = store
+  const { course, players, holes, currentHole, setCurrentHole, games, roundId, hydrateRound, setScore, sheetOpen, openSheet, closeSheet } = store
   const [showFinishConfirm, setShowFinishConfirm] = useState(false)
   const [notices, setNotices] = useState<string[]>([])
   const [hydrating, setHydrating] = useState(false)
@@ -224,6 +225,18 @@ export default function ScorecardPage() {
         title={course.name}
         rightAction={
           <div className="flex gap-2">
+            {games.length > 0 && (
+              <button
+                type="button"
+                onClick={openSheet}
+                className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                style={{ background: 'var(--green-mid)', color: 'var(--sand)' }}
+                data-testid="open-bet-details-sheet"
+                aria-label="Open round summary"
+              >
+                Summary
+              </button>
+            )}
             <Link href={`/bets/${roundId}`} className="text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'var(--green-mid)', color: 'var(--sand)' }}>
               Bets
             </Link>
@@ -276,6 +289,9 @@ export default function ScorecardPage() {
         <p className="text-center text-sm font-medium text-red-500 px-4 pb-1">{saveError}</p>
       )}
       <BottomCta label={isLastHole ? 'Finish Round →' : 'Save & Next Hole →'} onClick={handleSaveNext} disabled={!allScored} />
+
+      {/* Bet details bottom sheet */}
+      <BetDetailsSheet open={sheetOpen} onClose={closeSheet} />
 
       {/* Finish confirmation overlay */}
       {showFinishConfirm && (

@@ -4,6 +4,7 @@ import { vsPar } from './scoring'
 import { computeJunkPayouts, hasAnyJunk } from './junk'
 import { settleStrokePlayBet } from '../bridge/stroke_play_bridge'
 import { settleSkinsBet } from '../bridge/skins_bridge'
+import { settleWolfBet } from '../bridge/wolf_bridge'
 import { payoutMapFromLedger } from '../bridge/shared'
 
 function emptyPayouts(playerIds: string[]): PayoutMap {
@@ -116,6 +117,10 @@ function computeGamePayouts(holes: HoleData[], players: PlayerSetup[], game: Gam
     case 'stableford': return computeStableford(holes, players, game)
     case 'skins': return payoutMapFromLedger(
       settleSkinsBet(holes, players, game).ledger,
+      game.playerIds,
+    )
+    case 'wolf': return payoutMapFromLedger(
+      settleWolfBet(holes, players, game).ledger,
       game.playerIds,
     )
     default: return emptyPayouts(game.playerIds)

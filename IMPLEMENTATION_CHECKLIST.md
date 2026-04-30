@@ -2,7 +2,7 @@
 
 Single source of truth for scope. Read the **Active item** before any work. Tangents → Parking Lot. Closed items → Done (append-only).
 
-**No active phase (phase boundary).** Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30. `docs/plans/SKINS_PLAN.md` is the completed Skins plan; retained for history alongside `docs/plans/STROKE_PLAY_PLAN.md`. Next phase TBD at SOD.
+**Active phase: Wolf.** Plan: `docs/plans/WOLF_PLAN.md`. WF-1 and WF-2 closed 2026-04-30. Current item: WF-3 (Skins accordion → pop-up migration). Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history.
 
 ## Project Scope Summary
 
@@ -26,7 +26,12 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-**No active item — phase boundary. Skins phase COMPLETE as of 2026-04-30. Next phase TBD at SOD.**
+**Wolf phase — WF-2 (scorecard pop-up shared primitive). See `docs/plans/WOLF_PLAN.md`.**
+
+**Wolf phase closure evidence (in progress):**
+- WF-0 — CLOSED 2026-04-30. Deliverable: `docs/plans/WOLF_PLAN.md`. Report: `docs/2026-04-30/02-wolf-phase-plan.md`.
+- WF-1 — CLOSED 2026-04-30. Deliverable: `src/bridge/wolf_bridge.ts` + cutover + guard. Report: `docs/2026-04-30/03-wf1-wolf-bridge.md`. Reviewer: APPROVED. 439/439 tests, tsc clean. Grep gate: zero wolf `disabled` matches.
+- WF-2 — CLOSED 2026-04-30. Deliverable: `BetDetailsSheet.tsx` + roundStore sheet slice + scorecard trigger + SKINS-1 fix. Report: `docs/2026-04-30/04-wf2-bet-details-sheet.md`. Reviewer: APPROVED. 441/441 tests, tsc clean. E2E 2/2 pass.
 
 **Skins phase closure evidence:**
 - SK-0 — CLOSED 2026-04-29. Deliverable: `docs/plans/SKINS_PLAN.md`.

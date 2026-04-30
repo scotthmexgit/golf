@@ -126,7 +126,7 @@ export default function ScoreRow({
           <button
             type="button"
             onClick={() => setIsExpanded(x => !x)}
-            className="w-full flex items-center justify-between border-t pt-1.5"
+            className="w-full flex items-center justify-between border-t py-2 min-h-[40px]"
             style={{
               borderColor: 'var(--line)',
               background: 'transparent',

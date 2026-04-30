@@ -11,10 +11,15 @@ export function skinsTooFewPlayers(game: GameInstance): boolean {
   return game.type === 'skins' && game.playerIds.length < 3
 }
 
+// Returns true when a Wolf bet has fewer than 4 or more than 5 players.
+// Wolf requires exactly 4 or 5 players per assertValidWolfCfg.
+// False for all other game types.
+export function wolfInvalidPlayerCount(game: GameInstance): boolean {
+  return game.type === 'wolf' && (game.playerIds.length < 4 || game.playerIds.length > 5)
+}
+
 // Returns true when any game instance in the round is in an invalid state
 // that must be resolved before round creation can proceed.
-// Currently only Skins with < 3 players is invalid; other types are added here
-// when they unpark and bring their own requirements.
 export function hasInvalidGames(games: GameInstance[]): boolean {
-  return games.some(skinsTooFewPlayers)
+  return games.some(g => skinsTooFewPlayers(g) || wolfInvalidPlayerCount(g))
 }

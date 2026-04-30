@@ -108,7 +108,7 @@ export interface HoleData {
   index: number
   scores: Record<string, number>
   dots: Record<string, HoleDots>
-  wolfPick?: string | 'solo'
+  wolfPick?: 'solo' | 'blind' | string
   presses?: string[]
   greenieWinners?: Record<string, string | null>  // keyed by gameInstance.id
   bangoWinner?: string | null
@@ -153,7 +153,7 @@ export const GAME_DEFS: { key: GameType; label: string; description: string; min
   { key: 'nassau', label: 'Nassau', description: 'Three bets: front 9, back 9, overall', disabled: true },
   { key: 'bestBall', label: 'Best Ball', description: 'Team best net score per hole', minPlayers: 4, maxPlayers: 4, requirementText: 'Requires exactly 4 betting players', disabled: true },
   { key: 'bingoBangoBongo', label: 'Bingo Bango Bongo', description: 'First on, closest, first in — one point each', disabled: true },
-  { key: 'wolf', label: 'Wolf', description: 'Pick your partner or go solo', minPlayers: 4, maxPlayers: 5, requirementText: 'Requires 4–5 betting players', disabled: true },
+  { key: 'wolf', label: 'Wolf', description: 'Pick your partner or go solo', minPlayers: 4, maxPlayers: 5, requirementText: 'Requires 4–5 betting players' },
   { key: 'vegas', label: 'Vegas', description: 'Team scores combine as a 2-digit number', disabled: true },
 ]
 

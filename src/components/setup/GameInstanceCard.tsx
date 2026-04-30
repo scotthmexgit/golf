@@ -5,7 +5,7 @@ import type { GameInstance, JunkConfig } from '@/types'
 import { useRoundStore } from '@/store/roundStore'
 import Pill from '@/components/ui/Pill'
 import { stakeUnitLabel } from '@/lib/scoring'
-import { skinsTooFewPlayers } from '@/lib/gameGuards'
+import { skinsTooFewPlayers, wolfInvalidPlayerCount } from '@/lib/gameGuards'
 
 interface GameInstanceCardProps {
   game: GameInstance
@@ -21,12 +21,13 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
   // Players step). The engine's assertValidSkinsCfg is the backstop; this is
   // the user-facing feedback surface.
   const playerCountError = skinsTooFewPlayers(game)
+  const wolfPlayerError = wolfInvalidPlayerCount(game)
 
   return (
     <div
       className="rounded-xl border overflow-hidden"
       style={{
-        borderColor: playerCountError ? 'var(--red-card)' : 'var(--green-soft)',
+        borderColor: (playerCountError || wolfPlayerError) ? 'var(--red-card)' : 'var(--green-soft)',
         background: 'white',
       }}
     >
@@ -129,7 +130,7 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
           </div>
         </div>
 
-        {/* Player-count error — Skins-specific live guard */}
+        {/* Player-count error — Skins live guard */}
         {playerCountError && (
           <p
             className="text-[11px] font-semibold"
@@ -137,6 +138,17 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
             data-testid={`skins-player-count-error-${game.id}`}
           >
             Skins requires at least 3 players
+          </p>
+        )}
+
+        {/* Player-count error — Wolf live guard */}
+        {wolfPlayerError && (
+          <p
+            className="text-[11px] font-semibold"
+            style={{ color: 'var(--red-card)' }}
+            data-testid={`wolf-player-count-error-${game.id}`}
+          >
+            Wolf requires 4–5 players
           </p>
         )}
 

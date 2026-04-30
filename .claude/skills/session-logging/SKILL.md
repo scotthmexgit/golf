@@ -7,9 +7,9 @@ description: Append a per-prompt summary and a rolling EOD entry after every sub
 
 ## Do this, every substantive response
 
-1. Append `./YYYY-MM-DD/NNN_<slug>.md` — per-prompt summary.
-2. Append one line to `./EOD_DD-Month-YYYY.md` — rolling log.
-3. `EOD-FINAL_DD-Month-YYYY.md` is only written when the user explicitly asks for it.
+1. Append to `docs/yyyy-mm-dd/NN-<slug>.md` — per-prompt report (DevFlow path; NN is 2-digit, docs/-relative).
+2. Append one line to `docs/yyyy-mm-dd/eod.md` — rolling EOD entry.
+3. `docs/yyyy-mm-dd/eod.md` is finalized (not a separate file) when GM runs EOD.
 
 ## What counts as "substantive" — log all of these
 
@@ -39,12 +39,12 @@ Example **not** skipped (log even though Active item stays open):
 - User asks for a plan revision; response applies some edits and pauses others for more input → log.
 - User asks a question that triggers re-reading a rule file and citing it → log.
 
-## Paths (today = 2026-04-20, DD-Month-YYYY = 20-April-2026)
+## Paths (DevFlow convention as of 2026-04-30)
 
-- Per-prompt: `./YYYY-MM-DD/NNN_<slug>.md`
-  NNN is a zero-padded 3-digit counter starting at `001`, reset daily; `<slug>` is kebab-case, ≤5 words.
-- Rolling EOD: `./EOD_20-April-2026.md`
-- EOD-FINAL (on request): `./EOD-FINAL_20-April-2026.md`
+- Per-prompt: `docs/yyyy-mm-dd/NN-<slug>.md`
+  NN is a zero-padded 2-digit counter starting at `01`, reset daily; `<slug>` is kebab-case, ≤5 words.
+- Rolling EOD entry: appended to `docs/yyyy-mm-dd/eod.md`
+- EOD finalization: `docs/yyyy-mm-dd/eod.md` is finalized on explicit EOD run (no separate EOD-FINAL file under DevFlow).
 
 ## Per-prompt file template
 

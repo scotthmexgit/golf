@@ -4,7 +4,7 @@
 - **Date:** 2026-04-30
 - **Day index:** 1 (first and only DevFlow work session — single calendar day)
 - **Linked SOD:** docs/2026-04-30/sod.md (authoritative); docs/2026-04-30/sod-midday-recalibration.md (mid-session planning artifact, date drift corrected)
-- **Reports filed today:** 9 — 01 through 08 plus this EOD finalization (09)
+- **Reports filed today:** 10 — 01 through 08, EOD finalization (09), WF-6 spec (10, post-EOD same session)
 
 ## DevFlow session log
 
@@ -18,6 +18,7 @@
 | afternoon | 06-wf4-exit-round | Day+3-5 pull-forward | Exit Round in BetDetailsSheet header; confirmation overlay; router.push('/') on confirm; no DB write; reviewer APPROVED | ✓ |
 | afternoon | 07-wf5-wolf-declaration | Day+1-2 pull-forward (stretch) | WolfDeclare.tsx captain+declaration UI; SKINS-2 suppressBetDelta; Stepper initialValue? (no-op); reviewer APPROVED; per-prompt commit first application | ✓ |
 | afternoon | 08-cowork-followup | Cowork dispatch (same-session) | Bet-row scope investigation (design correct); BetDetailsSheet max-h→h-[75vh]; CONSOLE-EXCEPTION closed; reviewer APPROVED | ✓ |
+| post-EOD | 10-wf6-wolf-flow-spec | WF-6 (same session, after EOD finalization) | wolf-flow.spec.ts §1–§6; 3/3 Playwright; reviewer APPROVED; committed 7de52c6 | ✓ |
 
 ---
 
@@ -85,7 +86,7 @@ The SOD (docs/2026-04-30/sod.md) committed one Today item. Eight additional prom
 - `docs/2026-04-30/sod.md`, `docs/2026-04-30/sod-midday-recalibration.md`
 - `docs/2026-04-30/01–08` prompt reports
 
-**Test counts:** started day at 396/396 → ended at 441/441 (+45 new tests). tsc clean throughout. Playwright 2/2.
+**Test counts:** started day at 396/396 → ended at 441/441 (+45 new tests, vitest). tsc clean throughout. Playwright: started 2/2 (skins+stroke-play); ended 3/3 (+wolf-flow WF-6).
 
 ---
 
@@ -202,15 +203,16 @@ Direct input to next session's SOD.
 
 | # | Item | Source | Estimate | Scope notes |
 |---|---|---|---|---|
-| 1 | WF-6: Playwright wolf-flow.spec.ts | WOLF_PLAN.md WF-6 | S | New spec covering wolf-specific flows: pick partner, pick Lone Wolf, pick Blind Lone, verify BetDetailsSheet totals for each. Must cover 4-player and 5-player rounds. Reviewer gate. |
-| 2 | WF-7: Cowork phase-end visual verification | WOLF_PLAN.md WF-7 | 1 session | Cowork verifies WolfDeclare UI, declaration persistence across holes, BetDetailsSheet Wolf totals, Exit Round from sheet, sheet height at 75vh. Gate for Wolf phase close. |
+| 1 | WF-7: Cowork phase-end visual verification | WOLF_PLAN.md WF-7 | 1 session | Cowork verifies WolfDeclare UI, declaration persistence across holes, BetDetailsSheet Wolf totals, Exit Round from sheet, sheet height at 75vh. Gate for Wolf phase close. |
 
-Stretch (if WF-6 closes quickly and Cowork session is same-day):
+WF-6 closed in same session as this EOD — removed from suggested items.
+
+Stretch (if Cowork session is same-day):
 - **Session-logging skill update:** The skill's path specification (old `NNN_slug.md` root-relative format) was corrected in prompt 01 but the skill file itself may still reference the old convention. A XS doc edit to align the skill with docs/yyyy-mm-dd/NN-slug.md DevFlow convention.
 
 ### Seed watchouts
 
-- **WF-6 Playwright spec:** wolf-flow spec must handle WolfDeclare (a React UI component writing wolfPick to Zustand) via browser automation. The spec will need to interact with `data-testid="wolf-declare-panel"`, `wolf-partner-{pid}`, `wolf-declare-lone`, `wolf-declare-blind` buttons. PM2 is already rebuilt and current.
-- **WOLF_PLAN.md stepper-affordance staleness:** WF-5 confirmed the described Stepper bug doesn't exist. The plan note at §5 (stepper-affordance item) is a stale description. Low-priority: can be corrected as a one-line edit within WF-6 or separately.
-- **75vh sheet height Cowork verification:** Cowork's test environment may not be exactly 375px mobile width. Recommend verifying at whatever viewport Cowork uses; the fixed `h-[75vh]` should be stable across widths.
-- **Per-prompt commit:** active from WF-5. WF-6 should commit at reviewer APPROVED before filing report.
+- **WF-6 done:** wolf-flow.spec.ts committed at 7de52c6. Playwright 3/3. Next blocking gate is WF-7 (Cowork session).
+- **WOLF_PLAN.md stepper-affordance staleness:** WF-5 found the described Stepper bug doesn't exist. The plan note at §5 is stale. Low-priority doc edit; can fold into WF-7 prep.
+- **75vh sheet height Cowork verification:** Cowork's test environment may not be exactly 375px mobile width. Fixed `h-[75vh]` should be stable across widths.
+- **Per-prompt commit:** active from WF-5; applied in WF-6. Continue pattern going forward.

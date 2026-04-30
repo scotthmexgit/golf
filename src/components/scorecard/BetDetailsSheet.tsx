@@ -50,7 +50,7 @@ export default function BetDetailsSheet({ open, onClose, onExit }: BetDetailsShe
 
       {/* Sheet panel — slides up from bottom */}
       <div
-        className={`fixed bottom-0 inset-x-0 z-50 rounded-t-2xl flex flex-col max-h-[75vh] transition-transform duration-300 ease-out ${
+        className={`fixed bottom-0 inset-x-0 z-50 rounded-t-2xl flex flex-col h-[75vh] transition-transform duration-300 ease-out ${
           open ? 'translate-y-0' : 'translate-y-full'
         }`}
         style={{ background: 'white' }}

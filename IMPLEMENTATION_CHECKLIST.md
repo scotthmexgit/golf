@@ -184,7 +184,7 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 
 - [ ] **PARKING-LOT-SKINS-3** [documentation only] — Stake unit label `/hole` for Skins differs from `/round` for Stroke Play. This is intentional per engine semantics (SP-UI-4 fix 2026-04-29) and correct: skins are won per hole. The label is accurate. Filing as a documentation note so future engineers do not "fix" it back to `/hole` for both. No code change needed. — 2026-04-30 — Cowork findings-2026-04-30-0246.md §parking-lot #4
 
-- [ ] **CONSOLE-EXCEPTION-SCORECARD-LOAD** — Console exception observed on scorecard load during Skins Cowork verification (findings-2026-04-30-0246.md §parking-lot #3). Noted in `docs/2026-04-30/006_sk5_closeout.md` line 52 but not filed in the SK-5 parking-lot dispatch. Exact exception text unknown from Code-accessible files — operator must retrieve from original findings file. Triage path: once text is known, identify the throwing file/hook and assign to appropriate WF-N slot or address as standalone fix. Priority unknown until text retrieved. — 2026-04-30 (observed) / 2026-05-01 (filed) — SK-5 Cowork + WF-3 triage
+- [x] **CONSOLE-EXCEPTION-SCORECARD-LOAD** — Console exception observed on scorecard load during Skins Cowork verification (findings-2026-04-30-0246.md §parking-lot #3). Not reproducing in PM2 build at 2026-05-01; Cowork findings-2026-05-01-1330.md confirmed only Chrome password-manager extension noise unrelated to /golf, no application exceptions. Closed 2026-05-01 per Cowork findings-2026-05-01-1330.md. — 2026-04-30 (observed) / 2026-05-01 (closed) — SK-5 Cowork + WF-3 triage / WF-5 Cowork
 
 ## Done
 

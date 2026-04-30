@@ -5,6 +5,8 @@ interface StepperProps {
   onChange: (v: number) => void
   min?: number
   max?: number
+  // No-op: Stepper is controlled by value. Added for forward-compatibility.
+  initialValue?: number
 }
 
 export default function Stepper({ value, onChange, min = 1, max = 15 }: StepperProps) {

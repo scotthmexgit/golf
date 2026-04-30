@@ -94,7 +94,7 @@ export interface RoundStore {
   setCurrentHole: (h: number) => void
   setScore: (playerId: string, hole: number, score: number) => void
   setDot: (playerId: string, hole: number, dot: keyof HoleDots, value: boolean) => void
-  setWolfPick: (hole: number, partnerId: string | 'solo') => void
+  setWolfPick: (hole: number, pick: 'solo' | 'blind' | string) => void
   setPress: (hole: number, gameKey: string) => void
   setGreenieWinner: (hole: number, gameId: string, playerId: string | null) => void
   setBangoWinner: (hole: number, playerId: string | null) => void
@@ -313,8 +313,8 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
     }),
   })),
 
-  setWolfPick: (hole, partnerId) => set((state) => ({
-    holes: state.holes.map(h => h.number === hole ? { ...h, wolfPick: partnerId } : h),
+  setWolfPick: (hole, pick) => set((state) => ({
+    holes: state.holes.map(h => h.number === hole ? { ...h, wolfPick: pick } : h),
   })),
 
   setPress: (hole, gameKey) => set((state) => ({

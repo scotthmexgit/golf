@@ -8,6 +8,8 @@ import { formatMoneyDecimal } from '@/lib/scoring'
 interface BetDetailsSheetProps {
   open: boolean
   onClose: () => void
+  /** When provided, renders an "Exit Round" button in the sheet header. */
+  onExit?: () => void
 }
 
 /**
@@ -23,7 +25,7 @@ interface BetDetailsSheetProps {
  * Sheet state (open/close) is driven by the caller via props. The component is
  * always rendered so CSS transitions animate correctly.
  */
-export default function BetDetailsSheet({ open, onClose }: BetDetailsSheetProps) {
+export default function BetDetailsSheet({ open, onClose, onExit }: BetDetailsSheetProps) {
   const { holes, players, games } = useRoundStore()
   // Tracks which player-hole row is expanded (one at a time).
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
@@ -61,15 +63,29 @@ export default function BetDetailsSheet({ open, onClose }: BetDetailsSheetProps)
           <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             Round Summary
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-lg leading-none px-2 py-1"
-            style={{ color: 'var(--muted)' }}
-            aria-label="Close round summary"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            {onExit && (
+              <button
+                type="button"
+                onClick={onExit}
+                className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                style={{ background: 'var(--red-card)', color: 'white' }}
+                data-testid="exit-round-trigger"
+                aria-label="Exit round"
+              >
+                Exit Round
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-lg leading-none px-2 py-1"
+              style={{ color: 'var(--muted)' }}
+              aria-label="Close round summary"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Scrollable content */}

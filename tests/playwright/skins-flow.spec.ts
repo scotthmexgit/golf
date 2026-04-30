@@ -5,7 +5,7 @@
  *   §1  Setup: 3-player round with Skins bet (escalating=true, $5/skin)
  *   §2  Carry scenario: hole 6 ties → carry; hole 7 decisive → scorecard shows +$20 delta
  *   §3  R4 reload: after holes 1–6, reload; hole 7 delta shows carry intact (not finalized early)
- *   §4  Accordion: "Skins +$20.00" on hole 7, "Skins —" on hole 6 (tied/carry)
+ *   §4  Bet Details Sheet: "Skins +$20.00" on hole 7, "Skins —" on hole 6 (tied/carry)
  *   §5  Finish flow: complete all 18 holes, finish the round
  *   §6  Results page: zero-sum, correct per-player payouts
  *   §7  DB: Round.status = 'Complete' after finish
@@ -115,14 +115,16 @@ test('skins flow: SK-4 §1–§8 closure spec', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Continue →' }).click()
 
-  // §8 FENCE CHECK: parked engines absent from picker
+  // §8 FENCE CHECK: still-parked engines absent from picker; live bets present
   const pickerSection = page.locator('div').filter({ hasText: /Add a game/ }).first()
   const pickerText = await pickerSection.textContent() ?? ''
-  for (const token of ['Wolf', 'Nassau', 'Match Play']) {
+  // Nassau and Match Play remain parked (disabled: true in GAME_DEFS)
+  for (const token of ['Nassau', 'Match Play']) {
     expect(pickerText, `Parked game "${token}" must not appear in picker`).not.toContain(token)
   }
-  // Skins is live after SK-2
+  // Skins live after SK-2; Wolf live after WF-1
   expect(pickerText, 'Skins must appear in picker').toContain('Skins')
+  expect(pickerText, 'Wolf must appear in picker (unparked WF-1)').toContain('Wolf')
 
   // Add Skins — enable escalating (store default is false; toggle to true)
   await page.getByRole('button', { name: 'Skins' }).click()
@@ -144,12 +146,9 @@ test('skins flow: SK-4 §1–§8 closure spec', async ({ page }) => {
   await page.waitForSelector('[data-testid^="hole-bet-total-"]')
   const aliceTestId = await page.locator('[data-testid^="hole-bet-total-"]').first().getAttribute('data-testid')
   const aliceId = aliceTestId!.replace('hole-bet-total-', '')
-  // Also discover Skins game ID from accordion breakdown testid (expand first player)
-  await page.locator('[data-testid^="hole-bet-total-"]').first().click()
-  await page.waitForTimeout(100)
-  const firstBreakdown = await page.locator('[data-testid^="hole-bet-breakdown-"]').first().getAttribute('data-testid')
-  const skinsGameId = firstBreakdown!.replace(`hole-bet-breakdown-${aliceId}-`, '')  // hole-bet-breakdown-{pid}-{gameId}
-  await page.locator('[data-testid^="hole-bet-total-"]').first().click()  // collapse
+  // Note: per-game breakdown is now in BetDetailsSheet (WF-3). Sheet testids:
+  //   sheet-row-{hole}-{pid}           — tap to expand player row in sheet
+  //   sheet-breakdown-{hole}-{pid}-{gameId} — per-game delta row in sheet
 
   // ── §2 CARRY SCENARIO — holes 1–5: Alice wins; hole 6: tie; hole 7: decisive ─
 
@@ -168,16 +167,20 @@ test('skins flow: SK-4 §1–§8 closure spec', async ({ page }) => {
   await decrementBtn(page, 2).click()  // Carol 4→3
   await page.waitForTimeout(100)
 
-  // §4 ACCORDION — hole 6 (tied/carry): bottom row shows "—" for all players
+  // §4 BET DETAILS SHEET — hole 6 (tied/carry): sheet breakdown shows "—" for Skins
   const aliceBetBtn6 = page.locator(`[data-testid="hole-bet-total-${aliceId}"]`)
-  await aliceBetBtn6.click()
+  await aliceBetBtn6.click()  // opens BetDetailsSheet (WF-3: Bet-row now routes to sheet)
+  await page.waitForTimeout(300)  // allow slide-up animation (300ms)
+  // Expand Alice's hole 6 row in the sheet
+  await page.locator(`[data-testid="sheet-row-6-${aliceId}"]`).click()
   await page.waitForTimeout(100)
-  const aliceBreakdown6 = page.locator(`[data-testid="hole-bet-breakdown-${aliceId}-${skinsGameId}"]`)
+  // Hole 6 is a tie (SkinCarried, no points) → sheet shows "—"
+  const aliceBreakdown6 = page.locator(`[data-testid^="sheet-breakdown-6-${aliceId}-"]`)
   await expect(aliceBreakdown6).toBeVisible()
-  // Hole 6 is a tie (SkinCarried, no points) → "—" in accordion
   const aliceBreakdown6Text = await aliceBreakdown6.textContent()
-  expect(aliceBreakdown6Text?.trim(), 'Hole 6 tied: accordion shows Skins —').toContain('—')
-  await aliceBetBtn6.click()  // collapse
+  expect(aliceBreakdown6Text?.trim(), 'Hole 6 tied: sheet shows Skins —').toContain('—')
+  await page.getByRole('button', { name: 'Close round summary' }).click()
+  await page.waitForTimeout(200)  // allow slide-down animation
 
   await saveHoleAndAdvance(page, 6, false)
   await expect(page.locator('div').filter({ hasText: 'Hole 7' }).first()).toBeVisible()
@@ -195,18 +198,22 @@ test('skins flow: SK-4 §1–§8 closure spec', async ({ page }) => {
   // Alice's hole-7 delta: +2000 minor units = +$20.00.
   await page.waitForTimeout(300)  // allow F9-a effect + useMemo recompute
 
-  // §4 ACCORDION — hole 7 (decisive, carry absorbed): Alice +$20.00
+  // §4 BET DETAILS SHEET — hole 7 (decisive, carry absorbed): sheet shows "+$20.00"
   const aliceBetBtn7 = page.locator(`[data-testid="hole-bet-total-${aliceId}"]`)
-  await aliceBetBtn7.click()
+  await aliceBetBtn7.click()  // opens BetDetailsSheet
+  await page.waitForTimeout(300)  // allow slide-up animation
+  // Expand Alice's hole 7 row in the sheet
+  await page.locator(`[data-testid="sheet-row-7-${aliceId}"]`).click()
   await page.waitForTimeout(100)
-  const aliceBreakdown7 = page.locator(`[data-testid="hole-bet-breakdown-${aliceId}-${skinsGameId}"]`)
+  const aliceBreakdown7 = page.locator(`[data-testid^="sheet-breakdown-7-${aliceId}-"]`)
   await expect(aliceBreakdown7).toBeVisible()
   const aliceBreakdown7Text = await aliceBreakdown7.textContent()
-  expect(aliceBreakdown7Text?.trim(), 'Hole 7 carry absorbed: accordion shows Skins +$20.00').toContain('+$20.00')
+  expect(aliceBreakdown7Text?.trim(), 'Hole 7 carry absorbed: sheet shows Skins +$20.00').toContain('+$20.00')
   // §3 R4 VERIFICATION: carry was NOT prematurely resolved (if R4 bug existed, hole-6
   // carry would have been split between tied players and hole 7 would show +$10.00 only)
   expect(aliceBreakdown7Text?.trim(), 'R4 verified: hole-7 delta is +$20.00 not +$10.00 (carry intact)').not.toContain('+$10.00')
-  await aliceBetBtn7.click()  // collapse
+  await page.getByRole('button', { name: 'Close round summary' }).click()
+  await page.waitForTimeout(200)  // allow slide-down animation
 
   // §2 CARRY: also assert the scorecard bottom row shows +$20.00 for Alice on hole 7
   const aliceTotalRow7 = page.locator(`[data-testid="hole-bet-total-${aliceId}"]`)

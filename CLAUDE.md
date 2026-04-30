@@ -41,26 +41,42 @@ You also keep CLAUDE.md (this file) current. When project conventions, structure
 
 When GM says "run SOD" or pastes the SOD prompt:
 
-1. Create docs/yyyy-mm-dd/ for today.
-2. Read yesterday's eod.md — specifically section 10 ("Tomorrow's seed").
-3. Refresh docs/roadmap.md from IMPLEMENTATION_CHECKLIST.md (Active item, Backlog, open Parking Lot items).
-4. Update docs/pipeline.md — the rolling 5-day pipeline.
-5. Confirm AGENTS.md "Active phase" / "Current item" matches IMPLEMENTATION_CHECKLIST.md; update AGENTS.md if it has drifted.
-6. Write docs/yyyy-mm-dd/sod.md using docs/templates/sod.md. Follow the strict format: header, carryover from prior EOD, issue tracker snapshot, five-day pipeline (Today / Day +1-2 / Day +3-5 / Beyond +5), today's structured plan, risks, Code's notes.
+1. Determine today's folder: docs/yyyy-mm-dd/ using the actual current calendar date. If the folder already exists from earlier in the same calendar day, use it — do not create a new dated folder.
+2. Determine the SOD filename:
+   - If no sod.md exists in today's folder, write to sod.md (this is session 1)
+   - If sod.md exists, count the existing SOD files (sod.md, sod-2.md, sod-3.md, ...) and write to the next number (sod-2.md, sod-3.md, etc.)
+   - The highest-numbered SOD file is the "active" SOD for the current session
+3. Read the most recent prior EOD — this is the highest-numbered eod file in the most recent prior date folder (or in today's folder if EOD already ran earlier today and the user is starting a new session). Specifically read section 10 ("Tomorrow's seed").
+4. Refresh docs/roadmap.md from the issue tracker.
+5. Update docs/pipeline.md — the rolling 5-day pipeline.
+6. Write the SOD file using docs/templates/sod.md. Follow the strict format: header, carryover from prior EOD, issue tracker snapshot, five-day pipeline (Today / Day +1-2 / Day +3-5 / Beyond +5), today's structured plan, risks, Code's notes. The header's "Day index" continues the work-session counter — does not reset for second-session same-day SODs.
 7. Enforce SOD format rules: 1-4 Today items, max 6 Day +1-2 items, max 5 Day +3-5 items, every Today item has a matching Plan entry, every Plan entry has explicit In scope and Out of scope.
-8. Report the SOD summary to GM. Do not start work until GM approves the plan.
+8. Report the SOD summary to GM, including which session number this is if it is not the first SOD of the calendar day. Do not start work until GM approves the plan.
 
 ## EOD (End of Day)
 
-When GM says "run EOD" or pastes the EOD prompt:
+EOD is user-initiated only. You do not run EOD because GM asked, because a few prompts have been completed, or because the work feels paused. Run EOD only when GM explicitly says "run EOD" or pastes the EOD prompt — and that prompt should always trace back to the user. If GM proposes EOD without an explicit user trigger, push back: "Confirm with the user before EOD — only a small portion of a typical work day has elapsed."
 
-1. Finalize today's docs/yyyy-mm-dd/eod.md using docs/templates/eod.md. Follow the strict format: header, plan-vs-reality table, shipped, in progress, blocked, codebase changes, instruction updates, Cowork queue, pipeline drift check, instruction-health, tomorrow's seed.
-2. Section 1 (plan vs reality) must have one row per Plan entry from today's SOD — no skipping.
-3. Section 8 (pipeline drift) compares today's Today completion count vs SOD's Today count, and lists every off-pipeline addition with reason.
-4. Section 10 (tomorrow's seed) is the direct input to tomorrow's SOD section 1 — fill it specifically, including 2-4 suggested Today items in the same table format the SOD uses.
-5. Update docs/pipeline.md to reflect today's shifts.
-6. Stage and commit (no remote — local commit is the durability checkpoint). Use ticket-prefixed commit style when work-item-linked.
-7. Report the EOD summary to GM.
+When EOD is correctly triggered:
+
+1. Determine the EOD filename in today's folder (docs/yyyy-mm-dd/, using the actual current calendar date):
+   - If no eod.md exists, write to eod.md (this is the session 1 wrap-up)
+   - If eod.md exists, count the existing EOD files (eod.md, eod-2.md, eod-3.md, ...) and write to the next number
+   - The new EOD pairs with the most recent SOD file from today (eod-2.md pairs with sod-2.md, etc.)
+2. Finalize the EOD using docs/templates/eod.md. Follow the strict format: header, plan-vs-reality table, shipped, in progress, blocked, codebase changes, instruction updates, Cowork queue, pipeline drift check, instruction-health, tomorrow's seed. The header's "Linked SOD" must point to the matching SOD file (the one with the same session number, not just sod.md).
+3. Section 1 (plan vs reality) must have one row per Plan entry from the matching SOD — no skipping.
+4. Section 8 (pipeline drift) compares this session's Today completion count vs the matching SOD's Today count, and lists every off-pipeline addition with reason.
+5. Section 10 (tomorrow's seed) is the direct input to the next SOD section 1 — fill it specifically, including 2-4 suggested Today items in the same table format the SOD uses. "Next SOD" may be later today (a new session) or tomorrow.
+6. Update docs/pipeline.md to reflect this session's shifts.
+7. Report the EOD summary to GM, including which session number this is if it is not the first EOD of the calendar day.
+
+## Multiple sessions in one calendar day
+
+When the user starts a new work session on a date that already has SOD/EOD activity:
+- Same yyyy-mm-dd folder (do not create a new dated folder)
+- Suffixed file names: sod-2.md, eod-2.md, sod-3.md, eod-3.md, etc.
+- Reports continue numbering sequentially across all sessions of the day (01-..., 02-..., ... 07, 08...) — do not reset numbering at session boundaries
+- The "latest" SOD/EOD is whichever has the highest suffix number; that is the one a fresh SOD reads from for carryover
 
 ## Cowork handoffs
 

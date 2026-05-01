@@ -1,20 +1,20 @@
 // src/games/aggregate.ts — Round aggregation: reduces a ScoringEventLog to a RunningLedger.
 //
-// Phase 1 scope: scaffold, Junk monetary reducer. Non-Junk monetary events
-// are reduced with money[p] = event.points[p] (correct formula for Phase 1).
-// Supersession filter deferred to a dedicated schema pass (EventBase has no
-// id field; zero writers in codebase — see parking-lot item).
-// RoundingAdjustment branch removed: integer-only mandate (game_junk.md §11)
-// makes the branch unreachable. Event type kept in events.ts as dead schema.
+// Full-recompute on every call (Decision 4). Idempotent and pure.
+// Nassau and Match Play compound byBet keys (${betId}::${matchId}) are handled
+// in reduceEvent. Supersession filter deferred (no id field on EventBase).
 //
-// Phase 2 adds Skins + Wolf synthetic-log tests.
-// Phase 3 adds Nassau + Match Play (compound byBet keys) + orchestration loop.
+// Decisions made during construction:
+//   Decision 1: Shape A — combined orchestrator + reducer (single file).
+//   Decision 2: junk.ts maybeEmitRoundingAdjustment stub deleted.
+//   Decision 3: Supersession filter deferred (no id field on EventBase; no writers).
+//   Decision 4: Full-recompute on every call.
+//   Decision 5: Sizing M.
 //
-// Decision 1: Shape A — combined orchestrator + reducer (single file).
-// Decision 2: junk.ts maybeEmitRoundingAdjustment stub deleted.
-// Decision 3: Supersession filter deferred (no id field on EventBase; no writers).
-// Decision 4: Full-recompute on every call.
-// Decision 5: Sizing M.
+// NA-pre-1 (2026-05-01): RoundingAdjustment is now emitted by stroke_play.ts and
+// match_play.ts when integer-division remainders occur. The reducer case below
+// is active (not dead schema). RoundingAdjustment.points carries the actual
+// remainder; aggregate accumulates it alongside the corresponding settled event.
 
 import type { PlayerId, BetId, RoundConfig, RunningLedger } from './types'
 import type { ScoringEventLog, NassauCfg, MatchPlayCfg, StrokePlayCfg } from './types'
@@ -130,10 +130,9 @@ function reduceEvent(
     //
     // Decision in §Money formula: money[p] = event.points[p] for all of:
     // SkinWon, WolfHoleResolved, LoneWolfResolved, BlindLoneResolved,
-    // ExtraHoleResolved, StrokePlaySettled, RoundingAdjustment (dead schema),
+    // ExtraHoleResolved, StrokePlaySettled, RoundingAdjustment,
     // FinalAdjustmentApplied.
-    //
-    // Phase 3 uses compound keys for Nassau events (handled above).
+    // Nassau compound keys are handled above.
 
     case 'SkinWon':
     case 'WolfHoleResolved':

@@ -345,9 +345,8 @@ function winnerTakesPotPoints(
   for (const w of winners) points[w] = perWinner
   const absorbingPlayer =
     remainder > 0 ? [...winners].sort()[0] : null
-  if (absorbingPlayer !== null) {
-    points[absorbingPlayer] += remainder
-  }
+  // Remainder goes into RoundingAdjustment event (emitted by caller), not silently
+  // absorbed here. Keeps StrokePlaySettled.points consistent across tied winners.
   return { points, absorbingPlayer, remainder }
 }
 
@@ -495,7 +494,7 @@ function resolveTie(args: {
           kind: 'RoundingAdjustment',
           ...base,
           absorbingPlayer: winPoints.absorbingPlayer,
-          points: zeroPoints(config.playerIds),
+          points: { [winPoints.absorbingPlayer]: winPoints.remainder },
         })
       }
       return out
@@ -527,7 +526,7 @@ function resolveTie(args: {
         kind: 'RoundingAdjustment',
         ...base,
         absorbingPlayer: winPoints.absorbingPlayer,
-        points: zeroPoints(config.playerIds),
+        points: { [winPoints.absorbingPlayer]: winPoints.remainder },
       })
     }
     return out
@@ -565,7 +564,7 @@ function emitSplitSettlement(
       to: 'split',
     })
   }
-  const { points, absorbingPlayer } = buildWinnerPoints(tied)
+  const { points, absorbingPlayer, remainder } = buildWinnerPoints(tied)
   out.push({
     kind: 'StrokePlaySettled',
     ...base,
@@ -577,7 +576,7 @@ function emitSplitSettlement(
       kind: 'RoundingAdjustment',
       ...base,
       absorbingPlayer,
-      points: zeroPoints(config.playerIds),
+      points: { [absorbingPlayer]: remainder },
     })
   }
   return out

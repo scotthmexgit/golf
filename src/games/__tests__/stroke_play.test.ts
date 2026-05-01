@@ -691,6 +691,114 @@ describe('§ 9: FieldTooSmall when fewer than 2 players complete the round', () 
   })
 })
 
+// ─── Test 17 — RoundingAdjustment.points carries actual remainder (NA-pre-1) ─
+//
+// AC 1: stake=100, 3 tied winners (Alice<Bob<Carol), 1 loser (Dave).
+//   loserPot=100, perWinner=33, remainder=1. Alice is lex-first winner.
+//   StrokePlaySettled.points[Alice] == 33 (NOT 34).
+//   RoundingAdjustment.points == { Alice: 1 }.
+//   Σ across all events' points == 0.
+
+describe('NA-pre-1 — RoundingAdjustment carries non-zero remainder (AC 1)', () => {
+  it('3 tied winners, stake=100, 1 loser → RA.points={Alice:1} and SP.points[Alice]=33', () => {
+    const cfg = makeSPCfg({
+      tieRule: 'split',
+      appliesHandicap: false,
+      stake: 100,
+      playerIds: ['Alice', 'Bob', 'Carol', 'Dave'],
+    })
+    const round = makeRoundCfg(cfg)
+    const strokes = { Alice: 0, Bob: 0, Carol: 0, Dave: 0 }
+    // Alice, Bob, Carol: all par (net=72). Dave: all bogey (net=90) → sole loser.
+    const holes = Array.from({ length: 18 }, () => ({
+      Alice: 4, Bob: 4, Carol: 4, Dave: 5,
+    }))
+    const events = runRound(holes, cfg, round, strokes)
+
+    const settled = events.find(e => e.kind === 'StrokePlaySettled')
+    expect(settled).toBeDefined()
+    if (settled?.kind === 'StrokePlaySettled') {
+      expect(settled.points['Alice']).toBe(33)
+      expect(settled.points['Bob']).toBe(33)
+      expect(settled.points['Carol']).toBe(33)
+      expect(settled.points['Dave']).toBe(-100)
+    }
+
+    const ra = events.filter(e => e.kind === 'RoundingAdjustment')
+    expect(ra).toHaveLength(1)
+    const raEvent = ra[0]
+    if (raEvent?.kind === 'RoundingAdjustment') {
+      expect(raEvent.absorbingPlayer).toBe('Alice')
+      expect(raEvent.points['Alice']).toBe(1)
+    }
+
+    assertZeroSum(events, cfg.playerIds)
+  })
+})
+
+// ─── Test 18 — No RoundingAdjustment when pot divides evenly (AC 2) ─────────
+
+describe('NA-pre-1 — no RoundingAdjustment when remainder is zero (AC 2)', () => {
+  it('2 tied winners, stake=100, 2 losers → loserPot=200 divisible by 2, no RA', () => {
+    const cfg = makeSPCfg({
+      tieRule: 'split',
+      appliesHandicap: false,
+      stake: 100,
+      playerIds: ['Alice', 'Bob', 'Carol', 'Dave'],
+    })
+    const round = makeRoundCfg(cfg)
+    const strokes = { Alice: 0, Bob: 0, Carol: 0, Dave: 0 }
+    // Alice, Bob: all par (net=72). Carol, Dave: all bogey (net=90).
+    const holes = Array.from({ length: 18 }, () => ({
+      Alice: 4, Bob: 4, Carol: 5, Dave: 5,
+    }))
+    const events = runRound(holes, cfg, round, strokes)
+
+    // loserPot = 100×2 = 200, nWinners = 2 → perWinner = 100, remainder = 0.
+    const ra = events.filter(e => e.kind === 'RoundingAdjustment')
+    expect(ra).toHaveLength(0)
+
+    assertZeroSum(events, cfg.playerIds)
+  })
+})
+
+// ─── Test 19 — Multi-hole round: Σ == 0 with remainder (AC 4) ───────────────
+
+describe('NA-pre-1 — 18-hole round with RoundingAdjustment: Σ==0, all integers (AC 4)', () => {
+  it('stake=100, 3-way tie → RA fires; round Σ==0; all point values are integers', () => {
+    const cfg = makeSPCfg({
+      tieRule: 'split',
+      appliesHandicap: false,
+      stake: 100,
+      playerIds: ['Alice', 'Bob', 'Carol', 'Dave'],
+    })
+    const round = makeRoundCfg(cfg)
+    const strokes = { Alice: 0, Bob: 0, Carol: 0, Dave: 0 }
+    const holes = Array.from({ length: 18 }, () => ({
+      Alice: 4, Bob: 4, Carol: 4, Dave: 5,
+    }))
+    const events = runRound(holes, cfg, round, strokes)
+
+    // Zero-sum across all 18 hole events + finalization events.
+    assertZeroSum(events, cfg.playerIds)
+
+    // Exactly one RoundingAdjustment was emitted.
+    const ra = events.filter(e => e.kind === 'RoundingAdjustment')
+    expect(ra).toHaveLength(1)
+
+    // Final per-player totals are correct integers.
+    const totals = sumPoints(events, cfg.playerIds)
+    expect(Number.isInteger(totals['Alice'])).toBe(true)
+    expect(Number.isInteger(totals['Bob'])).toBe(true)
+    expect(Number.isInteger(totals['Carol'])).toBe(true)
+    expect(Number.isInteger(totals['Dave'])).toBe(true)
+    expect(totals['Alice']).toBe(34)   // 33 + 1 remainder
+    expect(totals['Bob']).toBe(33)
+    expect(totals['Carol']).toBe(33)
+    expect(totals['Dave']).toBe(-100)
+  })
+})
+
 // ─── Test 16 — resolveTieByCardBack helper exposed and pure ───────────────
 
 describe('resolveTieByCardBack helper', () => {

@@ -191,6 +191,8 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 
 - [x] **CONSOLE-EXCEPTION-SCORECARD-LOAD** — Console exception observed on scorecard load during Skins Cowork verification (findings-2026-04-30-0246.md §parking-lot #3). Not reproducing in PM2 build at 2026-04-30; Cowork findings-2026-05-01-1330.md (date-misnamed by Cowork session; actual session date 2026-04-30) confirmed only Chrome password-manager extension noise unrelated to /golf, no application exceptions. Closed 2026-04-30 per Cowork findings. — 2026-04-30 (observed and closed) — SK-5 Cowork + WF-3 triage / WF-5 Cowork
 
+- [ ] **CODEX-BROKER-LIFETIME** — Codex companion broker process binds auth state at process start; tokens issued by `codex login` after the broker has already started are not picked up. Symptom: `401 Unauthorized` on `/v1/responses` despite successful device-auth login. Fix: kill stale broker PIDs (`cat /tmp/cxc-*/broker.pid | xargs kill`) after `codex login`; subsequent broker spawns pick up the new token. Note in CLAUDE.md or operator notes when Codex usage becomes frequent. — 2026-05-01 — architecture audit session — Low priority (workaround known; document-only)
+
 - [ ] **PL-1** — `setPress(hole, gameKey)` semantic mismatch: stores game-instance UUID, not Nassau match ID. Document or rename. — 2026-05-01 — architecture audit F3 — **Active: addressed by NA-3 F3 gate (new `setPressConfirmation` action + deprecation of `setPress` if unused)**
 
 - [x] **PL-2** — Emit `RoundingAdjustment` event when winner-takes-pot/splitToTeam remainder > 0. GM decision: Option B (emit). — 2026-05-01 — architecture audit F5 — **ABSORBED by NA-pre-1** (AC items 1–5)

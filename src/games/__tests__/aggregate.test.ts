@@ -1829,3 +1829,71 @@ describe('aggregateRound — serialization invariant', () => {
     expect(total).toBe(0)
   })
 })
+
+// ─── NA-pre-1 — RoundingAdjustment replay equivalence (AC 5) ────────────────
+//
+// Verifies that aggregateRound produces identical netByPlayer whether the
+// remainder is in StrokePlaySettled (legacy style) or in RoundingAdjustment
+// (new style). Proves backward compatibility of the event log format change.
+
+describe('NA-pre-1 — RoundingAdjustment replay equivalence (AC 5)', () => {
+  const spBet: BetSelection = {
+    id: 'sp-1',
+    type: 'strokePlay',
+    stake: 100,
+    participants: ['A', 'B', 'C', 'D'],
+    config: {
+      id: 'sp-1',
+      stake: 100,
+      settlementMode: 'winner-takes-pot',
+      stakePerStroke: 1,
+      placesPayout: [],
+      tieRule: 'split',
+      cardBackOrder: [],
+      appliesHandicap: false,
+      playerIds: ['A', 'B', 'C', 'D'],
+      junkItems: [],
+      junkMultiplier: 1,
+    },
+    junkItems: [],
+    junkMultiplier: 1,
+  }
+  const cfg = makeRoundCfg([spBet])
+
+  const ts = 'ts'
+  const actor = 'system' as const
+  const declaringBet = 'sp-1'
+  const hole = null
+
+  it('new-style (SP=perWinner, RA=remainder) and legacy-style (SP=perWinner+rem, no RA) produce same netByPlayer', () => {
+    // 3-way tie: A,B,C winners. D loser. stake=100.
+    // loserPot=100, perWinner=33, remainder=1. lex-first=A.
+
+    // New-style: SP carries perWinner for absorbing player; RA carries the remainder.
+    const newStyleLog: ScoringEventLog = {
+      events: [
+        { kind: 'StrokePlaySettled', timestamp: ts, actor, declaringBet, hole, mode: 'winner-takes-pot', points: { A: 33, B: 33, C: 33, D: -100 } },
+        { kind: 'RoundingAdjustment', timestamp: ts, actor, declaringBet, hole, absorbingPlayer: 'A', points: { A: 1 } },
+      ],
+      supersessions: {},
+    }
+
+    // Legacy-style: SP already absorbs remainder; RA has zero points.
+    const legacyStyleLog: ScoringEventLog = {
+      events: [
+        { kind: 'StrokePlaySettled', timestamp: ts, actor, declaringBet, hole, mode: 'winner-takes-pot', points: { A: 34, B: 33, C: 33, D: -100 } },
+        { kind: 'RoundingAdjustment', timestamp: ts, actor, declaringBet, hole, absorbingPlayer: 'A', points: { A: 0, B: 0, C: 0, D: 0 } },
+      ],
+      supersessions: {},
+    }
+
+    const newResult = aggregateRound(newStyleLog, cfg)
+    const legacyResult = aggregateRound(legacyStyleLog, cfg)
+
+    expect(newResult.netByPlayer).toEqual(legacyResult.netByPlayer)
+    expect(newResult.netByPlayer['A']).toBe(34)
+    expect(newResult.netByPlayer['B']).toBe(33)
+    expect(newResult.netByPlayer['C']).toBe(33)
+    expect(newResult.netByPlayer['D']).toBe(-100)
+  })
+})

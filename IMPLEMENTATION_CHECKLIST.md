@@ -26,7 +26,10 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-**Nassau phase — PROPOSED 2026-05-01. Plan: `docs/plans/NASSAU_PLAN.md`. Awaiting GM approval of Decisions A (allPairs in v1) and B (press offer UI shape). No NA-1 engineering until plan approved.**
+**Nassau phase — APPROVED 2026-05-01. Plan: `docs/plans/NASSAU_PLAN.md`. Decisions A (allPairs v1) + B (post-save modal) + Sequencing Option A LOCKED. Active item: NA-pre-1 (RoundingAdjustment emission). NA-pre-1 must close before NA-1 begins.**
+
+**NA-pre-1 evidence (to be filled when closed):**
+- NA-pre-1 — OPEN. Deliverable: `RoundingAdjustment` emission in `stroke_play.ts`, `match_play.ts`; aggregate.ts phase comments updated; events.ts "dead" label removed. AC: tests (a)+(b)+(c) pass; reviewer APPROVED; 441+ vitest; tsc clean.
 
 **Wolf phase closure evidence:**
 - WF-0 — CLOSED 2026-04-30. Deliverable: `docs/plans/WOLF_PLAN.md`. Report: `docs/2026-04-30/02-wolf-phase-plan.md`.
@@ -187,6 +190,14 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 - [ ] **PARKING-LOT-SKINS-3** [documentation only] — Stake unit label `/hole` for Skins differs from `/round` for Stroke Play. This is intentional per engine semantics (SP-UI-4 fix 2026-04-29) and correct: skins are won per hole. The label is accurate. Filing as a documentation note so future engineers do not "fix" it back to `/hole` for both. No code change needed. — 2026-04-30 — Cowork findings-2026-04-30-0246.md §parking-lot #4
 
 - [x] **CONSOLE-EXCEPTION-SCORECARD-LOAD** — Console exception observed on scorecard load during Skins Cowork verification (findings-2026-04-30-0246.md §parking-lot #3). Not reproducing in PM2 build at 2026-04-30; Cowork findings-2026-05-01-1330.md (date-misnamed by Cowork session; actual session date 2026-04-30) confirmed only Chrome password-manager extension noise unrelated to /golf, no application exceptions. Closed 2026-04-30 per Cowork findings. — 2026-04-30 (observed and closed) — SK-5 Cowork + WF-3 triage / WF-5 Cowork
+
+- [ ] **PL-1** — `setPress(hole, gameKey)` semantic mismatch: stores game-instance UUID, not Nassau match ID. Document or rename. — 2026-05-01 — architecture audit F3 — **Active: addressed by NA-3 F3 gate (new `setPressConfirmation` action + deprecation of `setPress` if unused)**
+
+- [x] **PL-2** — Emit `RoundingAdjustment` event when winner-takes-pot/splitToTeam remainder > 0. GM decision: Option B (emit). — 2026-05-01 — architecture audit F5 — **ABSORBED by NA-pre-1** (AC items 1–5)
+
+- [x] **PL-3** — Bridge test must assert `buildMatchStates(events, roundCfg).nassauMatches` matches bridge's final MatchState for round with at least one press. — 2026-05-01 — architecture audit F6 — **ABSORBED by NA-1 F6 gate** (explicit AC in NA-1)
+
+- [x] **PL-4** — `aggregate.ts:1-18` stale phase comments — update to reflect Phase 3 complete. — 2026-05-01 — architecture audit F8 — **ABSORBED by NA-pre-1 scope** (in-scope for that commit)
 
 ## Done
 

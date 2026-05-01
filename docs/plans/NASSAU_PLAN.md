@@ -1,8 +1,8 @@
 # Nassau Phase Plan
 
 **Authored:** 2026-05-01
-**Status:** PROPOSED — awaiting GM approval of Decisions A and B (sections 1 and 2) before NA-1 implementation begins.
-**Source research:** `docs/2026-05-01/02-nassau-plan.md` (this prompt's report)
+**Status:** APPROVED — Decisions A (allPairs v1) and B (post-save modal) LOCKED. Sequencing Option A (bridge-first, split bridge/wizard) LOCKED. NA-pre-1 (RoundingAdjustment emission) added before NA-1. Amended 2026-05-01 per architecture audit `docs/2026-05-01/03-architecture-audit.md`.
+**Source research:** `docs/2026-05-01/02-nassau-plan.md` (original plan report)
 **Preceding phase:** Wolf phase — closed 2026-04-30 per `docs/plans/WOLF_PLAN.md`
 
 ---
@@ -31,25 +31,21 @@ Closing NA-5 does **not** automatically unpark Match Play or Junk #7b. The next 
 
 Decisions settled before the plan was written or resolved by the project state. Not re-litigable within this phase.
 
-### Decision A — allPairs in v1 *(assessment — GM approval required)*
+### Decision A — allPairs in v1 — **LOCKED: YES**
 
-**See §2 below.** Whether `pairingMode = 'allPairs'` (3–5 player Nassau with every distinct pair scoring independently) is in scope for v1. Code recommendation: **yes, include allPairs in v1.** The engine already handles it; the bridge handles it by iterating pairs; the wizard needs a `pairingMode` toggle. Marginal cost over singles-only is low.
+`pairingMode = 'allPairs'` (3–5 player Nassau with every distinct pair scoring independently) is **in scope for v1**. The engine already handles it; the bridge iterates pairs; the wizard surfaces a `pairingMode` toggle. Full assessment in §2 (retained for reference).
 
-**If GM selects singles-only:** the bridge is simpler (one pair, two playerIds required), but Nassau only works for 2-player rounds in v1. A follow-on phase would unpark allPairs.
+### Decision B — Press offer interaction shape — **LOCKED: Option (a) post-save modal**
 
-**GM must confirm before NA-1 implementation begins.**
-
-### Decision B — Press offer interaction shape *(assessment — GM approval required)*
-
-**See §2 below.** How the press confirmation dialog surfaces to the user. Three options evaluated; Code recommends one.
-
-**GM must confirm before NA-3 implementation begins.** (NA-1 and NA-2 are not blocked by this decision.)
+Press confirmation surfaces as a post-save modal overlay on the scorecard (after "Save & Next Hole", before hole navigation). Full assessment in §2 (retained for reference). NA-3 uses Decision B = option (a); the `**Applies only if Decision B = option (a)**` qualifier in NA-3 is now always true.
 
 ---
 
-## 2. Assessments Requiring GM Decision
+## 2. Assessments (Locked — retained for reference)
 
-### Assessment A — allPairs in v1
+Both assessments below are locked per GM approval 2026-05-01. Retained for decision history only — not re-litigable within this phase.
+
+### Assessment A — allPairs in v1 (LOCKED: YES)
 
 The Nassau engine (`nassau.ts`) has first-class support for `pairingMode = 'allPairs'`: `initialMatches(cfg)` generates all `C(n,2)` pair-match triples when `pairingMode = 'allPairs'`; `settleNassauHole` iterates over all match states; `finalizeNassauRound` settles each pair's front/back/overall/press independently. The existing tests include allPairs (Test 5: 3-player allPairs settlement).
 
@@ -77,13 +73,11 @@ The Nassau engine (`nassau.ts`) has first-class support for `pairingMode = 'allP
 
 ---
 
-**Code recommendation: Option (a) — allPairs in v1.**
-
-The engine supports it; the aggregate layer supports it; the marginal cost is modest. Nassau without allPairs is only useful for 2-player match-up rounds, which is a common but limited subset of the group's use cases. Including allPairs makes Nassau immediately useful for the full group.
+**Decision: Option (a) — allPairs in v1. LOCKED.**
 
 ---
 
-### Assessment B — Press offer interaction shape
+### Assessment B — Press offer interaction shape (LOCKED: Option a)
 
 After a player saves a hole score, if that hole meets a press threshold (`pressRule = 'auto-2-down'` or `auto-1-down'`), the UI must prompt the down player: "You are N down on [front/back/overall]. Do you want to press?" The player's answer is stored in `HoleData.presses?: string[]` (already on `HoleData` — the matchId of confirmed presses is appended; empty or absent means no press on this hole). The bridge reads `holeData.presses` to know which presses were confirmed.
 
@@ -133,7 +127,7 @@ Three interaction options:
 
 For allPairs with multiple concurrent offers: the bridge determines offer order (e.g., front match first, back second, overall third); the modal processes them one at a time with a "Next offer" step.
 
-**GM must confirm (a) — or select (b) or (c) — before NA-3 implementation begins.** NA-1 and NA-2 are not blocked.
+**Decision: Option (a) — post-save modal. LOCKED.**
 
 ---
 
@@ -244,17 +238,17 @@ For `allPairs` mode, the bridge runs the above loop once per pair combination, t
 
 ## 5. Sequencing Options
 
-Three sequencing options are evaluated. Code's recommendation follows.
+**LOCKED: Option A (bridge-first, split bridge/wizard).** Options B and C evaluated below for reference; not chosen.
 
-### Option A — Bridge-first (recommended)
+### Option A — Bridge-first — **LOCKED**
 
-**Order:** NA-0 → NA-1 (bridge + cutover + GAME_DEFS unpark) → NA-2 (wizard setup) → NA-3 (press offer UI) → NA-4 (Playwright spec) → NA-5 (Cowork)
+**Order:** NA-0 → **NA-pre-1** (RoundingAdjustment emission) → NA-1 (bridge + cutover + GAME_DEFS unpark) → NA-2 (wizard setup) → NA-3 (press offer UI) → NA-4 (Playwright spec) → NA-5 (Cowork)
 
 *Rationale:* Same pattern as Skins (SK-2 before SK-3) and Wolf (WF-1 first). The bridge is wired early, which means `BetDetailsSheet` immediately shows Nassau data (via `perHoleDeltas.ts` dispatch) after NA-1. The wizard (NA-2) can follow in a separate focused prompt. Press offer UI (NA-3) is the most complex piece and is deferred until the bridge is stable — if the bridge reveals unexpected behavior, the press UI design is not yet committed.
 
 *Risk:* Medium. Nassau bridge is more complex than Wolf/Skins (MatchState threading, press handling from HoleData). NA-1 is the largest single item. Mitigation: the engine is complete and well-tested; the bridge has a clear contract.
 
-### Option B — Wizard-first with stub bridge
+### Option B — Wizard-first with stub bridge (not chosen)
 
 **Order:** NA-0 → NA-1 (wizard + GAME_DEFS unpark + stub bridge returning empty events) → NA-2 (full bridge + cutover) → NA-3 (press offer UI) → NA-4 → NA-5
 
@@ -262,7 +256,7 @@ Three sequencing options are evaluated. Code's recommendation follows.
 
 *Risk:* Higher. A stub bridge masks bridge-level bugs until NA-2; the GAME_DEFS unpark exposes Nassau in the wizard but the game produces no settlement until NA-2 lands. Two-step cutover is messier. Not recommended unless the wizard has significant design uncertainty.
 
-### Option C — Combined bridge + wizard in one item
+### Option C — Combined bridge + wizard in one item (not chosen)
 
 **Order:** NA-0 → NA-1 (bridge + cutover + wizard + GAME_DEFS unpark, combined) → NA-2 (press offer UI) → NA-3 (Playwright spec) → NA-4 (Cowork)
 
@@ -272,9 +266,9 @@ Three sequencing options are evaluated. Code's recommendation follows.
 
 ---
 
-**Code recommendation: Option A (bridge-first, split bridge/wizard).**
+**Decision: Option A. LOCKED.**
 
-The Nassau bridge is meaningfully more complex than prior bridges (MatchState threading, press handling from HoleData, allPairs pair iteration). Splitting bridge (NA-1) from wizard (NA-2) reduces the blast radius of unexpected bridge issues and keeps each item reviewable. The BetDetailsSheet immediately benefits from NA-1 (Nassau deltas visible in the sheet before the wizard is complete). The press offer UI (NA-3) is the most novel piece and is best deferred until the bridge's press-handling contract is proven in tests.
+Audit findings F6 (bridge/aggregate MatchState consistency invariant) and F10 (hydrateRound config loss) both reinforce the split: NA-1 proves the bridge contract before NA-2's Explore might surface a DB migration. See `docs/2026-05-01/03-architecture-audit.md §5`.
 
 ---
 
@@ -284,9 +278,51 @@ The Nassau bridge is meaningfully more complex than prior bridges (MatchState th
 
 **Type:** Documenter
 **Sizing:** S
-**Status:** PROPOSED — awaiting GM approval of Decisions A and B.
+**Status:** CLOSED — plan approved 2026-05-01. AGENTS.md and IMPLEMENTATION_CHECKLIST.md pointers updated to Nassau phase.
 
-Deliverable: `docs/plans/NASSAU_PLAN.md`. Plan is approved when GM confirms both decisions and signals green light for NA-1. AGENTS.md "Current item" pointer will be updated to NA-1 on approval.
+Deliverable: `docs/plans/NASSAU_PLAN.md` (this file). Amended same day per architecture audit findings.
+
+---
+
+### NA-pre-1 — RoundingAdjustment Event Emission
+
+**Type:** Engineer
+**Sizing:** S
+**Dependencies:** NA-0 closed (no Nassau bridge dependency — this item is bet-agnostic).
+**Source:** Architecture audit F5 — `docs/2026-05-01/03-architecture-audit.md §3 F5`. GM decision: Option B (emit `RoundingAdjustment` event when remainder > 0).
+
+**Purpose:** `stroke_play.ts:343-350` and `match_play.ts:139-146` currently absorb winner-takes-pot and best-ball `splitToTeam` remainders silently into the lex-first player's points. Ground rules #6 (every delta emits a typed `ScoringEvent`) and #7 (no silent defaults) require an explicit `RoundingAdjustment` event when rounding occurs. The `RoundingAdjustment` type exists in `events.ts` but is labeled "dead schema" — this item activates it.
+
+**In scope:**
+- `src/games/stroke_play.ts:343-350` — `winnerTakesPotPoints`: when `remainder > 0`, emit `RoundingAdjustment(remainder, absorbingPlayer)` alongside `StrokePlaySettled`.
+- `src/games/match_play.ts:139-146` — `splitToTeam`: when `remainder !== 0`, return a `RoundingAdjustment` event alongside `MatchClosedOut` (or wherever `splitToTeam` result is consumed).
+- `src/games/aggregate.ts` — confirm `reduceEvent` already handles `RoundingAdjustment` in the monetary reducer (it does: case `'RoundingAdjustment'` at line 144 reduces `event.points`). Verify the path is exercised by the new tests.
+- `src/games/events.ts` — remove "dead schema" / "never emitted" comments from `RoundingAdjustment` type definition.
+- `src/games/aggregate.ts:1-18` — update stale phase comments ("Phase 1/2/3 scope") to reflect Phase 3 complete. (Audit F8 fold — cosmetic, rides in this commit.)
+
+**Out of scope:**
+- Any Nassau-specific logic — this item is Stroke Play + Match Play only.
+- Any change to the absorb-first-winner rule itself — the distribution logic is unchanged; only the event emission is added.
+- Any schema/DB changes.
+
+**Acceptance criteria:**
+1. `stroke_play.ts:winnerTakesPotPoints` — when `remainder > 0` (e.g., stake=100, 3 tied winners, 1 loser: loserPot=100, perWinner=33, remainder=1), emits one `RoundingAdjustment` event with `points: { [absorbingPlayer]: remainder }` alongside `StrokePlaySettled`. Zero-sum: Σ across `StrokePlaySettled.points` + `RoundingAdjustment.points` = 0.
+2. `match_play.ts:splitToTeam` — when `remainder !== 0`, emits one `RoundingAdjustment` event. Zero-sum preserved.
+3. Test (a): stake=100, 1 loser, 3 tied winners → `remainder = 1` → `RoundingAdjustment` emitted with `points: { [lex-first-winner]: 1 }`.
+4. Test (b): stake=100, 1 loser, 2 tied winners → `remainder = 0` → no `RoundingAdjustment` emitted.
+5. Test (c): replay through `aggregateRound` — round with a RoundingAdjustment event produces identical `netByPlayer` to the pre-amendment behavior (the absorb was already in the delta; the event is now explicit).
+6. `events.ts` `RoundingAdjustment` — "dead schema" comments removed.
+7. `aggregate.ts:1-18` — stale phase comments updated.
+8. `npm run test:run` passes (all existing + new tests). `tsc --noEmit --strict` passes.
+9. Reviewer gate: `reviewer` agent returns `APPROVED` before NA-pre-1 is declared done.
+10. **Fence:** `src/games/stroke_play.ts`, `src/games/match_play.ts`, `src/games/aggregate.ts` (comment update only), `src/games/events.ts` (comment removal only), new test additions in `src/games/__tests__/`. No bridge, UI, or prisma changes.
+
+**Phase plan:**
+- Explore: read `stroke_play.ts:334-352`, `match_play.ts:130-160` (splitToTeam and its callers), `aggregate.ts:90-155` (reduceEvent — confirm RoundingAdjustment case is present and correct), `events.ts:241-245` (RoundingAdjustment type).
+- Plan: confirm caller sites where `winnerTakesPotPoints` and `splitToTeam` results are consumed; identify where to emit the new events.
+- Develop with TDD: write failing tests for (a) and (b) first, then add emission.
+- Reviewer gate: `reviewer` agent APPROVED before commit.
+- Commit: `NA-pre-1: emit RoundingAdjustment when winner-takes-pot/splitToTeam remainder > 0`.
 
 ---
 
@@ -294,7 +330,7 @@ Deliverable: `docs/plans/NASSAU_PLAN.md`. Plan is approved when GM confirms both
 
 **Type:** Engineer
 **Sizing:** M–L
-**Dependencies:** NA-0 approved (GM green-lights plan + Decision A).
+**Dependencies:** NA-pre-1 closed (RoundingAdjustment emission complete). NA-0 approved.
 
 **Purpose:** Create `src/bridge/nassau_bridge.ts`, wire `computeGamePayouts` to route `'nassau'` through the bridge, add `case 'nassau'` to `perHoleDeltas.ts`, and unpark Nassau in GAME_DEFS. This is the most complex bridge in the project due to MatchState threading.
 
@@ -367,7 +403,9 @@ Add `case 'nassau': return settleNassauBet(holes, players, game).events` to `gam
 - `npm run test:run` passes (all existing tests + new bridge tests).
 - `tsc --noEmit --strict` passes.
 - Playwright `skins-flow.spec.ts` and `wolf-flow.spec.ts` still pass (regression gate).
-- **Fence:** `nassau_bridge.ts`, `nassau_bridge.test.ts`, `payouts.ts` (nassau case), `perHoleDeltas.ts` (nassau case), `src/types/index.ts` (disabled flag removal). No Skins, Wolf, Stroke Play, or scorecard UI files touched.
+- **[F6 gate — audit-derived]** Bridge test asserts: `buildMatchStates({ events, supersessions: {} }, roundCfg).nassauMatches` matches bridge's final internal `MatchState[]` for a fixture round containing at least one confirmed press. This proves bridge event emission is complete and `aggregateRound` replay will converge.
+- **[F7 gate — audit-derived]** `payouts.ts` nassau case (`settleNassauBet` path) and `perHoleDeltas.ts` nassau case must land in the **same commit**. A partial commit where only one is updated is a blocking defect.
+- **Fence:** `nassau_bridge.ts`, `nassau_bridge.test.ts`, `payouts.ts` (nassau case — replaces `computeNassau` dispatch), `perHoleDeltas.ts` (nassau case — atomic with payouts.ts), `src/types/index.ts` (disabled flag removal). No Skins, Wolf, Stroke Play, or scorecard UI files touched.
 
 **Risk flags:**
 
@@ -426,14 +464,21 @@ These fields are already on `GameInstance` (from prior engine work): `pressRule`
 - `GameInstance` may not yet have `pressRule`, `pressScope`, `pairingMode` fields if they were not added during engine work. The bridge defaults them; the wizard just needs to surface them. If missing: add to `GameInstance` type (in `src/types/index.ts`) and the Zustand store's `addGame` / `updateGame` logic. This is a type-only change — no DB schema change (the `Game` model stores game config as JSON or as separate columns depending on current schema).
 - Confirm `Game` Prisma model stores these fields. If stored as typed columns, they may need a DB migration. If stored as a JSON config blob, no migration needed. **Explore phase for NA-2 must read the `prisma/schema.prisma` Game model before planning the wizard change.**
 
+**[F10 gate — audit-derived]** Before NA-2 begins its Develop phase, the engineer must verify the full hydration chain:
+1. Confirm `prisma/schema.prisma` `Game` model stores `pressRule`, `pressScope`, `pairingMode` (as typed columns or a JSON config field).
+2. Confirm `GET /api/rounds/[id]` serializes these fields in the games array response.
+3. Confirm `hydrateRound` in `roundStore.ts:263-270` maps these fields back onto the restored `GameInstance`.
+If any step fails, surface as an **Approval Gate** before Develop proceeds — a DB migration or API serialization change is required. NA-2 Develop **includes** the `hydrateRound` mapping fix if not already present; this is in-scope for NA-2, not a separate item.
+
 ---
 
 ### NA-3 — Press Offer UI
 
 **Type:** Engineer
 **Sizing:** M
-**Dependencies:** NA-2 complete (wizard controls must be in place so pressRule is saved and the bridge knows to expect press confirmations). Decision B must be approved.
-**Applies only if Decision B = option (a) (post-save modal). Adapted if GM selects (b) or (c).**
+**Dependencies:** NA-2 complete (wizard controls must be in place so pressRule is saved and the bridge knows to expect press confirmations). Decision B = option (a) LOCKED.
+
+**[F3 gate — audit-derived]** NA-3 must add a **new** `setPressConfirmation(hole: number, matchId: string)` Zustand action to `roundStore.ts`. Do **NOT** reuse the existing `setPress(hole, gameKey)` — that action stores game-instance UUIDs, which are semantically incompatible with Nassau match IDs (`'front'`, `'back'`, `'overall'`, `'press-N'`). If `setPress` has no remaining callers after NA-3 lands, mark it `@deprecated` or remove it in the same commit.
 
 **Purpose:** Add the press offer interaction to the hole-save flow. After a player saves a hole score, if any match meets the `pressRule` threshold, the UI prompts the down player to accept or decline. The bridge reads `HoleData.presses` to determine which presses were confirmed.
 
@@ -601,6 +646,12 @@ The following IMPLEMENTATION_CHECKLIST backlog/parking-lot items are addressed o
 **Risk:** `pressRule`, `pressScope`, `pairingMode` may not be stored as DB columns on the `Game` model; if stored as a JSON blob or simply missing, wizard saves are lost on hydration.
 
 **Mitigation:** NA-2 Explore phase reads `prisma/schema.prisma` to confirm the `Game` model. If fields are missing, a DB migration is required (add them as typed columns or extend a JSON config field). This is an Approval Gate item for NA-2 — if a migration is needed, stop after Plan and report to GM before applying.
+
+### R7 — NA-pre-1 RoundingAdjustment prerequisite for NA-1
+
+**Risk:** NA-1 adds `nassau_bridge.test.ts` tests that include the `aggregateRound` F6 replay gate (buildMatchStates consistency). If `RoundingAdjustment` events are not yet emitted (NA-pre-1 not closed), aggregate test fixtures that include Stroke Play or Match Play bets alongside Nassau may fail the zero-sum check because the `RoundingAdjustment` path is untested.
+
+**Mitigation:** NA-pre-1 must be **closed** before NA-1 begins. The dependency is explicit in NA-1's Dependencies field. Do not start NA-1 while NA-pre-1 is still in progress.
 
 ### R6 — Legacy `computeNassau` semantic divergence
 

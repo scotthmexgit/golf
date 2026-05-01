@@ -34,17 +34,18 @@ model CourseHole {
 }
 
 model Round {
-  id         Int           @id @default(autoincrement())
-  courseId   Int
-  holesCount Int           @default(18)
-  playedAt   DateTime      @default(now())
-  tee        String        @default("blue")
-  status     String        @default("InProgress")
-  createdAt  DateTime      @default(now())
-  games      Game[]
-  course     Course        @relation(fields: [courseId], references: [id])
-  players    RoundPlayer[]
-  scores     Score[]
+  id             Int            @id @default(autoincrement())
+  courseId       Int
+  holesCount     Int            @default(18)
+  playedAt       DateTime       @default(now())
+  tee            String         @default("blue")
+  status         String         @default("InProgress")
+  createdAt      DateTime       @default(now())
+  games          Game[]
+  holeDecisions  HoleDecision[]
+  course         Course         @relation(fields: [courseId], references: [id])
+  players        RoundPlayer[]
+  scores         Score[]
 }
 
 model RoundPlayer {
@@ -80,8 +81,19 @@ model Game {
   type      String
   stake     Int
   playerIds Int[]
+  config    Json?        // game-type-specific config; NULL = use bridge defaults
   round     Round        @relation(fields: [roundId], references: [id])
   results   GameResult[]
+}
+
+model HoleDecision {
+  id        Int    @id @default(autoincrement())
+  roundId   Int
+  hole      Int
+  decisions Json   // per-hole decision state (wolfPick, presses, greenieWinners, bangoWinner, dots)
+  round     Round  @relation(fields: [roundId], references: [id])
+
+  @@unique([roundId, hole])
 }
 
 model GameResult {

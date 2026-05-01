@@ -30,6 +30,9 @@ export async function GET(
         orderBy: [{ hole: 'asc' }, { playerId: 'asc' }],
       },
       games: true,
+      holeDecisions: {
+        orderBy: { hole: 'asc' },
+      },
     },
   })
 
@@ -85,6 +88,7 @@ export async function GET(
       type: g.type,
       stake: g.stake,
       playerIds: g.playerIds,
+      config: g.config ?? null,
     })),
     scores: round.scores.map((s) => ({
       playerId: s.playerId,
@@ -92,6 +96,10 @@ export async function GET(
       gross: s.gross,
       putts: s.putts,
       fromBunker: s.fromBunker,
+    })),
+    holeDecisions: round.holeDecisions.map((hd) => ({
+      hole: hd.hole,
+      decisions: hd.decisions,
     })),
   })
 }

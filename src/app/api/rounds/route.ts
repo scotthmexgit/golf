@@ -1,12 +1,27 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { COURSES } from '@/types'
+import type { GameType, GameInstance } from '@/types'
+import { buildGameConfig, validateGameConfig } from '@/lib/gameConfig'
 
 export async function POST(request: Request) {
+  let body: Record<string, unknown>
   try {
-    const body = await request.json()
-    const { courseName, courseLocation, holesCount, playedAt, players, gameInstances } = body
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Malformed JSON' }, { status: 400 })
+  }
+  const { courseName, courseLocation, holesCount, playedAt, players, gameInstances } = body as {
+    courseName: string
+    courseLocation?: string
+    holesCount: string
+    playedAt?: string
+    players: Array<{ id?: string; name?: string; tee?: string; hcpIndex?: number; courseHcp?: number; betting?: boolean }>
+    gameInstances: Array<GameInstance>
+  }
 
+  try {
     // Find or create course
     let course = await prisma.course.findFirst({ where: { name: courseName } })
     if (!course) {
@@ -43,11 +58,41 @@ export async function POST(request: Request) {
       playerRecords.push(player)
     }
 
+    // Map wizard player UUIDs (Zustand-local) to DB player IDs by position.
+    // The wizard stores players positionally; the i-th player in the wizard
+    // corresponds to the i-th playerRecord created above.
+    const wizardIdToDbId = new Map<string, number>(
+      (players || []).map((p, i) => [p.id ?? '', playerRecords[i]?.id ?? -1]),
+    )
+
+    // Validate and prepare game configs before the round.create transaction.
+    const allBettingDbIds = playerRecords
+      .filter((_, i) => players[i]?.betting !== false)
+      .map(pr => pr.id)
+
+    const processedGames: { type: string; stake: number; playerIds: number[]; config: Prisma.InputJsonValue | null }[] = []
+    for (const g of (gameInstances || [])) {
+      const config = buildGameConfig(g)
+      const v = validateGameConfig(g.type as GameType, config)
+      if (!v.ok) {
+        return NextResponse.json({ error: `Invalid config for ${g.type}: ${v.reason}` }, { status: 400 })
+      }
+
+      // Map wizard player UUIDs to DB IDs; fall back to all betting players
+      // if the wizard used Zustand-local IDs that don't map (e.g., fresh round).
+      const mappedIds = (g.playerIds || [])
+        .map(wid => wizardIdToDbId.get(wid))
+        .filter((id): id is number => id !== undefined && id >= 0)
+      const gamePlayerIds = mappedIds.length > 0 ? mappedIds : allBettingDbIds
+
+      processedGames.push({ type: g.type, stake: g.stake, playerIds: gamePlayerIds, config: config as unknown as Prisma.InputJsonValue | null })
+    }
+
     // Create round
     const round = await prisma.round.create({
       data: {
         courseId: course.id,
-        holesCount: holesCount === '9front' || holesCount === '9back' ? 9 : 18,
+        holesCount: holeCountInt,
         tee: players?.[0]?.tee || 'blue',
         playedAt: playedAt ? new Date(playedAt) : new Date(),
         players: {
@@ -60,12 +105,11 @@ export async function POST(request: Request) {
           })),
         },
         games: {
-          create: (gameInstances || []).map((g: { type: string; stake: number; playerIds: string[] }) => ({
+          create: processedGames.map(g => ({
             type: g.type,
             stake: g.stake,
-            playerIds: playerRecords
-              .filter((_, i) => players[i]?.betting !== false)
-              .map(pr => pr.id),
+            playerIds: g.playerIds,
+            ...(g.config !== null && g.config !== undefined ? { config: g.config } : {}),
           })),
         },
       },
@@ -74,8 +118,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ roundId: round.id })
   } catch (error) {
     console.error('Failed to create round:', error)
-    // Return a client-side round ID so the app still works
-    return NextResponse.json({ roundId: Date.now() })
+    return NextResponse.json({ error: 'Failed to create round' }, { status: 500 })
   }
 }
 

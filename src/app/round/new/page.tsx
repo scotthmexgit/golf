@@ -76,6 +76,7 @@ export default function NewRoundPage() {
   const store = useRoundStore()
   const { setupStep, setSetupStep, course } = store
   const [loading, setLoading] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const canContinue = () => {
     if (setupStep === 0) return !!course
@@ -93,6 +94,7 @@ export default function NewRoundPage() {
       // canContinue was bypassed or state changed between steps.
       if (hasInvalidGames(store.games)) return
       setLoading(true)
+      setSubmitError(null)
       try {
         const res = await fetch('/golf/api/rounds', {
           method: 'POST',
@@ -106,15 +108,17 @@ export default function NewRoundPage() {
             gameInstances: store.games,
           }),
         })
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}))
+          setSubmitError((errData as { error?: string }).error ?? 'Failed to create round. Please try again.')
+          return
+        }
         const data = await res.json()
         store.setRoundId(data.roundId)
         store.initHoles()
         router.push(`/scorecard/${data.roundId}`)
       } catch {
-        // Fallback: client-only round
-        store.setRoundId(Date.now())
-        store.initHoles()
-        router.push(`/scorecard/${store.roundId}`)
+        setSubmitError('Failed to create round. Please try again.')
       } finally {
         setLoading(false)
       }
@@ -151,6 +155,9 @@ export default function NewRoundPage() {
         {setupStep === 1 && <PlayerList />}
         {setupStep === 2 && <GameList />}
         {setupStep === 3 && <ReviewStep />}
+        {submitError && (
+          <p className="mt-3 text-sm text-red-600" role="alert">{submitError}</p>
+        )}
       </div>
 
       <BottomCta

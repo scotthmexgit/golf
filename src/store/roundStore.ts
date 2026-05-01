@@ -6,6 +6,8 @@ import type {
 import { GAME_DEFS } from '@/types'
 import { calcCourseHcp, calcStrokes } from '@/lib/handicap'
 import { defaultJunk, syncJunkAmounts } from '@/lib/junk'
+import { hydrateGameConfig } from '@/lib/gameConfig'
+import { hydrateHoleDecisions } from '@/lib/holeDecisions'
 
 function uuid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
@@ -88,8 +90,9 @@ export interface RoundStore {
     round: { id: number; holesCount: number; tee: string; status: string }
     course: { name: string; location: string; holes: { hole: number; par: number; index: number }[] }
     players: { id: number; playerId: number; name: string; handicapIdx: number; courseHcp: number; betting: boolean; tee: string }[]
-    games: { id: number; type: string; stake: number; playerIds: string[] }[]
+    games: { id: number; type: string; stake: number; playerIds: string[]; config: Record<string, unknown> | null }[]
     scores: { playerId: number; hole: number; gross: number; putts: number | null; fromBunker: boolean }[]
+    holeDecisions?: { hole: number; decisions: Record<string, unknown> | null }[]
   }) => void
   setCurrentHole: (h: number) => void
   setScore: (playerId: string, hole: number, score: number) => void
@@ -204,7 +207,7 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
   setRoundId: (id) => set({ roundId: id }),
 
   hydrateRound: (apiResponse) => set((state) => {
-    const { round, course: apiCourse, players: apiPlayers, games: apiGames, scores } = apiResponse
+    const { round, course: apiCourse, players: apiPlayers, games: apiGames, scores, holeDecisions } = apiResponse
 
     // Rebuild CourseData shape for the store
     const courseData: CourseData = {
@@ -235,6 +238,14 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
     // Build a hole range from apiCourse.holes
     const holeNums = apiCourse.holes.map(h => h.hole)
 
+    // Build a decisions lookup: hole number → parsed decisions partial
+    const decisionsMap = new Map<number, Partial<HoleData>>()
+    for (const hd of (holeDecisions ?? [])) {
+      if (hd.decisions !== null && hd.decisions !== undefined) {
+        decisionsMap.set(hd.hole, hydrateHoleDecisions(hd.decisions))
+      }
+    }
+
     // Rebuild HoleData[]: one entry per hole in the range
     const holes: HoleData[] = holeNums.map((hNum, idx) => {
       const holeScores: Record<string, number> = {}
@@ -245,12 +256,19 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
         const s = scores.find(sc => sc.playerId === rp.playerId && sc.hole === hNum)
         holeScores[key] = s ? s.gross : 0
       }
+      // Merge persisted decisions (wolfPick, presses, greenieWinners, bangoWinner, dots)
+      // over the defaults. Persisted dots overwrite the defaultDots() above.
+      const persistedDecisions = decisionsMap.get(hNum) ?? {}
       return {
         number: hNum,
         par: apiCourse.holes[idx].par,
         index: apiCourse.holes[idx].index,
         scores: holeScores,
-        dots: holeDots,
+        dots: persistedDecisions.dots ?? holeDots,
+        ...('wolfPick'       in persistedDecisions && { wolfPick:       persistedDecisions.wolfPick }),
+        ...('presses'        in persistedDecisions && { presses:        persistedDecisions.presses }),
+        ...('greenieWinners' in persistedDecisions && { greenieWinners: persistedDecisions.greenieWinners }),
+        ...('bangoWinner'    in persistedDecisions && { bangoWinner:    persistedDecisions.bangoWinner }),
       }
     })
 
@@ -260,6 +278,8 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
 
     // Rebuild GameInstance[]. Games from API have numeric id; keep as string for store compat.
     // playerIds from DB are integers; map to strings to match PlayerSetup.id = String(playerId).
+    // config: deserialized per game type via hydrateGameConfig; validation failures are
+    // logged and produce {} (defaults), so the app never crashes on a corrupt DB blob.
     const games: GameInstance[] = apiGames.map(g => ({
       id: String(g.id),
       type: g.type as GameType,
@@ -267,6 +287,7 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
       stake: g.stake,
       playerIds: g.playerIds.map(String),
       junk: defaultJunk(g.stake),
+      ...hydrateGameConfig(g.type as GameType, g.config),
     }))
 
     return {

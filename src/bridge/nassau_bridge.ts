@@ -38,8 +38,8 @@ export function buildNassauCfg(game: GameInstance): NassauCfg {
     pressRule: game.pressRule ?? 'manual',
     pressScope: game.pressScope ?? 'nine',
     pairingMode: game.pairingMode ?? (game.playerIds.length >= 3 ? 'allPairs' : 'singles'),
-    // HARDCODE: appliesHandicap not yet on GameInstance; always true in v1.
-    appliesHandicap: true,
+    // Defaults true; NA-2 wizard surfaces the toggle via game.appliesHandicap.
+    appliesHandicap: game.appliesHandicap ?? true,
     junkItems: [],
     junkMultiplier: 1,
   }

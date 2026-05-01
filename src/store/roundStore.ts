@@ -172,6 +172,12 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
     if (type === 'skins') inst.escalating = false
     if (type === 'vegas') inst.maxExposure = 50
     if (type === 'matchPlay' || type === 'nassau') inst.pressAmount = 5
+    if (type === 'nassau') {
+      inst.pressRule       = 'manual'
+      inst.pressScope      = 'nine'
+      inst.pairingMode     = bettingIds.length >= 3 ? 'allPairs' : 'singles'
+      inst.appliesHandicap = true
+    }
     return { games: [...state.games, inst] }
   }),
 

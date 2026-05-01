@@ -18,8 +18,30 @@ export function wolfInvalidPlayerCount(game: GameInstance): boolean {
   return game.type === 'wolf' && (game.playerIds.length < 4 || game.playerIds.length > 5)
 }
 
+// Returns true when a Nassau bet has fewer than the required 2 players.
+// False for all other game types.
+export function nassauTooFewPlayers(game: GameInstance): boolean {
+  return game.type === 'nassau' && game.playerIds.length < 2
+}
+
+// Returns true when a Nassau bet is in allPairs mode but has fewer than 3 players.
+// allPairs requires ≥3 players: 2 players gives only 1 pair, equivalent to singles.
+// False for all other game types or pairingMode=singles.
+export function nassauAllPairsTooFewPlayers(game: GameInstance): boolean {
+  return (
+    game.type === 'nassau' &&
+    game.pairingMode === 'allPairs' &&
+    game.playerIds.length < 3
+  )
+}
+
 // Returns true when any game instance in the round is in an invalid state
 // that must be resolved before round creation can proceed.
 export function hasInvalidGames(games: GameInstance[]): boolean {
-  return games.some(g => skinsTooFewPlayers(g) || wolfInvalidPlayerCount(g))
+  return games.some(g =>
+    skinsTooFewPlayers(g) ||
+    wolfInvalidPlayerCount(g) ||
+    nassauTooFewPlayers(g) ||
+    nassauAllPairsTooFewPlayers(g)
+  )
 }

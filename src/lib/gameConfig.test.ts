@@ -29,6 +29,16 @@ describe('buildGameConfig — nassau', () => {
     }))
     expect(cfg).toEqual({ pressRule: 'manual', pressScope: 'nine', pairingMode: 'allPairs' })
   })
+  it('includes appliesHandicap when set', () => {
+    const cfg = buildGameConfig(makeGame('nassau', { appliesHandicap: false }))
+    expect(cfg).toEqual({ appliesHandicap: false })
+  })
+  it('includes appliesHandicap=true in full config', () => {
+    const cfg = buildGameConfig(makeGame('nassau', {
+      pressRule: 'manual', pressScope: 'nine', pairingMode: 'allPairs', appliesHandicap: true,
+    }))
+    expect(cfg).toEqual({ pressRule: 'manual', pressScope: 'nine', pairingMode: 'allPairs', appliesHandicap: true })
+  })
 })
 
 describe('buildGameConfig — wolf', () => {
@@ -124,6 +134,10 @@ describe('validateGameConfig — rejects invalid enum values', () => {
   it('non-boolean escalating rejected for skins', () => {
     expect(validateGameConfig('skins', { escalating: 1 }).ok).toBe(false)
   })
+  it('non-boolean appliesHandicap rejected for nassau', () => {
+    expect(validateGameConfig('nassau', { appliesHandicap: 1 }).ok).toBe(false)
+    expect(validateGameConfig('nassau', { appliesHandicap: 'yes' }).ok).toBe(false)
+  })
 })
 
 // ── hydrateGameConfig ─────────────────────────────────────────────────────────
@@ -135,6 +149,14 @@ describe('hydrateGameConfig — round-trip fidelity', () => {
     expect(hydrated.pressRule).toBe('auto-1-down')
     expect(hydrated.pressScope).toBe('match')
     expect(hydrated.pairingMode).toBe('singles')
+  })
+  it('nassau: round-trips appliesHandicap=false', () => {
+    const hydrated = hydrateGameConfig('nassau', { appliesHandicap: false })
+    expect(hydrated.appliesHandicap).toBe(false)
+  })
+  it('nassau: round-trips appliesHandicap=true', () => {
+    const hydrated = hydrateGameConfig('nassau', { appliesHandicap: true })
+    expect(hydrated.appliesHandicap).toBe(true)
   })
   it('wolf: round-trips loneWolfMultiplier + escalating', () => {
     const hydrated = hydrateGameConfig('wolf', { loneWolfMultiplier: 3, escalating: true })

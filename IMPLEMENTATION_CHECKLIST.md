@@ -26,7 +26,7 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-**Nassau phase — APPROVED 2026-05-01. Plan: `docs/plans/NASSAU_PLAN.md`. Decisions A (allPairs v1) + B (post-save modal) + Sequencing Option A LOCKED. Active item: NA-1 CLOSED — next item NA-2 (Nassau wizard setup) pending GM go-ahead.**
+**Nassau phase — APPROVED 2026-05-01. Plan: `docs/plans/NASSAU_PLAN.md`. Decisions A (allPairs v1) + B (post-save modal) + Sequencing Option A LOCKED. NA-1 CLOSED. NA-2 CLOSED. Active item: NA-3 (press confirmation UI) — pending GM go-ahead.**
 
 **NA-pre-1 — CLOSED 2026-05-01. Commit: `572dc32`.**
 - Deliverable: `stroke_play.ts` emits `RoundingAdjustment.points={absorbingPlayer:remainder}` instead of silent absorb; `aggregate.ts` stale comments removed; 4 new tests (AC 1–5). `match_play.ts` confirmed already correct (unchanged).
@@ -34,6 +34,10 @@ Updated at EOD-FINAL.
 
 **NA-1 — CLOSED 2026-05-01. Commit: `95e7c41`.**
 - Deliverable: `src/bridge/nassau_bridge.ts` (buildNassauCfg + settleNassauBet); `nassau_bridge.test.ts` (F6 invariant, T1–T7); `aggregate.ts` MatchTied→closed in buildMatchStates; `payouts.ts` + `perHoleDeltas.ts` cut over from legacy computeNassau; Nassau unparked in GAME_DEFS. F7 atomic commit satisfied.
+- Tests: 454/454 pass. tsc clean. Reviewer: APPROVED.
+
+**NA-2 — CLOSED 2026-05-01. Commit: (pending)**
+- Deliverable: Nassau wizard UI (pressRule/pressScope/pairingMode/appliesHandicap pills + checkbox in GameInstanceCard); appliesHandicap added to GameInstance + bridge + validators; nassauTooFewPlayers + nassauAllPairsTooFewPlayers guards; addGame sets explicit defaults; vitest.config.ts adds @/ alias + store test scope; 30 new tests. F10 user-facing surface closed.
 - Tests: 454/454 pass. tsc clean. Reviewer: APPROVED.
 
 **Wolf phase closure evidence:**

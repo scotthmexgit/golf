@@ -24,7 +24,7 @@ const NASSAU_PRESS_RULES  = new Set(['manual', 'auto-2-down', 'auto-1-down'])
 const NASSAU_PRESS_SCOPES = new Set(['nine', 'match'])
 const NASSAU_PAIRING_MODES = new Set(['singles', 'allPairs'])
 
-const NASSAU_KEYS = new Set(['pressRule', 'pressScope', 'pairingMode'])
+const NASSAU_KEYS = new Set(['pressRule', 'pressScope', 'pairingMode', 'appliesHandicap'])
 const WOLF_KEYS   = new Set(['loneWolfMultiplier', 'escalating'])
 const SKINS_KEYS  = new Set(['escalating'])
 
@@ -94,9 +94,10 @@ export function buildGameConfig(game: GameInstance): Record<string, unknown> | n
   switch (game.type) {
     case 'nassau': {
       const out: Record<string, unknown> = {}
-      if (game.pressRule  !== undefined) out.pressRule  = game.pressRule
-      if (game.pressScope !== undefined) out.pressScope = game.pressScope
-      if (game.pairingMode !== undefined) out.pairingMode = game.pairingMode
+      if (game.pressRule       !== undefined) out.pressRule       = game.pressRule
+      if (game.pressScope      !== undefined) out.pressScope      = game.pressScope
+      if (game.pairingMode     !== undefined) out.pairingMode     = game.pairingMode
+      if (game.appliesHandicap !== undefined) out.appliesHandicap = game.appliesHandicap
       return Object.keys(out).length > 0 ? out : null
     }
     case 'wolf': {
@@ -140,6 +141,9 @@ export function validateGameConfig(type: GameType, config: unknown): ValidationR
       }
       if (obj.pairingMode !== undefined && !NASSAU_PAIRING_MODES.has(String(obj.pairingMode))) {
         return { ok: false, reason: `Nassau config: invalid pairingMode "${obj.pairingMode}"` }
+      }
+      if (obj.appliesHandicap !== undefined && typeof obj.appliesHandicap !== 'boolean') {
+        return { ok: false, reason: 'Nassau config: appliesHandicap must be a boolean' }
       }
       return { ok: true }
     }
@@ -201,9 +205,10 @@ export function hydrateGameConfig(
   switch (type) {
     case 'nassau':
       return {
-        pressRule:   obj.pressRule  !== undefined ? (obj.pressRule  as GameInstance['pressRule'])  : undefined,
-        pressScope:  obj.pressScope !== undefined ? (obj.pressScope as GameInstance['pressScope']) : undefined,
-        pairingMode: obj.pairingMode !== undefined ? (obj.pairingMode as GameInstance['pairingMode']) : undefined,
+        pressRule:       obj.pressRule       !== undefined ? (obj.pressRule       as GameInstance['pressRule'])       : undefined,
+        pressScope:      obj.pressScope      !== undefined ? (obj.pressScope      as GameInstance['pressScope'])      : undefined,
+        pairingMode:     obj.pairingMode     !== undefined ? (obj.pairingMode     as GameInstance['pairingMode'])     : undefined,
+        appliesHandicap: typeof obj.appliesHandicap === 'boolean' ? obj.appliesHandicap : undefined,
       }
     case 'wolf':
       return {

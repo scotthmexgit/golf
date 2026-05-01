@@ -75,6 +75,7 @@ export interface GameInstance {
   pressRule?: 'manual' | 'auto-2-down' | 'auto-1-down'
   pressScope?: 'nine' | 'match'
   pairingMode?: 'singles' | 'allPairs'
+  appliesHandicap?: boolean
   // junk config
   junk: JunkConfig
 }

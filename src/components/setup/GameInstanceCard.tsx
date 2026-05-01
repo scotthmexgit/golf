@@ -5,7 +5,7 @@ import type { GameInstance, JunkConfig } from '@/types'
 import { useRoundStore } from '@/store/roundStore'
 import Pill from '@/components/ui/Pill'
 import { stakeUnitLabel } from '@/lib/scoring'
-import { skinsTooFewPlayers, wolfInvalidPlayerCount } from '@/lib/gameGuards'
+import { skinsTooFewPlayers, wolfInvalidPlayerCount, nassauTooFewPlayers, nassauAllPairsTooFewPlayers } from '@/lib/gameGuards'
 
 interface GameInstanceCardProps {
   game: GameInstance
@@ -22,12 +22,14 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
   // the user-facing feedback surface.
   const playerCountError = skinsTooFewPlayers(game)
   const wolfPlayerError = wolfInvalidPlayerCount(game)
+  const nassauPlayerError = nassauTooFewPlayers(game)
+  const nassauPairingError = nassauAllPairsTooFewPlayers(game)
 
   return (
     <div
       className="rounded-xl border overflow-hidden"
       style={{
-        borderColor: (playerCountError || wolfPlayerError) ? 'var(--red-card)' : 'var(--green-soft)',
+        borderColor: (playerCountError || wolfPlayerError || nassauPlayerError || nassauPairingError) ? 'var(--red-card)' : 'var(--green-soft)',
         background: 'white',
       }}
     >
@@ -107,6 +109,73 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
           </>
         )}
 
+        {game.type === 'nassau' && (
+          <>
+            {/* Press rule — when a press is offered */}
+            <div>
+              <label className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Press rule</label>
+              <div className="flex gap-1.5 mt-1">
+                <Pill label="Manual" active={(game.pressRule ?? 'manual') === 'manual'}
+                  onClick={() => updateGame(game.id, { pressRule: 'manual' })}
+                  data-testid={`nassau-press-rule-manual-${game.id}`} />
+                <Pill label="Auto 2-down" active={game.pressRule === 'auto-2-down'}
+                  onClick={() => updateGame(game.id, { pressRule: 'auto-2-down' })}
+                  data-testid={`nassau-press-rule-auto2-${game.id}`} />
+                <Pill label="Auto 1-down" active={game.pressRule === 'auto-1-down'}
+                  onClick={() => updateGame(game.id, { pressRule: 'auto-1-down' })}
+                  data-testid={`nassau-press-rule-auto1-${game.id}`} />
+              </div>
+            </div>
+
+            {/* Press scope — how long the press runs */}
+            <div>
+              <label className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Press scope</label>
+              <div className="flex gap-1.5 mt-1">
+                <Pill label="9-hole" active={(game.pressScope ?? 'nine') === 'nine'}
+                  onClick={() => updateGame(game.id, { pressScope: 'nine' })}
+                  data-testid={`nassau-press-scope-nine-${game.id}`} />
+                <Pill label="Full match" active={game.pressScope === 'match'}
+                  onClick={() => updateGame(game.id, { pressScope: 'match' })}
+                  data-testid={`nassau-press-scope-match-${game.id}`} />
+              </div>
+            </div>
+
+            {/* Pairing mode — always shown so user can fix allPairs/singles when player count changes */}
+            <div>
+              <label className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Format</label>
+              <div className="flex gap-1.5 mt-1">
+                <Pill
+                  label="All Pairs"
+                  active={(game.pairingMode ?? 'allPairs') === 'allPairs' && game.playerIds.length >= 3}
+                  onClick={() => game.playerIds.length >= 3 && updateGame(game.id, { pairingMode: 'allPairs' })}
+                  data-testid={`nassau-pairing-allpairs-${game.id}`}
+                />
+                <Pill
+                  label="Singles"
+                  active={game.pairingMode === 'singles' || game.playerIds.length < 3}
+                  onClick={() => updateGame(game.id, { pairingMode: 'singles' })}
+                  data-testid={`nassau-pairing-singles-${game.id}`}
+                />
+              </div>
+              {game.playerIds.length < 3 && (
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>Add a 3rd player to enable All Pairs</p>
+              )}
+            </div>
+
+            {/* Handicap toggle */}
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={game.appliesHandicap ?? true}
+                onChange={(e) => updateGame(game.id, { appliesHandicap: e.target.checked })}
+                className="w-3.5 h-3.5"
+                data-testid={`nassau-handicap-${game.id}`}
+              />
+              <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Apply handicap</span>
+            </label>
+          </>
+        )}
+
         {game.type === 'vegas' && (
           <div className="flex items-center gap-2">
             <label className="text-[11px] font-semibold" style={{ color: 'var(--muted)' }}>Max exposure/hole $</label>
@@ -149,6 +218,28 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
             data-testid={`wolf-player-count-error-${game.id}`}
           >
             Wolf requires 4–5 players
+          </p>
+        )}
+
+        {/* Player-count error — Nassau live guard */}
+        {nassauPlayerError && (
+          <p
+            className="text-[11px] font-semibold"
+            style={{ color: 'var(--red-card)' }}
+            data-testid={`nassau-player-count-error-${game.id}`}
+          >
+            Nassau requires at least 2 players
+          </p>
+        )}
+
+        {/* allPairs player-count error — Nassau live guard */}
+        {nassauPairingError && (
+          <p
+            className="text-[11px] font-semibold"
+            style={{ color: 'var(--red-card)' }}
+            data-testid={`nassau-pairing-error-${game.id}`}
+          >
+            All Pairs requires at least 3 players
           </p>
         )}
 

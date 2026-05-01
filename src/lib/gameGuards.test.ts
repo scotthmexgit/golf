@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { skinsTooFewPlayers, hasInvalidGames } from './gameGuards'
+import { skinsTooFewPlayers, hasInvalidGames, nassauTooFewPlayers, nassauAllPairsTooFewPlayers } from './gameGuards'
 import type { GameInstance, JunkConfig } from '../types'
 
 const EMPTY_JUNK: JunkConfig = {
@@ -81,5 +81,70 @@ describe('hasInvalidGames', () => {
     const g1 = { ...makeGame('skins', 3), id: 'sk-a' }
     const g2 = { ...makeGame('skins', 4), id: 'sk-b' }
     expect(hasInvalidGames([g1, g2])).toBe(false)
+  })
+})
+
+// ── nassauTooFewPlayers ───────────────────────────────────────────────────────
+
+describe('nassauTooFewPlayers', () => {
+  it('returns false for a nassau game with exactly 2 players', () => {
+    expect(nassauTooFewPlayers(makeGame('nassau', 2))).toBe(false)
+  })
+  it('returns false for a nassau game with 3 players', () => {
+    expect(nassauTooFewPlayers(makeGame('nassau', 3))).toBe(false)
+  })
+  it('returns true for a nassau game with 1 player', () => {
+    expect(nassauTooFewPlayers(makeGame('nassau', 1))).toBe(true)
+  })
+  it('returns true for a nassau game with 0 players', () => {
+    expect(nassauTooFewPlayers(makeGame('nassau', 0))).toBe(true)
+  })
+  it('returns false for non-nassau types regardless of player count', () => {
+    expect(nassauTooFewPlayers(makeGame('skins', 1))).toBe(false)
+    expect(nassauTooFewPlayers(makeGame('strokePlay', 1))).toBe(false)
+  })
+})
+
+// ── nassauAllPairsTooFewPlayers ───────────────────────────────────────────────
+
+describe('nassauAllPairsTooFewPlayers', () => {
+  it('returns false when pairingMode=allPairs and 3+ players', () => {
+    const g = { ...makeGame('nassau', 3), pairingMode: 'allPairs' as const }
+    expect(nassauAllPairsTooFewPlayers(g)).toBe(false)
+  })
+  it('returns true when pairingMode=allPairs and only 2 players', () => {
+    const g = { ...makeGame('nassau', 2), pairingMode: 'allPairs' as const }
+    expect(nassauAllPairsTooFewPlayers(g)).toBe(true)
+  })
+  it('returns false when pairingMode=singles (even with 2 players)', () => {
+    const g = { ...makeGame('nassau', 2), pairingMode: 'singles' as const }
+    expect(nassauAllPairsTooFewPlayers(g)).toBe(false)
+  })
+  it('returns false when pairingMode is undefined (no pairing mode set)', () => {
+    expect(nassauAllPairsTooFewPlayers(makeGame('nassau', 2))).toBe(false)
+  })
+  it('returns false for non-nassau types', () => {
+    const g = { ...makeGame('wolf', 2), pairingMode: 'allPairs' as const }
+    expect(nassauAllPairsTooFewPlayers(g)).toBe(false)
+  })
+})
+
+// ── hasInvalidGames — Nassau additions ───────────────────────────────────────
+
+describe('hasInvalidGames — nassau guards', () => {
+  it('returns true for nassau game with 1 player', () => {
+    expect(hasInvalidGames([makeGame('nassau', 1)])).toBe(true)
+  })
+  it('returns false for nassau game with 2 players, singles', () => {
+    const g = { ...makeGame('nassau', 2), pairingMode: 'singles' as const }
+    expect(hasInvalidGames([g])).toBe(false)
+  })
+  it('returns true for nassau allPairs with 2 players', () => {
+    const g = { ...makeGame('nassau', 2), pairingMode: 'allPairs' as const }
+    expect(hasInvalidGames([g])).toBe(true)
+  })
+  it('returns false for nassau allPairs with 3 players', () => {
+    const g = { ...makeGame('nassau', 3), pairingMode: 'allPairs' as const }
+    expect(hasInvalidGames([g])).toBe(false)
   })
 })

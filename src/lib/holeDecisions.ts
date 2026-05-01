@@ -16,6 +16,7 @@ export type ValidationResult = { ok: true } | { ok: false; reason: string }
 const KNOWN_DECISION_KEYS = new Set([
   'wolfPick',        // wolf: 'solo' | 'blind' | playerId
   'presses',         // nassau: string[] of confirmed match IDs
+  'withdrew',        // nassau: string[] of player IDs who withdrew on this hole
   'greenieWinners',  // junk greenie: Record<gameInstanceId, playerId | null>
   'bangoWinner',     // junk bingo: playerId | null
   'dots',            // per-player dot state: Record<playerId, HoleDots>
@@ -38,6 +39,9 @@ export function buildHoleDecisions(
   }
   if (gameTypes.has('nassau') && Array.isArray(holeData.presses) && holeData.presses.length > 0) {
     out.presses = holeData.presses
+  }
+  if (gameTypes.has('nassau') && Array.isArray(holeData.withdrew) && holeData.withdrew.length > 0) {
+    out.withdrew = holeData.withdrew
   }
   if (holeData.greenieWinners !== undefined && Object.keys(holeData.greenieWinners).length > 0) {
     out.greenieWinners = holeData.greenieWinners
@@ -85,6 +89,9 @@ export function validateHoleDecisions(
     if ('presses' in obj && !gameTypes.has('nassau')) {
       return { ok: false, reason: 'decisions: presses requires nassau game type' }
     }
+    if ('withdrew' in obj && !gameTypes.has('nassau')) {
+      return { ok: false, reason: 'decisions: withdrew requires nassau game type' }
+    }
   }
 
   if ('wolfPick' in obj && typeof obj.wolfPick !== 'string') {
@@ -93,6 +100,11 @@ export function validateHoleDecisions(
   if ('presses' in obj) {
     if (!Array.isArray(obj.presses) || !obj.presses.every(p => typeof p === 'string')) {
       return { ok: false, reason: 'decisions: presses must be string[]' }
+    }
+  }
+  if ('withdrew' in obj) {
+    if (!Array.isArray(obj.withdrew) || !obj.withdrew.every(p => typeof p === 'string')) {
+      return { ok: false, reason: 'decisions: withdrew must be string[]' }
     }
   }
   return { ok: true }
@@ -120,6 +132,9 @@ export function hydrateHoleDecisions(decisions: unknown): Partial<HoleData> {
   }
   if (Array.isArray(obj.presses) && obj.presses.every(p => typeof p === 'string')) {
     result.presses = obj.presses as string[]
+  }
+  if (Array.isArray(obj.withdrew) && obj.withdrew.every(p => typeof p === 'string')) {
+    result.withdrew = obj.withdrew as string[]
   }
   if (
     obj.greenieWinners !== null &&

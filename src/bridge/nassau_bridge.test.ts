@@ -423,6 +423,77 @@ describe('T6 — per-hole event slicing consistent with perHoleDeltas dispatch',
   })
 })
 
+// ─── T5b — Bridge-level withdrawal via hd.withdrew ───────────────────────────
+//
+// NA-3: settleNassauBet now reads hd.withdrew and calls settleNassauWithdrawal
+// automatically. This test exercises the full bridge path rather than calling
+// settleNassauWithdrawal directly (that's already covered in T5).
+
+describe('T5b — bridge-level withdrawal detection via hd.withdrew', () => {
+  it('Bob withdraws on hole 6: NassauWithdrawalSettled emitted, zero-sum holds', () => {
+    const game = makeGame()
+    const players = [makePlayer('Alice'), makePlayer('Bob')]
+
+    // Alice wins h1-h3 (Alice 3-up in front + overall).
+    // Bob withdraws on h6. Front and overall are non-tied → settlement events.
+    const alice = Array.from({ length: 18 }, (_, i) => i < 3 ? 3 : 4)
+    const bob   = Array.from({ length: 18 }, () => 4)
+
+    const holes: HoleData[] = makeHoles({ Alice: alice, Bob: bob })
+    // Mark Bob as withdrawn on hole 6
+    holes[5] = { ...holes[5]!, withdrew: ['Bob'] }
+
+    const { events, payouts } = settleNassauBet(holes, players, game)
+
+    const withdrawalEvents = events.filter(e => e.kind === 'NassauWithdrawalSettled')
+    // Front (Alice 3-0 open) and overall (Alice 3-0 open) settle for Alice.
+    // Back (0-0 at withdrawal) is tied → no event per § 9.
+    expect(withdrawalEvents.length).toBeGreaterThanOrEqual(1)
+
+    // Alice should be net positive; Bob net negative.
+    expect(payouts['Alice']).toBeGreaterThan(0)
+    expect(payouts['Bob']).toBeLessThan(0)
+
+    zeroSum(events, ['Alice', 'Bob'])
+  })
+
+  it('withdrew player not in bet is ignored (no crash)', () => {
+    const game = makeGame()
+    const players = [makePlayer('Alice'), makePlayer('Bob')]
+    const holes: HoleData[] = makeHoles({
+      Alice: Array.from({ length: 18 }, () => 4),
+      Bob:   Array.from({ length: 18 }, () => 4),
+    })
+    // 'Carol' is not in playerIds — should be silently skipped
+    holes[5] = { ...holes[5]!, withdrew: ['Carol'] }
+    expect(() => settleNassauBet(holes, players, game)).not.toThrow()
+  })
+
+  it('Bob withdraws on hole 6 AFTER a press was confirmed on hole 3: press match also settled', () => {
+    const game = makeGame()
+    const players = [makePlayer('Alice'), makePlayer('Bob')]
+
+    // Alice wins h1-h3 (3-0 on front). Press confirmed on hole 3 for front match.
+    // Bob withdraws on h6. Withdrawal should settle front + press-1 + overall.
+    const alice = Array.from({ length: 18 }, (_, i) => i < 3 ? 3 : 4)
+    const bob   = Array.from({ length: 18 }, () => 4)
+
+    const holes: HoleData[] = makeHoles({ Alice: alice, Bob: bob }, { 3: ['front'] })
+    holes[5] = { ...holes[5]!, withdrew: ['Bob'] }
+
+    const { events } = settleNassauBet(holes, players, game)
+
+    // PressOpened must exist (press-1 was opened)
+    expect(events.filter(e => e.kind === 'PressOpened')).toHaveLength(1)
+
+    // Withdrawal events settle open matches (front, press-1, overall — all Alice-leading)
+    const withdrawalEvents = events.filter(e => e.kind === 'NassauWithdrawalSettled')
+    expect(withdrawalEvents.length).toBeGreaterThanOrEqual(2)
+
+    zeroSum(events, ['Alice', 'Bob'])
+  })
+})
+
 // ─── T7 — GAME_DEFS Nassau disabled flag ─────────────────────────────────────
 
 describe('T7 — Nassau GAME_DEFS disabled flag is false after cutover', () => {

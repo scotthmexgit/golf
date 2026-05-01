@@ -19,6 +19,7 @@ import {
   initialMatches,
   openPress,
   settleNassauHole,
+  settleNassauWithdrawal,
   finalizeNassauRound,
 } from '../games/nassau'
 import type { MatchState } from '../games/nassau'
@@ -102,6 +103,23 @@ export function settleNassauBet(
         )
         allEvents.push(...pressEvents)
         matches = pressedMatches
+      }
+    }
+
+    // Withdrawal settlement: process after presses so any open press matches
+    // are also settled. Only players in this bet can trigger withdrawal events.
+    if (hd.withdrew && hd.withdrew.length > 0) {
+      for (const withdrawingPlayer of hd.withdrew) {
+        if (!cfg.playerIds.includes(withdrawingPlayer)) continue
+        const { events: withdrawalEvents, matches: newMatches } = settleNassauWithdrawal(
+          hd.number,
+          withdrawingPlayer,
+          cfg,
+          roundCfg,
+          matches,
+        )
+        allEvents.push(...withdrawalEvents)
+        matches = newMatches
       }
     }
   }

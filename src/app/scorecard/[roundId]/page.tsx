@@ -11,11 +11,16 @@ import HoleDots from '@/components/scorecard/HoleDots'
 import ScoreRow from '@/components/scorecard/ScoreRow'
 import BetDetailsSheet from '@/components/scorecard/BetDetailsSheet'
 import WolfDeclare from '@/components/scorecard/WolfDeclare'
+import PressConfirmationModal from '@/components/scorecard/PressConfirmationModal'
 import Link from 'next/link'
 import { hasGreenieJunk, hasAnyJunk } from '@/lib/junk'
 import { vsPar } from '@/lib/scoring'
 import { patchRoundComplete } from '@/lib/roundApi'
 import { computePerHoleDeltas } from '@/lib/perHoleDeltas'
+import { buildHoleDecisions } from '@/lib/holeDecisions'
+import { detectNassauPressOffers } from '@/lib/nassauPressDetect'
+import type { PressOffer } from '@/lib/nassauPressDetect'
+import type { GameType } from '@/types'
 
 export default function ScorecardPage() {
   const router = useRouter()
@@ -28,6 +33,7 @@ export default function ScorecardPage() {
   const [hydrating, setHydrating] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [finishError, setFinishError] = useState<string | null>(null)
+  const [pendingPressOffers, setPendingPressOffers] = useState<PressOffer[]>([])
   // SKINS-2: suppress Bet-row delta on fresh hole navigation until user edits a score.
   // Starts false (page load / hydration should show deltas immediately).
   const [suppressBetDelta, setSuppressBetDelta] = useState(false)
@@ -137,26 +143,37 @@ export default function ScorecardPage() {
     setNotices([])
   }
 
-  const handleSaveNext = async () => {
-    if (!allScored || !holeData) return
-
-    detectNotices()
+  // Step 4b: persist scores + decisions, then navigate. Called after all press
+  // offers have been resolved (either from handleSaveNext directly or from the
+  // modal's onComplete callback). Reads holeData fresh from the store so that
+  // any presses confirmed via the modal are included in the decisions blob.
+  const proceedSave = async () => {
+    setPendingPressOffers([])
     setSaveError(null)
 
-    // Step 4: Persist scores for this hole before advancing (Decision 3 — sequential)
+    const latestHoles = useRoundStore.getState().holes
+    const latestHoleData = latestHoles.find(h => h.number === currentHole)
+    if (!latestHoleData) return
+
     if (roundId) {
       const scorePayload = players.map(p => ({
         playerId: Number(p.id),
-        gross: holeData.scores[p.id] || 0,
+        gross: latestHoleData.scores[p.id] || 0,
         putts: null,
         fromBunker: false,
       }))
+      const gameTypes = new Set(games.map(g => g.type as GameType))
+      const decisionsBlob = buildHoleDecisions(latestHoleData, gameTypes)
+
+      const body: Record<string, unknown> = { scores: scorePayload }
+      if (decisionsBlob !== null) body.decisions = decisionsBlob
+
       let ok = false
       try {
         const res = await fetch(`/golf/api/rounds/${roundId}/scores/hole/${currentHole}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scores: scorePayload }),
+          body: JSON.stringify(body),
         })
         ok = res.ok
       } catch {
@@ -168,8 +185,7 @@ export default function ScorecardPage() {
       }
     }
 
-    // Check if par 3 with any game that has greenie junk
-    const isPar3 = holeData.par === 3
+    const isPar3 = latestHoleData.par === 3
     const anyGreenie = games.some(g => hasGreenieJunk(g.junk))
     const anyBBB = games.some(g => g.type === 'bingoBangoBongo')
 
@@ -184,6 +200,25 @@ export default function ScorecardPage() {
     } else {
       handleHoleChange(holeRange[currentIdx + 1])
     }
+  }
+
+  const handleSaveNext = async () => {
+    if (!allScored || !holeData) return
+
+    detectNotices()
+
+    // Detect auto-mode press offers across ALL Nassau games. Collecting from all
+    // games before showing the modal ensures no game's offers are silently dropped.
+    const nassauGames = games.filter(g => g.type === 'nassau')
+    const allOffers = nassauGames.flatMap(g =>
+      detectNassauPressOffers(currentHole, holes, players, g)
+    )
+    if (allOffers.length > 0) {
+      setPendingPressOffers(allOffers)
+      return
+    }
+
+    await proceedSave()
   }
 
   const handleExit = () => {
@@ -317,6 +352,15 @@ export default function ScorecardPage() {
 
       {/* Bet details bottom sheet */}
       <BetDetailsSheet open={sheetOpen} onClose={closeSheet} onExit={handleExit} />
+
+      {/* Nassau press confirmation modal */}
+      {pendingPressOffers.length > 0 && (
+        <PressConfirmationModal
+          hole={currentHole}
+          offers={pendingPressOffers}
+          onComplete={proceedSave}
+        />
+      )}
 
       {/* Exit confirmation overlay */}
       {showExitConfirm && (

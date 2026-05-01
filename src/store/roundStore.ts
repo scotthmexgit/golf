@@ -98,7 +98,10 @@ export interface RoundStore {
   setScore: (playerId: string, hole: number, score: number) => void
   setDot: (playerId: string, hole: number, dot: keyof HoleDots, value: boolean) => void
   setWolfPick: (hole: number, pick: 'solo' | 'blind' | string) => void
+  /** @deprecated Use setPressConfirmation(hole, matchId) — stores MatchState IDs, not game UUIDs. */
   setPress: (hole: number, gameKey: string) => void
+  setPressConfirmation: (hole: number, matchId: string) => void
+  setWithdrawn: (hole: number, playerIds: string[]) => void
   setGreenieWinner: (hole: number, gameId: string, playerId: string | null) => void
   setBangoWinner: (hole: number, playerId: string | null) => void
   addHoleResult: (result: HoleResult) => void
@@ -273,6 +276,7 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
         dots: persistedDecisions.dots ?? holeDots,
         ...('wolfPick'       in persistedDecisions && { wolfPick:       persistedDecisions.wolfPick }),
         ...('presses'        in persistedDecisions && { presses:        persistedDecisions.presses }),
+        ...('withdrew'       in persistedDecisions && { withdrew:       persistedDecisions.withdrew }),
         ...('greenieWinners' in persistedDecisions && { greenieWinners: persistedDecisions.greenieWinners }),
         ...('bangoWinner'    in persistedDecisions && { bangoWinner:    persistedDecisions.bangoWinner }),
       }
@@ -349,6 +353,18 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
   setPress: (hole, gameKey) => set((state) => ({
     holes: state.holes.map(h =>
       h.number === hole ? { ...h, presses: [...(h.presses || []), gameKey] } : h
+    ),
+  })),
+
+  setPressConfirmation: (hole, matchId) => set((state) => ({
+    holes: state.holes.map(h =>
+      h.number === hole ? { ...h, presses: [...(h.presses || []), matchId] } : h
+    ),
+  })),
+
+  setWithdrawn: (hole, playerIds) => set((state) => ({
+    holes: state.holes.map(h =>
+      h.number === hole ? { ...h, withdrew: playerIds } : h
     ),
   })),
 

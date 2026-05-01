@@ -106,3 +106,67 @@ describe('updateGame — Nassau config fields round-trip through store', () => {
     expect(useRoundStore.getState().games[0]!.appliesHandicap).toBe(false)
   })
 })
+
+// ── setPressConfirmation ───────────────────────────────────────────────────────
+
+describe('setPressConfirmation — adds matchId to hd.presses', () => {
+  beforeEach(() => {
+    useRoundStore.getState().reset()
+    // Set up a minimal hole list so holes[0].number === 1 exists
+    useRoundStore.setState((s) => ({
+      ...s,
+      holes: [{ number: 1, par: 4, index: 1, scores: {}, dots: {} }],
+    }))
+  })
+
+  it('adds a matchId to presses on the correct hole', () => {
+    useRoundStore.getState().setPressConfirmation(1, 'front')
+    expect(useRoundStore.getState().holes[0]!.presses).toEqual(['front'])
+  })
+
+  it('appends second matchId without replacing', () => {
+    useRoundStore.getState().setPressConfirmation(1, 'front')
+    useRoundStore.getState().setPressConfirmation(1, 'overall')
+    expect(useRoundStore.getState().holes[0]!.presses).toEqual(['front', 'overall'])
+  })
+
+  it('does not affect other holes', () => {
+    useRoundStore.setState((s) => ({
+      ...s,
+      holes: [
+        { number: 1, par: 4, index: 1, scores: {}, dots: {} },
+        { number: 2, par: 4, index: 2, scores: {}, dots: {} },
+      ],
+    }))
+    useRoundStore.getState().setPressConfirmation(1, 'front')
+    expect(useRoundStore.getState().holes[1]!.presses).toBeUndefined()
+  })
+})
+
+// ── setWithdrawn ──────────────────────────────────────────────────────────────
+
+describe('setWithdrawn — sets withdrew array on a hole', () => {
+  beforeEach(() => {
+    useRoundStore.getState().reset()
+    useRoundStore.setState((s) => ({
+      ...s,
+      holes: [{ number: 5, par: 4, index: 5, scores: {}, dots: {} }],
+    }))
+  })
+
+  it('sets withdrew on the correct hole', () => {
+    useRoundStore.getState().setWithdrawn(5, ['p2'])
+    expect(useRoundStore.getState().holes[0]!.withdrew).toEqual(['p2'])
+  })
+
+  it('replaces previous withdrew (not appended)', () => {
+    useRoundStore.getState().setWithdrawn(5, ['p1'])
+    useRoundStore.getState().setWithdrawn(5, ['p2'])
+    expect(useRoundStore.getState().holes[0]!.withdrew).toEqual(['p2'])
+  })
+
+  it('multiple players can withdraw on the same hole', () => {
+    useRoundStore.getState().setWithdrawn(5, ['p1', 'p3'])
+    expect(useRoundStore.getState().holes[0]!.withdrew).toEqual(['p1', 'p3'])
+  })
+})

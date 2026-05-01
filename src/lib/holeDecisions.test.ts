@@ -157,6 +157,56 @@ describe('hydrateHoleDecisions — round-trip fidelity', () => {
   })
 })
 
+// ── withdrew ──────────────────────────────────────────────────────────────────
+
+describe('buildHoleDecisions — withdrew field', () => {
+  it('withdrew included when nassau active and non-empty', () => {
+    const blob = buildHoleDecisions(makeHole({ withdrew: ['p1'] }), NASSAU_SET)
+    expect(blob).toEqual({ withdrew: ['p1'] })
+  })
+  it('withdrew excluded when nassau not in gameTypes', () => {
+    expect(buildHoleDecisions(makeHole({ withdrew: ['p1'] }), WOLF_SET)).toBeNull()
+  })
+  it('withdrew empty array omitted', () => {
+    expect(buildHoleDecisions(makeHole({ withdrew: [] }), NASSAU_SET)).toBeNull()
+  })
+  it('withdrew included alongside presses', () => {
+    const hole = makeHole({ presses: ['front'], withdrew: ['p2'] })
+    const blob = buildHoleDecisions(hole, NASSAU_SET)
+    expect(blob).toEqual({ presses: ['front'], withdrew: ['p2'] })
+  })
+})
+
+describe('validateHoleDecisions — withdrew field', () => {
+  it('withdrew string[] passes with nassau active', () => {
+    expect(validateHoleDecisions(NASSAU_SET, { withdrew: ['p1'] }).ok).toBe(true)
+  })
+  it('withdrew rejected when nassau not active', () => {
+    const r = validateHoleDecisions(WOLF_SET, { withdrew: ['p1'] })
+    expect(r.ok).toBe(false)
+    expect((r as { reason: string }).reason).toMatch(/withdrew requires nassau/)
+  })
+  it('withdrew accepted when empty gameTypes (hydration path)', () => {
+    expect(validateHoleDecisions(EMPTY_SET, { withdrew: ['p1'] }).ok).toBe(true)
+  })
+  it('withdrew with non-string element rejected', () => {
+    const r = validateHoleDecisions(NASSAU_SET, { withdrew: [42] })
+    expect(r.ok).toBe(false)
+    expect((r as { reason: string }).reason).toMatch(/withdrew must be string\[\]/)
+  })
+})
+
+describe('hydrateHoleDecisions — withdrew round-trip', () => {
+  it('withdrew survives round-trip', () => {
+    const blob = buildHoleDecisions(makeHole({ withdrew: ['p3'] }), NASSAU_SET)!
+    expect(hydrateHoleDecisions(blob).withdrew).toEqual(['p3'])
+  })
+  it('withdrew multiple players survives round-trip', () => {
+    const blob = buildHoleDecisions(makeHole({ withdrew: ['p1', 'p2'] }), NASSAU_SET)!
+    expect(hydrateHoleDecisions(blob).withdrew).toEqual(['p1', 'p2'])
+  })
+})
+
 // ── Full round-trip: wolfPick (Wolf round), presses (Nassau round) ────────────
 
 describe('Full round-trip: build → validate → hydrate', () => {

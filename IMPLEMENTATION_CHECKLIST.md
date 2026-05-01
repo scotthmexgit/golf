@@ -2,7 +2,7 @@
 
 Single source of truth for scope. Read the **Active item** before any work. Tangents → Parking Lot. Closed items → Done (append-only).
 
-**Wolf phase COMPLETE.** Plan: `docs/plans/WOLF_PLAN.md`. WF-0–WF-7 all closed 2026-04-30; Cowork 7/7 PASS. **Active phase: TBD — GM selects at next SOD.** Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history.
+**Wolf phase COMPLETE.** Plan: `docs/plans/WOLF_PLAN.md`. WF-0–WF-7 all closed 2026-04-30; Cowork 7/7 PASS. Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history. **Active phase: Nassau — awaiting GM approval of `docs/plans/NASSAU_PLAN.md`. Current item: NA-0 (plan approval gate — no engineering until plan approved).**
 
 ## Project Scope Summary
 
@@ -26,7 +26,7 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-**Wolf phase — COMPLETE 2026-04-30. All WF-0 through WF-7 closed. See `docs/plans/WOLF_PLAN.md`.**
+**Nassau phase — PROPOSED 2026-05-01. Plan: `docs/plans/NASSAU_PLAN.md`. Awaiting GM approval of Decisions A (allPairs in v1) and B (press offer UI shape). No NA-1 engineering until plan approved.**
 
 **Wolf phase closure evidence:**
 - WF-0 — CLOSED 2026-04-30. Deliverable: `docs/plans/WOLF_PLAN.md`. Report: `docs/2026-04-30/02-wolf-phase-plan.md`.

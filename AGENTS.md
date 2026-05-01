@@ -18,7 +18,8 @@ Skins, Wolf, Nassau, Match Play, Stroke Play. Junk is the side-bet engine (not a
 
 Current status (live scope in `IMPLEMENTATION_CHECKLIST.md`):
 - All five engines (Skins, Wolf, Nassau, Match Play, Stroke Play) landed under `src/games/` (#3–#8 closed 2026-04-24). Junk Phase 1–2 landed; Phase 3 deferred.
-- Wolf phase COMPLETE as of 2026-04-30 (WF-0–WF-7 all closed; Cowork 7/7 PASS). Active phase: TBD — GM selects at next SOD. Current item: none.
+- Wolf phase COMPLETE as of 2026-04-30 (WF-0–WF-7 all closed; Cowork 7/7 PASS). Skins phase COMPLETE 2026-04-30 (SK-0–SK-5 all closed).
+- **Active phase: Nassau — awaiting GM approval of NASSAU_PLAN.md.** Current item: NA-0 (plan approval gate). Active plan: `docs/plans/NASSAU_PLAN.md`.
 - Old scoring in `src/lib/*` remains live; Stroke Play cutover is SP-4; full multi-bet cutover deferred (phase 7).
 
 ## Source of truth
@@ -27,7 +28,7 @@ Current status (live scope in `IMPLEMENTATION_CHECKLIST.md`):
 - **Types:** `src/types/index.ts` and Prisma `schema.prisma`.
 - **Scoring (target path):** `src/games/<name>.ts`.
 - **Scoring (pre-cutover parallel path):** `src/lib/scoring.ts`, `payouts.ts`, `handicap.ts`, `junk.ts`.
-- **Active scope:** `IMPLEMENTATION_CHECKLIST.md` Active item → active plan for that item's AC (currently `docs/plans/STROKE_PLAY_PLAN.md` for the Stroke-Play-only phase; `REBUILD_PLAN.md` retained for #3–#10 history).
+- **Active scope:** `IMPLEMENTATION_CHECKLIST.md` Active item → active plan for that item's AC (`docs/plans/NASSAU_PLAN.md` for the Nassau phase; `REBUILD_PLAN.md` retained for #3–#10 history).
 - **History (not a todo list):** `MIGRATION_NOTES.md`, `AUDIT.md`.
 - **Skill entry point for rule questions:** `.claude/skills/golf-betting-rules/SKILL.md`.
 

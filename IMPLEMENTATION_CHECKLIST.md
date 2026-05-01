@@ -26,11 +26,15 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-**Nassau phase — APPROVED 2026-05-01. Plan: `docs/plans/NASSAU_PLAN.md`. Decisions A (allPairs v1) + B (post-save modal) + Sequencing Option A LOCKED. Active item: NA-pre-1 (RoundingAdjustment emission). NA-pre-1 must close before NA-1 begins.**
+**Nassau phase — APPROVED 2026-05-01. Plan: `docs/plans/NASSAU_PLAN.md`. Decisions A (allPairs v1) + B (post-save modal) + Sequencing Option A LOCKED. Active item: NA-1 CLOSED — next item NA-2 (Nassau wizard setup) pending GM go-ahead.**
 
 **NA-pre-1 — CLOSED 2026-05-01. Commit: `572dc32`.**
 - Deliverable: `stroke_play.ts` emits `RoundingAdjustment.points={absorbingPlayer:remainder}` instead of silent absorb; `aggregate.ts` stale comments removed; 4 new tests (AC 1–5). `match_play.ts` confirmed already correct (unchanged).
 - Tests: 445/445 pass. tsc clean. Reviewer: APPROVED. Codex: sandbox bwrap blocked (not a code finding).
+
+**NA-1 — CLOSED 2026-05-01. Commit: `95e7c41`.**
+- Deliverable: `src/bridge/nassau_bridge.ts` (buildNassauCfg + settleNassauBet); `nassau_bridge.test.ts` (F6 invariant, T1–T7); `aggregate.ts` MatchTied→closed in buildMatchStates; `payouts.ts` + `perHoleDeltas.ts` cut over from legacy computeNassau; Nassau unparked in GAME_DEFS. F7 atomic commit satisfied.
+- Tests: 454/454 pass. tsc clean. Reviewer: APPROVED.
 
 **Wolf phase closure evidence:**
 - WF-0 — CLOSED 2026-04-30. Deliverable: `docs/plans/WOLF_PLAN.md`. Report: `docs/2026-04-30/02-wolf-phase-plan.md`.

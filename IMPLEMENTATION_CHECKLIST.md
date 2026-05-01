@@ -28,8 +28,9 @@ Updated at EOD-FINAL.
 
 **Nassau phase — APPROVED 2026-05-01. Plan: `docs/plans/NASSAU_PLAN.md`. Decisions A (allPairs v1) + B (post-save modal) + Sequencing Option A LOCKED. Active item: NA-pre-1 (RoundingAdjustment emission). NA-pre-1 must close before NA-1 begins.**
 
-**NA-pre-1 evidence (to be filled when closed):**
-- NA-pre-1 — OPEN. Deliverable: `RoundingAdjustment` emission in `stroke_play.ts`, `match_play.ts`; aggregate.ts phase comments updated; events.ts "dead" label removed. AC: tests (a)+(b)+(c) pass; reviewer APPROVED; 441+ vitest; tsc clean.
+**NA-pre-1 — CLOSED 2026-05-01. Commit: `572dc32`.**
+- Deliverable: `stroke_play.ts` emits `RoundingAdjustment.points={absorbingPlayer:remainder}` instead of silent absorb; `aggregate.ts` stale comments removed; 4 new tests (AC 1–5). `match_play.ts` confirmed already correct (unchanged).
+- Tests: 445/445 pass. tsc clean. Reviewer: APPROVED. Codex: sandbox bwrap blocked (not a code finding).
 
 **Wolf phase closure evidence:**
 - WF-0 — CLOSED 2026-04-30. Deliverable: `docs/plans/WOLF_PLAN.md`. Report: `docs/2026-04-30/02-wolf-phase-plan.md`.

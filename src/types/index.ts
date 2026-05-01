@@ -71,6 +71,10 @@ export interface GameInstance {
   maxExposure?: number
   settlePer9?: boolean
   partnerIds?: [string, string][]
+  // Nassau-specific fields (surfaced by NA-2 wizard; bridged with defaults until then)
+  pressRule?: 'manual' | 'auto-2-down' | 'auto-1-down'
+  pressScope?: 'nine' | 'match'
+  pairingMode?: 'singles' | 'allPairs'
   // junk config
   junk: JunkConfig
 }
@@ -150,7 +154,7 @@ export const GAME_DEFS: { key: GameType; label: string; description: string; min
   { key: 'matchPlay', label: 'Match Play', description: 'Win holes head-to-head — works with 2–5 players', minPlayers: 2, disabled: true },
   { key: 'stableford', label: 'Stableford', description: 'Points per hole based on net score', disabled: true },
   { key: 'skins', label: 'Skins', description: 'Win the hole outright to win the skin' },
-  { key: 'nassau', label: 'Nassau', description: 'Three bets: front 9, back 9, overall', disabled: true },
+  { key: 'nassau', label: 'Nassau', description: 'Three bets: front 9, back 9, overall' },
   { key: 'bestBall', label: 'Best Ball', description: 'Team best net score per hole', minPlayers: 4, maxPlayers: 4, requirementText: 'Requires exactly 4 betting players', disabled: true },
   { key: 'bingoBangoBongo', label: 'Bingo Bango Bongo', description: 'First on, closest, first in — one point each', disabled: true },
   { key: 'wolf', label: 'Wolf', description: 'Pick your partner or go solo', minPlayers: 4, maxPlayers: 5, requirementText: 'Requires 4–5 betting players' },

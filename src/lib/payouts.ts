@@ -5,6 +5,7 @@ import { computeJunkPayouts, hasAnyJunk } from './junk'
 import { settleStrokePlayBet } from '../bridge/stroke_play_bridge'
 import { settleSkinsBet } from '../bridge/skins_bridge'
 import { settleWolfBet } from '../bridge/wolf_bridge'
+import { settleNassauBet } from '../bridge/nassau_bridge'
 import { payoutMapFromLedger } from '../bridge/shared'
 
 function emptyPayouts(playerIds: string[]): PayoutMap {
@@ -113,7 +114,7 @@ function computeGamePayouts(holes: HoleData[], players: PlayerSetup[], game: Gam
       return payoutMapFromLedger(ledger, game.playerIds)
     }
     case 'matchPlay': return computeMatchPlay(holes, players, game)
-    case 'nassau': return computeNassau(holes, players, game)
+    case 'nassau': return settleNassauBet(holes, players, game).payouts
     case 'stableford': return computeStableford(holes, players, game)
     case 'skins': return payoutMapFromLedger(
       settleSkinsBet(holes, players, game).ledger,

@@ -239,6 +239,21 @@ export function buildMatchStates(
         break
       }
 
+      // MatchTied carries no points but signals a settled match (0-0 final).
+      // Marking closed prevents double-finalization when bridge events are replayed
+      // through aggregateRound.
+      case 'MatchTied': {
+        const betType = roundCfg.bets.find(b => b.id === event.declaringBet)?.type
+        if (betType !== 'nassau') break
+        const matches = nassauMatches.get(event.declaringBet)
+        if (!matches) break
+        nassauMatches.set(
+          event.declaringBet,
+          matches.map(m => m.id === event.matchId ? { ...m, closed: true } : m),
+        )
+        break
+      }
+
       case 'MatchClosedOut': {
         const betType = roundCfg.bets.find(b => b.id === event.declaringBet)?.type
         if (betType === 'nassau') {

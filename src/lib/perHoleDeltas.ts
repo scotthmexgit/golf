@@ -21,6 +21,7 @@ import type { ScoringEvent } from '../games/types'
 import { settleStrokePlayBet } from '../bridge/stroke_play_bridge'
 import { settleSkinsBet } from '../bridge/skins_bridge'
 import { settleWolfBet } from '../bridge/wolf_bridge'
+import { settleNassauBet } from '../bridge/nassau_bridge'
 
 export interface PerHoleDeltasResult {
   /** Summed across all games: { holeNumber → { playerId → netDelta } } */
@@ -43,6 +44,8 @@ function gameHoleEvents(
       return settleSkinsBet(holes, players, game).events
     case 'wolf':
       return settleWolfBet(holes, players, game).events
+    case 'nassau':
+      return settleNassauBet(holes, players, game).events
     default:
       return []
   }

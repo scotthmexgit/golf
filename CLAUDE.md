@@ -23,6 +23,8 @@ If GM gives you a tiny prompt ("fix the typo in line 42"), still do all 4 phases
 
 **Prompt format check.** Every work prompt from GM should follow docs/templates/prompt.md — with Objective, In scope, Out of scope, Success criteria, References, Phase guidance, and Approval gate. If a prompt is missing required fields, reply to GM: "Prompt is missing <fields>. Reissue using the template, or confirm I should proceed with my interpretation." Do not run on guesses. Conversational follow-ups during an active prompt cycle don't need full format.
 
+**Pre-commit review:** standard / `/codex:review` required / skip
+
 **Approval gate defaults.** Stop after Plan and report back to GM if any of these apply: new dependency, refactor across 3+ files, schema change, public API change, security-sensitive change, deletion of code older than 30 days. Otherwise auto-proceed through Develop.
 
 ## Documentation responsibilities
@@ -188,6 +190,16 @@ TypeScript strict mode is on. No Prettier — match surrounding style in each fi
 ### Commit hygiene
 
 Tickets first. One sentence is fine. Session-log/EOD-only commits are acceptable and routine.
+- **Per-prompt commit workflow** (adopted WF-5): one commit per substantive prompt, made at the reviewer APPROVED gate. Applies to all engineering and doc prompts that change source files.
+
+## External code review (optional)
+
+For prompts that touch 3+ files, change schemas/APIs, or alter security-sensitive code, run `/codex:review` after Develop and before commit. Record the result in the report's Develop section as one bullet:
+- "Codex review: clean" if no issues
+- "Codex review: N issues — addressed in commit X" if issues found and fixed
+- "Codex review: N issues — deferred to issue #N" if not addressing now
+
+For pre-merge of feature branches, GM may require `/codex:adversarial-review --base <main>` before approving. Findings get filed as a separate cowork-findings-style report (type: external-review).
 
 ## Reporting to GM
 

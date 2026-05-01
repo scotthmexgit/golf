@@ -77,14 +77,14 @@ tags: [audit, docs]
 ## Rolling EOD entry (one line per prompt)
 
 ```
-HH:MM | NNN_<slug> | <checklist item # or "parking" or "meta"> | <≤12-word summary> | <tag>
+HH:MM | NN-<slug> | <checklist item # or "parking" or "meta"> | <≤12-word summary> | <tag>
 ```
 
 Tags: `✓` done, `⏸` partial, `⚠` blocked, `🅿` parking-lot add, `🧭` scope-check triggered.
 
 Example:
 ```
-14:22 | 003_audit-migration-notes | #1 | classified 19 items; 9 closed 5 partial 5 open | ✓
+14:22 | 03-audit-migration-notes | #1 | classified 19 items; 9 closed 5 partial 5 open | ✓
 ```
 
 ## EOD-FINAL (on explicit request only)

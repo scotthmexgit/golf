@@ -280,6 +280,8 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
     // playerIds from DB are integers; map to strings to match PlayerSetup.id = String(playerId).
     // config: deserialized per game type via hydrateGameConfig; validation failures are
     // logged and produce {} (defaults), so the app never crashes on a corrupt DB blob.
+    // Intentional asymmetry: POST strict-rejects unknown keys (see validateGameConfigInput in
+    // gameConfig.ts); hydrateGameConfig is permissive so legacy/pre-validation blobs don't crash.
     const games: GameInstance[] = apiGames.map(g => ({
       id: String(g.id),
       type: g.type as GameType,

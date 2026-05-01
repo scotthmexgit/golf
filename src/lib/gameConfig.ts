@@ -1,13 +1,18 @@
 // src/lib/gameConfig.ts — Game-config persistence helpers.
 //
-// Three-function contract:
-//   buildGameConfig   — GameInstance → DB-safe JSON blob (null when no config)
-//   validateGameConfig — blob → ValidationResult (reject unknown keys + bad enums)
-//   hydrateGameConfig  — blob → Partial<GameInstance> (log on failure, return defaults)
+// Four-function contract:
+//   validateGameConfigInput — strict: validates raw POST body game object (BEFORE buildGameConfig)
+//   buildGameConfig         — GameInstance → DB-safe JSON blob (null when no config)
+//   validateGameConfig      — blob → ValidationResult (validates derived blob for enum correctness)
+//   hydrateGameConfig       — blob → Partial<GameInstance> (log on failure, return defaults)
 //
-// Rule #7 (no silent defaults): every per-type default is documented inline.
-// Unknown keys at POST boundary → HTTP 400 (rejected).
-// Unknown keys at hydration boundary → logged + ignored (app does not crash).
+// Intentional POST-strict / hydrate-permissive asymmetry (rule #7):
+//   • POST boundary: validateGameConfigInput rejects unknown/cross-type keys with HTTP 400.
+//     A misspelled key (e.g. `presRule`) or a cross-type key (e.g. `loneWolfMultiplier` on
+//     a nassau game) is caught at write time so the user's intent is not silently dropped.
+//   • Hydration boundary: hydrateGameConfig calls validateGameConfig on the DB blob and
+//     falls back to defaults on failure. This protects the app from crashing on legacy or
+//     pre-strict-validation config blobs stored before this validation layer existed.
 
 import type { GameType, GameInstance } from '../types'
 
@@ -22,6 +27,62 @@ const NASSAU_PAIRING_MODES = new Set(['singles', 'allPairs'])
 const NASSAU_KEYS = new Set(['pressRule', 'pressScope', 'pairingMode'])
 const WOLF_KEYS   = new Set(['loneWolfMultiplier', 'escalating'])
 const SKINS_KEYS  = new Set(['escalating'])
+
+// Union of all type-specific config keys across every game type.
+// Used by validateGameConfigInput to distinguish cross-type keys from truly unknown keys.
+// SKINS_KEYS ({ escalating }) is intentionally not spread separately — escalating is already
+// covered by WOLF_KEYS. If skins ever gains a skins-exclusive key, spread SKINS_KEYS here.
+const ALL_TYPE_CONFIG_KEYS = new Set([...NASSAU_KEYS, ...WOLF_KEYS])
+
+// Base GameInstance fields that are not game-type-specific — always valid on any game object.
+// Type-specific config keys (pressRule, loneWolfMultiplier, escalating, etc.) are intentionally
+// EXCLUDED so that validateGameConfigInput can detect them on the wrong game type.
+const BASE_GAME_INSTANCE_KEYS = new Set([
+  'id', 'type', 'label', 'stake', 'playerIds', 'junk',
+  'pressAmount', 'matchFormat', 'maxExposure', 'settlePer9', 'partnerIds',
+])
+
+// Valid raw-input config keys per type at POST boundary.
+const VALID_INPUT_KEYS_BY_TYPE: Partial<Record<string, Set<string>>> = {
+  nassau:  NASSAU_KEYS,
+  wolf:    WOLF_KEYS,
+  skins:   SKINS_KEYS,
+  // All other types have no config keys. Unknown keys on those types → rejected.
+}
+
+// ── validateGameConfigInput ───────────────────────────────────────────────────
+//
+// Strict validator for raw POST body game objects — called BEFORE buildGameConfig
+// so that a misspelled key (e.g. `presRule` vs `pressRule`) or a cross-type key
+// (e.g. `loneWolfMultiplier` on a nassau game) is rejected with HTTP 400 rather
+// than silently dropped. This closes the rule #7 loophole at the write boundary.
+//
+// Does NOT validate enum values — that stays in validateGameConfig on the derived
+// blob. Two-phase POST validation:
+//   1. validateGameConfigInput(type, rawGame) — unknown / cross-type keys
+//   2. buildGameConfig(game)                 — extract blob
+//   3. validateGameConfig(type, blob)        — enum correctness
+
+export function validateGameConfigInput(type: GameType, rawGame: unknown): ValidationResult {
+  if (typeof rawGame !== 'object' || rawGame === null || Array.isArray(rawGame)) {
+    return { ok: false, reason: `game must be a plain object` }
+  }
+  const obj = rawGame as Record<string, unknown>
+  const validForType = VALID_INPUT_KEYS_BY_TYPE[type] ?? new Set<string>()
+
+  for (const key of Object.keys(obj)) {
+    if (BASE_GAME_INSTANCE_KEYS.has(key)) continue
+    if (validForType.has(key)) continue
+
+    if (ALL_TYPE_CONFIG_KEYS.has(key)) {
+      // This key belongs to another game type's config — likely a config mistake.
+      return { ok: false, reason: `Config key "${key}" is not valid for game type "${type}"` }
+    }
+    // Key is not in base fields and not in any type's config → truly unknown.
+    return { ok: false, reason: `Unknown game config key "${key}" in ${type} game` }
+  }
+  return { ok: true }
+}
 
 // ── buildGameConfig ───────────────────────────────────────────────────────────
 //

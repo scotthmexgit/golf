@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { COURSES } from '@/types'
 import type { GameType, GameInstance } from '@/types'
-import { buildGameConfig, validateGameConfig } from '@/lib/gameConfig'
+import { buildGameConfig, validateGameConfig, validateGameConfigInput } from '@/lib/gameConfig'
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>
@@ -72,7 +72,17 @@ export async function POST(request: Request) {
 
     const processedGames: { type: string; stake: number; playerIds: number[]; config: Prisma.InputJsonValue | null }[] = []
     for (const g of (gameInstances || [])) {
+      // Step 1: strict raw-input validation — catches misspelled/cross-type keys before buildGameConfig
+      // silently drops them. See the POST-strict / hydrate-permissive asymmetry note in gameConfig.ts.
+      const inputCheck = validateGameConfigInput(g.type as GameType, g)
+      if (!inputCheck.ok) {
+        return NextResponse.json({ error: `Invalid game config: ${inputCheck.reason}` }, { status: 400 })
+      }
+
+      // Step 2: derive blob from known typed fields.
       const config = buildGameConfig(g)
+
+      // Step 3: enum validation on the derived blob.
       const v = validateGameConfig(g.type as GameType, config)
       if (!v.ok) {
         return NextResponse.json({ error: `Invalid config for ${g.type}: ${v.reason}` }, { status: 400 })

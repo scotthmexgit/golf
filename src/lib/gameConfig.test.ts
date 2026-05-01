@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { buildGameConfig, validateGameConfig, hydrateGameConfig } from './gameConfig'
+import { buildGameConfig, validateGameConfig, hydrateGameConfig, validateGameConfigInput } from './gameConfig'
 import type { GameInstance, JunkConfig } from '../types'
 
 const EMPTY_JUNK: JunkConfig = {
@@ -194,5 +194,91 @@ describe('buildGameConfig → validateGameConfig → hydrateGameConfig round-tri
     const hydrated = hydrateGameConfig('nassau', blob)
     expect(hydrated).toEqual({})
     // buildNassauCfg will apply its own defaults when called with these
+  })
+})
+
+// ── validateGameConfigInput ───────────────────────────────────────────────────
+// Strict POST-boundary validator. Catches misspelled/cross-type keys before
+// buildGameConfig silently drops them (closes rule #7 loophole at write boundary).
+
+const BASE_NASSAU_GAME = { id: 'g1', type: 'nassau', label: 'Nassau', stake: 100, playerIds: ['p1', 'p2'], junk: EMPTY_JUNK }
+const BASE_WOLF_GAME   = { id: 'g2', type: 'wolf',   label: 'Wolf',   stake: 100, playerIds: ['p1', 'p2', 'p3', 'p4'], junk: EMPTY_JUNK }
+
+describe('validateGameConfigInput — accepts valid inputs', () => {
+  it('base fields only → valid for any type', () => {
+    expect(validateGameConfigInput('nassau', BASE_NASSAU_GAME).ok).toBe(true)
+    expect(validateGameConfigInput('wolf',   BASE_WOLF_GAME).ok).toBe(true)
+  })
+  it('nassau with valid config fields → valid', () => {
+    expect(validateGameConfigInput('nassau', { ...BASE_NASSAU_GAME, pressRule: 'manual', pressScope: 'nine', pairingMode: 'allPairs' }).ok).toBe(true)
+  })
+  it('wolf with valid config fields → valid', () => {
+    expect(validateGameConfigInput('wolf', { ...BASE_WOLF_GAME, loneWolfMultiplier: 2, escalating: false }).ok).toBe(true)
+  })
+  it('skins with escalating → valid', () => {
+    expect(validateGameConfigInput('skins', { ...BASE_NASSAU_GAME, type: 'skins', escalating: true }).ok).toBe(true)
+  })
+  it('pressAmount on nassau is a base GameInstance field → valid', () => {
+    expect(validateGameConfigInput('nassau', { ...BASE_NASSAU_GAME, pressAmount: 5 }).ok).toBe(true)
+  })
+})
+
+describe('validateGameConfigInput — rejects misspelled config keys (POST boundary)', () => {
+  it('presRule (misspelled pressRule) on nassau → rejected', () => {
+    const r = validateGameConfigInput('nassau', { ...BASE_NASSAU_GAME, presRule: 'manual' })
+    expect(r.ok).toBe(false)
+    expect((r as { reason: string }).reason).toMatch(/Unknown game config key "presRule"/)
+  })
+  it('pressRulee (another typo) on nassau → rejected', () => {
+    const r = validateGameConfigInput('nassau', { ...BASE_NASSAU_GAME, pressRulee: 'manual' })
+    expect(r.ok).toBe(false)
+    expect((r as { reason: string }).reason).toMatch(/Unknown/)
+  })
+  it('loneWolfMultiplier on nassau (cross-type key) → rejected', () => {
+    const r = validateGameConfigInput('nassau', { ...BASE_NASSAU_GAME, loneWolfMultiplier: 2 })
+    expect(r.ok).toBe(false)
+    expect((r as { reason: string }).reason).toMatch(/not valid for game type/)
+  })
+  it('pressRule on wolf (nassau key on wolf) → rejected', () => {
+    const r = validateGameConfigInput('wolf', { ...BASE_WOLF_GAME, pressRule: 'manual' })
+    expect(r.ok).toBe(false)
+    expect((r as { reason: string }).reason).toMatch(/not valid for game type/)
+  })
+  it('pairingMode on skins (nassau key on skins) → rejected', () => {
+    const r = validateGameConfigInput('skins', { ...BASE_NASSAU_GAME, type: 'skins', pairingMode: 'allPairs' })
+    expect(r.ok).toBe(false)
+  })
+  it('escalating on nassau (wolf/skins key on nassau) → rejected', () => {
+    const r = validateGameConfigInput('nassau', { ...BASE_NASSAU_GAME, escalating: true })
+    expect(r.ok).toBe(false)
+    expect((r as { reason: string }).reason).toMatch(/not valid for game type/)
+  })
+  it('completely unknown key on any type → rejected', () => {
+    expect(validateGameConfigInput('nassau', { ...BASE_NASSAU_GAME, xFactor: 42 }).ok).toBe(false)
+    expect(validateGameConfigInput('wolf',   { ...BASE_WOLF_GAME,   xFactor: 42 }).ok).toBe(false)
+  })
+})
+
+describe('hydrateGameConfig — permissive on unknown keys in DB blob (asymmetry test)', () => {
+  it('otherwise-valid nassau config with unknown key → logs + returns {}', () => {
+    // Simulates a blob written before strict validation existed (legacy data).
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = hydrateGameConfig('nassau', { pressRule: 'manual', unknownField: true })
+    expect(result).toEqual({})  // graceful default, no crash
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+  it('wolf blob with unknown key → logs + returns {}', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = hydrateGameConfig('wolf', { loneWolfMultiplier: 2, extraKey: 'oops' })
+    expect(result).toEqual({})
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+  it('valid nassau blob (no unknown keys) still hydrates correctly', () => {
+    // Confirm the asymmetry does not break valid DB blobs.
+    const result = hydrateGameConfig('nassau', { pressRule: 'auto-2-down', pressScope: 'nine' })
+    expect(result.pressRule).toBe('auto-2-down')
+    expect(result.pressScope).toBe('nine')
   })
 })

@@ -5,7 +5,7 @@ import { computeJunkPayouts, hasAnyJunk } from './junk'
 import { settleStrokePlayBet } from '../bridge/stroke_play_bridge'
 import { settleSkinsBet, buildSkinsCfg } from '../bridge/skins_bridge'
 import { settleWolfBet, buildWolfCfg } from '../bridge/wolf_bridge'
-import { settleNassauBet } from '../bridge/nassau_bridge'
+import { settleNassauBet, buildNassauCfg } from '../bridge/nassau_bridge'
 import { payoutMapFromLedger, buildMinimalRoundCfg } from '../bridge/shared'
 import { aggregateRound } from '../games/aggregate'
 import type { ScoringEventLog } from '../games/types'
@@ -116,7 +116,31 @@ function computeGamePayouts(holes: HoleData[], players: PlayerSetup[], game: Gam
       return payoutMapFromLedger(ledger, game.playerIds)
     }
     case 'matchPlay': return computeMatchPlay(holes, players, game)
-    case 'nassau': return settleNassauBet(holes, players, game).payouts
+    case 'nassau': {
+      // Phase 7 sweep: orchestrate through aggregateRound (Nassau, Wolf/Skins pattern).
+      // Bridge produces finalized events (finalizeNassauRound runs inside settleNassauBet);
+      // log is assembled here; aggregateRound reduces to RunningLedger.
+      // DIVERGENCE from Wolf/Skins: Nassau byBet uses compound keys (${game.id}::${matchId}).
+      // byBet[game.id] is always undefined — use netByPlayer instead.
+      // PRECONDITION: the log assembled here contains events from this single Nassau bet only.
+      // netByPlayer is correct under this precondition because aggregateRound is a pure reducer.
+      // Multi-bet log usage would silently sum across bets — DO NOT change the assembly to span
+      // multiple bets without revisiting this extraction.
+      // Ref: docs/games/game_nassau.md; docs/2026-05-08/06-nassau-explore.md (NE6, NE9)
+      const nassauCfg = buildNassauCfg(game)
+      // Guard: buildNassauCfg must preserve game.id so event attribution is correct.
+      // (GR8 — string-equality bet-id chain). If this throws, the bridge contract broke.
+      if (nassauCfg.id !== game.id) {
+        throw new Error(`Nassau bridge id contract violation: nassauCfg.id="${nassauCfg.id}" !== game.id="${game.id}"`)
+      }
+      const { events } = settleNassauBet(holes, players, game)
+      const log: ScoringEventLog = { events, supersessions: {} }
+      const roundCfg = buildMinimalRoundCfg(nassauCfg, 'nassau')
+      const result = aggregateRound(log, roundCfg)
+      // Nassau byBet keys are compound (${game.id}::${matchId}) — byBet[game.id] is undefined.
+      // netByPlayer is safe: single-bet log, no cross-bet contamination.
+      return payoutMapFromLedger(result.netByPlayer, game.playerIds)
+    }
     case 'stableford': return computeStableford(holes, players, game)
     case 'skins': {
       // Phase 7 sweep: orchestrate through aggregateRound (Skins, Wolf-pilot pattern).

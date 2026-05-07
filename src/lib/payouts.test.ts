@@ -1,9 +1,13 @@
-// src/lib/payouts.test.ts — Integration tests for the WF7-2 Wolf orchestration path.
-// Exercises computeAllPayouts with Wolf games to verify the aggregateRound-based
-// dispatch produces correct, zero-sum, integer-valued results.
+// src/lib/payouts.test.ts — Integration tests for the Wolf, Skins, and Nassau
+// aggregateRound orchestration paths (Phase 7 sweep).
+// Exercises computeAllPayouts to verify correct, zero-sum, integer-valued results.
 //
-// Does NOT test Skins, Nassau, or Stroke Play (those remain on per-bet dispatch).
-// Does NOT test junk (junk payouts are independent of the Wolf orchestration path).
+// WP1–WP8: Wolf (WF7-2 cutover, aggregateRound via byBet[game.id])
+// SP1–SP10: Skins (Phase 7 sweep, aggregateRound via byBet[game.id])
+// NP1–NP10: Nassau (Phase 7 sweep, aggregateRound via netByPlayer — compound byBet keys)
+//
+// Does NOT test Stroke Play (still on per-bet dispatch).
+// Does NOT test junk (junk payouts are independent of the orchestration paths).
 
 import { describe, it, expect } from 'vitest'
 import { computeAllPayouts } from './payouts'
@@ -488,5 +492,350 @@ describe('SP10: escalating=true — carry-scaled SkinWon reduces correctly', () 
   })
   it('all deltas are integers (GR2)', () => {
     for (const pid of SPIDS) expect(Number.isInteger(payouts[pid])).toBe(true)
+  })
+})
+
+// ─── Nassau Phase 7 sweep — NP1–NP10 ─────────────────────────────────────────
+// Tests for the Nassau aggregateRound orchestration path (Phase 7 sweep).
+// Key invariant: result.netByPlayer extraction is correct for Nassau because
+// compound byBet keys (${game.id}::${matchId}) make byBet[game.id] always undefined.
+// netByPlayer is safe when the log contains only one bet's events (NP10 proves isolation).
+//
+// Fixture: 2 players (A/B) singles mode; 3 players (A/B/C) for NP9 allPairs.
+// All scratch (courseHcp=0), stake=100, pressRule='manual', pressScope='nine'.
+
+const NASSAU_GAME_ID = 'nassau-payout-test'
+
+function makeNassauGame(
+  playerIds: string[],
+  opts: {
+    stake?: number
+    id?: string
+    pressRule?: 'manual' | 'auto-2-down' | 'auto-1-down'
+    pressScope?: 'nine' | 'match'
+  } = {},
+): GameInstance {
+  return {
+    id: opts.id ?? NASSAU_GAME_ID,
+    type: 'nassau',
+    label: 'Nassau',
+    stake: opts.stake ?? 100,
+    playerIds,
+    pressRule: opts.pressRule ?? 'manual',
+    pressScope: opts.pressScope ?? 'nine',
+    junk: EMPTY_JUNK,
+  }
+}
+
+// Build 18-hole HoleData array for a 2-player Nassau round.
+// pressByHole: hole number → match IDs confirmed at that hole for this game.
+function makeNassauHoles(
+  aScores: number[],
+  bScores: number[],
+  opts: { pressByHole?: Record<number, string[]>; gameId?: string } = {},
+): HoleData[] {
+  const gid = opts.gameId ?? NASSAU_GAME_ID
+  return Array.from({ length: 18 }, (_, i) => {
+    const hole = i + 1
+    const pressMatches = opts.pressByHole?.[hole]
+    return {
+      number: hole,
+      par: 4,
+      index: hole,
+      scores: { A: aScores[i], B: bScores[i] },
+      dots: {},
+      ...(pressMatches ? { presses: { [gid]: pressMatches } } : {}),
+    }
+  })
+}
+
+const NPIDS = ['A', 'B']
+const nassauPlayers = NPIDS.map(id => makePlayer(id))
+
+// ─── NP1 — A wins front, back, overall (3× stake) ────────────────────────────
+// A=3, B=5 all 18 holes. All scratch.
+// A wins front (closeout before hole 9), back (closeout), overall (closeout).
+// A: +300, B: -300. Σ=0.
+
+describe('NP1: A wins all 3 matches — 3× stake', () => {
+  const game = makeNassauGame(NPIDS, { stake: 100 })
+  const holes = makeNassauHoles(Array(18).fill(3), Array(18).fill(5))
+  const payouts = computeAllPayouts(holes, nassauPlayers, [game])
+
+  it('zero-sum (GR3)', () => expect(zeroSum(payouts, NPIDS)).toBe(0))
+  it('A collects +300 (front + back + overall)', () => expect(payouts['A']).toBe(300))
+  it('B pays -300', () => expect(payouts['B']).toBe(-300))
+  it('all deltas are integers (GR2)', () => {
+    for (const pid of NPIDS) expect(Number.isInteger(payouts[pid])).toBe(true)
+  })
+})
+
+// ─── NP2 — Front tied, back + overall A wins (2× stake) ──────────────────────
+// Holes 1-9: A=4, B=4 (all halved). Holes 10-18: A=3, B=5 (A wins back).
+// Front: MatchTied → 0. Back: A wins → +100. Overall: A won 9 (back), B won 0 → A wins → +100.
+// A: +200, B: -200.
+
+describe('NP2: front tied, back + overall A wins — 2× stake', () => {
+  const game = makeNassauGame(NPIDS, { stake: 100 })
+  const holes = makeNassauHoles(
+    [...Array(9).fill(4), ...Array(9).fill(3)],
+    [...Array(9).fill(4), ...Array(9).fill(5)],
+  )
+  const payouts = computeAllPayouts(holes, nassauPlayers, [game])
+
+  it('zero-sum (GR3)', () => expect(zeroSum(payouts, NPIDS)).toBe(0))
+  it('A collects +200 (back + overall; front MatchTied)', () => expect(payouts['A']).toBe(200))
+  it('B pays -200', () => expect(payouts['B']).toBe(-200))
+  it('all deltas are integers (GR2)', () => {
+    for (const pid of NPIDS) expect(Number.isInteger(payouts[pid])).toBe(true)
+  })
+})
+
+// ─── NP3 — All matches tied → zero payout (GR7) ──────────────────────────────
+// All 18 holes halved (A=4, B=4). Front, back, overall all MatchTied.
+// GR7: MatchTied events emit explicitly; no silent zeros.
+
+describe('NP3: all matches tied — zero payout (GR7: MatchTied explicit)', () => {
+  const game = makeNassauGame(NPIDS, { stake: 100 })
+  const holes = makeNassauHoles(Array(18).fill(4), Array(18).fill(4))
+  const payouts = computeAllPayouts(holes, nassauPlayers, [game])
+
+  it('zero-sum (GR3)', () => expect(zeroSum(payouts, NPIDS)).toBe(0))
+  it('all payouts are zero (all 3 matches MatchTied)', () => {
+    for (const pid of NPIDS) expect(payouts[pid] ?? 0).toBe(0)
+  })
+  it('all deltas are integers (GR2)', () => {
+    for (const pid of NPIDS) expect(Number.isInteger(payouts[pid] ?? 0)).toBe(true)
+  })
+})
+
+// ─── NP4 — Front A wins, back B wins, overall tied → net zero ────────────────
+// Holes 1-9: A=3, B=5. Holes 10-18: A=5, B=3.
+// Front: A wins (+100). Back: B wins (A-100). Overall: 9-9 → MatchTied (0).
+// Net: A=0, B=0.
+
+describe('NP4: front A wins, back B wins, overall MatchTied — net zero', () => {
+  const game = makeNassauGame(NPIDS, { stake: 100 })
+  const holes = makeNassauHoles(
+    [...Array(9).fill(3), ...Array(9).fill(5)],
+    [...Array(9).fill(5), ...Array(9).fill(3)],
+  )
+  const payouts = computeAllPayouts(holes, nassauPlayers, [game])
+
+  it('zero-sum (GR3)', () => expect(zeroSum(payouts, NPIDS)).toBe(0))
+  it('A at net zero (front win offset by back loss; overall tied)', () => {
+    expect(payouts['A'] ?? 0).toBe(0)
+  })
+  it('B at net zero', () => expect(payouts['B'] ?? 0).toBe(0))
+})
+
+// ─── NP5 — Manual press wins, stacks with main result ────────────────────────
+// A=3, B=5 all 18 holes. Press confirmed on hole 3 for 'front' match.
+// Press covers holes 4-9 (pressScope='nine'); A wins all → A wins press (+100).
+// Front: A+100. Press: A+100. Back: A+100. Overall: A+100. Total: A+400, B-400.
+
+describe('NP5: press opens and wins — stacks with main result (4× stake total)', () => {
+  const game = makeNassauGame(NPIDS, { stake: 100 })
+  const holes = makeNassauHoles(
+    Array(18).fill(3),
+    Array(18).fill(5),
+    { pressByHole: { 3: ['front'] } },
+  )
+  const payouts = computeAllPayouts(holes, nassauPlayers, [game])
+
+  it('zero-sum (GR3)', () => expect(zeroSum(payouts, NPIDS)).toBe(0))
+  it('A collects +400 (front + press + back + overall)', () => expect(payouts['A']).toBe(400))
+  it('B pays -400', () => expect(payouts['B']).toBe(-400))
+  it('all deltas are integers (GR2)', () => {
+    for (const pid of NPIDS) expect(Number.isInteger(payouts[pid])).toBe(true)
+  })
+})
+
+// ─── NP6 — Press opened but ties → press contributes zero ────────────────────
+// Holes 1-3: A=3, B=5 (A leads front 3-0). Press on hole 3 for 'front'.
+// Holes 4-9: A=4, B=4 (all tied) → press ends 0-0 → MatchTied, press=0.
+// Front main: A won 3, B won 0, 6 halved → A wins front (+100 for A).
+// Holes 10-18: A=5, B=3 → B wins back and overall.
+// Net: A+100 (front) + 0 (press) - 100 (back) - 100 (overall) = A-100.
+
+describe('NP6: press opens but ties — press contributes zero (MatchTied)', () => {
+  const game = makeNassauGame(NPIDS, { stake: 100 })
+  const holes: HoleData[] = [
+    ...Array.from({ length: 3 }, (_, i): HoleData => ({
+      number: i + 1, par: 4, index: i + 1,
+      scores: { A: 3, B: 5 }, dots: {},
+      ...(i === 2 ? { presses: { [NASSAU_GAME_ID]: ['front'] } } : {}),
+    })),
+    ...Array.from({ length: 6 }, (_, i): HoleData => ({
+      number: i + 4, par: 4, index: i + 4,
+      scores: { A: 4, B: 4 }, dots: {},
+    })),
+    ...Array.from({ length: 9 }, (_, i): HoleData => ({
+      number: i + 10, par: 4, index: i + 10,
+      scores: { A: 5, B: 3 }, dots: {},
+    })),
+  ]
+  const payouts = computeAllPayouts(holes, nassauPlayers, [game])
+
+  it('zero-sum (GR3)', () => expect(zeroSum(payouts, NPIDS)).toBe(0))
+  it('A is net -100 (press tie = 0, B wins back + overall)', () => {
+    expect(payouts['A']).toBe(-100)
+  })
+  it('B is net +100', () => expect(payouts['B']).toBe(100))
+  it('all deltas are integers (GR2)', () => {
+    for (const pid of NPIDS) expect(Number.isInteger(payouts[pid])).toBe(true)
+  })
+})
+
+// ─── NP7 — GR8 bet-id chain: UUID-style game id ──────────────────────────────
+// Verifies the id chain game.id → buildNassauCfg.id → events.declaringBet →
+// netByPlayer attribution for a UUID-style game id (not the fixture default).
+// Nassau uses netByPlayer (byBet[game.id] is undefined for compound keys), but the
+// id still flows through buildNassauCfg → GR8 guard → event attribution.
+// Non-zero payouts confirm no silent id mismatch.
+
+describe('NP7: GR8 bet-id chain — UUID-style game id (non-default)', () => {
+  const game: GameInstance = {
+    id: 'c1d2e3f4-a5b6-7890-abcd-ef1234567890',
+    type: 'nassau',
+    label: 'Nassau',
+    stake: 100,
+    playerIds: NPIDS,
+    pressRule: 'manual',
+    pressScope: 'nine',
+    junk: EMPTY_JUNK,
+  }
+  const holes = makeNassauHoles(Array(18).fill(3), Array(18).fill(5), { gameId: game.id })
+  const payouts = computeAllPayouts(holes, nassauPlayers, [game])
+
+  it('zero-sum (GR3) — confirms attribution correct for UUID game id', () => {
+    expect(zeroSum(payouts, NPIDS)).toBe(0)
+  })
+  it('A collects +300 (not zero — confirms no silent id mismatch)', () => {
+    expect(payouts['A']).toBe(300)
+  })
+  it('B pays -300', () => expect(payouts['B']).toBe(-300))
+})
+
+// ─── NP8 — Partial round (3 holes) → finalizeNassauRound settles open matches ──
+// Only holes 1-3 are played (A=3, B=5 each). Back match never receives a hole.
+// finalizeNassauRound: front (A:3, B:0) → A wins front (+100); back (0-0) → MatchTied (0);
+// overall (A:3, B:0) → A wins overall (+100). Net: A+200, B-200.
+// Tests that finalization correctly resolves partially-played rounds.
+
+describe('NP8: partial round (3 holes) — finalizeNassauRound settles open matches', () => {
+  const game = makeNassauGame(NPIDS, { stake: 100 })
+  const holes: HoleData[] = Array.from({ length: 3 }, (_, i): HoleData => ({
+    number: i + 1, par: 4, index: i + 1,
+    scores: { A: 3, B: 5 }, dots: {},
+  }))
+  const payouts = computeAllPayouts(holes, nassauPlayers, [game])
+
+  it('zero-sum (GR3)', () => expect(zeroSum(payouts, NPIDS)).toBe(0))
+  it('A collects +200 (front won + overall won; back MatchTied at 0-0)', () => {
+    expect(payouts['A']).toBe(200)
+  })
+  it('B pays -200', () => expect(payouts['B']).toBe(-200))
+  it('all deltas are integers (GR2)', () => {
+    for (const pid of NPIDS) expect(Number.isInteger(payouts[pid])).toBe(true)
+  })
+})
+
+// ─── NP9 — 3-player allPairs via aggregateRound → zero-sum ──────────────────
+// 3 players (A/B/C), pairingMode inferred as 'allPairs' (3 >= 3 in buildNassauCfg).
+// 9 matches total (front/back/overall × 3 pairs). A=3, B=5, C=5 all 18 holes.
+// A beats B (all 3 matches, +300). A beats C (all 3, +300). B vs C: all tied (0).
+// Net: A+600, B-300, C-300, Σ=0. Confirms netByPlayer works for multi-pair Nassau.
+
+describe('NP9: 3-player allPairs Nassau — netByPlayer correct across all pairs (GR3)', () => {
+  const game = makeNassauGame(['A', 'B', 'C'])
+  const players3 = ['A', 'B', 'C'].map(id => makePlayer(id))
+  const holes = Array.from({ length: 18 }, (_, i): HoleData => ({
+    number: i + 1, par: 4, index: i + 1,
+    scores: { A: 3, B: 5, C: 5 }, dots: {},
+  }))
+  const payouts = computeAllPayouts(holes, players3, [game])
+
+  it('zero-sum across all 3 players (GR3)', () => {
+    expect(zeroSum(payouts, ['A', 'B', 'C'])).toBe(0)
+  })
+  it('A collects +600 (3 matches × 2 pairs × stake)', () => {
+    expect(payouts['A']).toBe(600)
+  })
+  it('B pays -300 (3 matches lost to A; tied with C)', () => expect(payouts['B']).toBe(-300))
+  it('C pays -300', () => expect(payouts['C']).toBe(-300))
+  it('all deltas are integers (GR2)', () => {
+    for (const pid of ['A', 'B', 'C']) expect(Number.isInteger(payouts[pid])).toBe(true)
+  })
+})
+
+// ─── NP10 — Multi-bet isolation: Nassau + Skins, no cross-bet contamination ───
+// Proves single-bet-log precondition empirically.
+// Method 1: vary Skins outcomes (C/D) while holding Nassau inputs (A/B) constant
+//           → Nassau payouts must be identical across both runs.
+// Method 2: vary Nassau outcomes (A/B) while holding Skins inputs (C/D) constant
+//           → Skins payouts must be identical across both runs.
+// Non-overlapping player sets ensure structural isolation matches semantic isolation.
+
+describe('NP10: multi-bet isolation — Nassau netByPlayer uncontaminated by Skins events', () => {
+  // Non-overlapping player sets: Nassau = [A, B]; Skins = [C, D, E] (3-player minimum).
+  const nassauGame = makeNassauGame(['A', 'B'], { stake: 100 })
+  const skinsGameBase: GameInstance = {
+    id: 'skins-isolation-test',
+    type: 'skins',
+    label: 'Skins',
+    stake: 100,
+    playerIds: ['C', 'D', 'E'],
+    escalating: false,
+    junk: EMPTY_JUNK,
+  }
+  const allPlayers = ['A', 'B', 'C', 'D', 'E'].map(id => makePlayer(id))
+
+  // Nassau: A=3, B=5 (A wins). Skins scenario X: C=3, D=5, E=5 on hole 1 (C wins skin).
+  const holesSkinsX = Array.from({ length: 18 }, (_, i): HoleData => ({
+    number: i + 1, par: 4, index: i + 1,
+    scores: { A: 3, B: 5, C: i === 0 ? 3 : 4, D: i === 0 ? 5 : 4, E: i === 0 ? 5 : 4 },
+    dots: {},
+  }))
+
+  // Nassau: A=3, B=5 (same). Skins scenario Y: D=3, C=5, E=5 on hole 1 (D wins skin instead).
+  const holesSkinsY = Array.from({ length: 18 }, (_, i): HoleData => ({
+    number: i + 1, par: 4, index: i + 1,
+    scores: { A: 3, B: 5, C: i === 0 ? 5 : 4, D: i === 0 ? 3 : 4, E: i === 0 ? 5 : 4 },
+    dots: {},
+  }))
+
+  // Nassau: B=3, A=5 (B wins instead). Skins: same as scenario X (C wins).
+  const holesNassauBwins = Array.from({ length: 18 }, (_, i): HoleData => ({
+    number: i + 1, par: 4, index: i + 1,
+    scores: { A: 5, B: 3, C: i === 0 ? 3 : 4, D: i === 0 ? 5 : 4, E: i === 0 ? 5 : 4 },
+    dots: {},
+  }))
+
+  const payoutsX = computeAllPayouts(holesSkinsX, allPlayers, [nassauGame, skinsGameBase])
+  const payoutsY = computeAllPayouts(holesSkinsY, allPlayers, [nassauGame, skinsGameBase])
+  const payoutsBwins = computeAllPayouts(holesNassauBwins, allPlayers, [nassauGame, skinsGameBase])
+
+  it('Nassau A payout identical when Skins outcome changes (X→Y)', () => {
+    expect(payoutsX['A']).toBe(payoutsY['A'])
+  })
+  it('Nassau B payout identical when Skins outcome changes (X→Y)', () => {
+    expect(payoutsX['B']).toBe(payoutsY['B'])
+  })
+  it('Skins C payout identical when Nassau outcome changes (A wins→B wins)', () => {
+    expect(payoutsX['C']).toBe(payoutsBwins['C'])
+  })
+  it('Skins D payout identical when Nassau outcome changes (A wins→B wins)', () => {
+    expect(payoutsX['D']).toBe(payoutsBwins['D'])
+  })
+  it('Nassau zero-sum in scenario X (GR3)', () => {
+    expect((payoutsX['A'] ?? 0) + (payoutsX['B'] ?? 0)).toBe(0)
+  })
+  it('Skins zero-sum in scenario X (GR3 — C/D/E)', () => {
+    const skinsNet = (payoutsX['C'] ?? 0) + (payoutsX['D'] ?? 0) + (payoutsX['E'] ?? 0)
+    expect(skinsNet).toBe(0)
+  })
+  it('Nassau A collects +300 in scenario X (A wins all 3 Nassau matches)', () => {
+    expect(payoutsX['A']).toBe(300)
   })
 })

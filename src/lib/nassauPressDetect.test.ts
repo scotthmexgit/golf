@@ -1,15 +1,21 @@
-// src/lib/nassauPressDetect.test.ts — Tests for auto-mode press offer detection.
+// src/lib/nassauPressDetect.test.ts — Tests for auto-mode and manual-mode press detection.
 //
-// Tests:
+// detectNassauPressOffers tests:
 //   manual mode returns []
 //   auto-2-down: not offered until exactly 2-down
 //   auto-2-down: offered when exactly 2-down after current hole
 //   auto-1-down: offered when exactly 1-down
 //   allPairs: correct matchId returned (pair-suffixed)
 //   prior presses are applied before detection
+//
+// detectManualNassauPressOffers tests (B5):
+//   manual mode + down player → returns offers (front + overall)
+//   manual mode + tied (no down player) → returns []
+//   auto-2-down mode → returns []
+//   auto-1-down mode → returns []
 
 import { describe, it, expect } from 'vitest'
-import { detectNassauPressOffers } from './nassauPressDetect'
+import { detectNassauPressOffers, detectManualNassauPressOffers } from './nassauPressDetect'
 import type { HoleData, PlayerSetup, GameInstance, JunkConfig } from '../types'
 
 const EMPTY_JUNK: JunkConfig = {
@@ -173,6 +179,55 @@ describe('detectNassauPressOffers — allPairs: pair-suffixed matchIds', () => {
     const matchIds = offers.map(o => o.matchId)
     expect(matchIds).toContain('front-Alice-Bob')
     expect(matchIds).toContain('front-Alice-Carol')
+  })
+})
+
+// ── detectManualNassauPressOffers (B5) ────────────────────────────────────────
+
+describe('detectManualNassauPressOffers — manual mode with down player returns offers', () => {
+  it('returns offers for front and overall matches when Bob is 1-down after hole 1', () => {
+    const game = makeGame({ pressRule: 'manual' })
+    const holes = makeHoles({
+      Alice: [3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+      Bob:   [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+    })
+    const offers = detectManualNassauPressOffers(1, holes, players, game)
+    expect(offers.length).toBeGreaterThanOrEqual(2)
+    // Front and overall are both 1-0 after hole 1 → offers for Bob in both
+    expect(offers.some(o => o.matchId === 'front')).toBe(true)
+    expect(offers.some(o => o.matchId === 'overall')).toBe(true)
+    expect(offers.every(o => o.downPlayer === 'Bob')).toBe(true)
+    expect(offers.every(o => o.gameId === 'nassau-1')).toBe(true)
+  })
+
+  it('returns [] when no player is down (all ties)', () => {
+    const game = makeGame({ pressRule: 'manual' })
+    const holes = makeHoles({
+      Alice: [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+      Bob:   [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+    })
+    const offers = detectManualNassauPressOffers(1, holes, players, game)
+    expect(offers).toEqual([])
+  })
+})
+
+describe('detectManualNassauPressOffers — auto mode returns []', () => {
+  it('returns [] for auto-2-down even when a player is down', () => {
+    const game = makeGame({ pressRule: 'auto-2-down' })
+    const holes = makeHoles({
+      Alice: [3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+      Bob:   [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+    })
+    expect(detectManualNassauPressOffers(2, holes, players, game)).toEqual([])
+  })
+
+  it('returns [] for auto-1-down', () => {
+    const game = makeGame({ pressRule: 'auto-1-down' })
+    const holes = makeHoles({
+      Alice: [3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+      Bob:   [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+    })
+    expect(detectManualNassauPressOffers(1, holes, players, game)).toEqual([])
   })
 })
 

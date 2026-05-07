@@ -143,6 +143,19 @@ test('wolf + skins multi-bet flow: WF7-3 closure spec', async ({ page }) => {
   // §1 confirm: wolf-declare-panel renders when Wolf game is active alongside Skins
   await expect(page.locator('[data-testid="wolf-declare-panel"]')).toBeVisible()
 
+  // B4: Save button must be disabled when Wolf is active and no declaration has been made yet.
+  // F9-a sets par scores on mount → allScored=true; wolf notice useEffect fires; button grays out.
+  await test.step('B4: save button disabled when Wolf active + no wolf declaration', async () => {
+    // Wolf notice appears proactively (useEffect) once all scores set + no declaration.
+    // Wait for notice rather than a fixed timeout — more robust against server hydration timing.
+    await expect(
+      page.locator('div').filter({ hasText: /Wolf: captain must declare/ }).first(),
+      'B4: wolf notice must be visible when all scored + no declaration',
+    ).toBeVisible({ timeout: 5000 })
+    const saveBtn = page.getByRole('button', { name: 'Save & Next Hole →' })
+    await expect(saveBtn, 'B4: button must be disabled with Wolf active + no declaration').toBeDisabled()
+  })
+
   // ── §2 MULTI-BET HOLE 1 (Alice lone wolf + skins win) ────────────────────────
 
   await test.step('§2 Multi-bet hole 1: lone wolf + skins; BetDetailsSheet shows both Wolf and Skins', async () => {
@@ -230,20 +243,22 @@ test('wolf + skins multi-bet flow: WF7-3 closure spec', async ({ page }) => {
 
   // ── §4 COMPLETE ROUND (holes 3–18, all par) ───────────────────────────────────
 
-  await test.step('§4 Complete round: holes 3–18 all par, no declarations', async () => {
-    // Holes 3–17: save with default par scores. No wolf declaration → WolfDecisionMissing → $0.
-    // Skins: all tie every hole → carry chain → resolved at hole 18 with tieRule='split' → $0.
-    // After each save, wait for the scorecard to render the next hole's "Save & Next Hole →"
-    // button before proceeding. This prevents a race between PUT completing and React advancing
-    // the hole state (codex P2 finding: saveHole loop can race the hole transition).
+  await test.step('§4 Complete round: holes 3–18 all par, lone wolf declared each hole → $0 wolf delta', async () => {
+    // B4: save button is disabled when Wolf active + no wolfPick. Must declare before each save.
+    // Declare "Lone Wolf" on holes 3–17. All par → WolfHoleTied (no-points rule) → $0 delta per hole.
+    // Functionally equivalent to WolfDecisionMissing ($0) while satisfying the B4 guard.
+    // Skins: all tie every hole → 14-hole carry chain → hole 18 tieRule='split' → $0.
     for (let h = 3; h <= 17; h++) {
+      await page.locator('[data-testid="wolf-declare-lone"]').click()
+      await page.waitForTimeout(50)
       await saveHole(page, h)
-      // Wait for the next hole to render. After h=17 the page shows hole 18 with "Finish Round →".
       await expect(
         page.locator('button').filter({ hasText: /Save & Next Hole|Finish Round/ }),
       ).toBeVisible()
     }
-    // Hole 18: finish the round, navigate to results page.
+    // Hole 18: declare lone wolf, then finish round (B4 guard applies to BottomCta here too).
+    await page.locator('[data-testid="wolf-declare-lone"]').click()
+    await page.waitForTimeout(50)
     await finishRound(page)
   })
 
@@ -270,5 +285,31 @@ test('wolf + skins multi-bet flow: WF7-3 closure spec', async ({ page }) => {
     // Money Summary section and winner heading must be visible (confirms full hydration).
     await expect(page.getByText('Money Summary')).toBeVisible()
     await expect(page.getByRole('heading', { name: /wins!/ })).toBeVisible()
+  })
+
+  // B3: Game Breakdown must show per-player subtotals (not just stakes).
+  await test.step('B3: Game Breakdown shows per-player subtotals per game', async () => {
+    await expect(page.getByText('Game Breakdown')).toBeVisible()
+
+    // Wolf game: Alice +$20.00 and Bob +$20.00 (Wolf +2000 each), Carol/Dave -$20.00 each
+    // Skins game: Alice +$10.00 and Bob +$10.00 (Skins +1000 each), Carol/Dave -$10.00 each
+    // Assert that the per-player breakdown amounts appear in the Game Breakdown section.
+    // Use exact text spans matching the Wolf-only and Skins-only amounts.
+    const wolfPositiveAmounts = page.locator('span').filter({ hasText: /^\+\$20\.00$/ })
+    const skinsPositiveAmounts = page.locator('span').filter({ hasText: /^\+\$10\.00$/ })
+    await expect(
+      wolfPositiveAmounts,
+      'B3: Wolf breakdown must show +$20.00 for Alice and Bob (2 entries)',
+    ).toHaveCount(2)
+    await expect(
+      skinsPositiveAmounts,
+      'B3: Skins breakdown must show +$10.00 for Alice and Bob (2 entries)',
+    ).toHaveCount(2)
+
+    // Game Breakdown section must render at least one player row per game
+    // (2 games × 4 players = 8 subtotal rows total)
+    const breakdownSection = page.getByText('Game Breakdown').locator('..').locator('..')
+    const subtotalRows = breakdownSection.locator('.pl-3')
+    await expect(subtotalRows, 'B3: Game Breakdown must have 8 per-player rows (2 games × 4 players)').toHaveCount(8)
   })
 })

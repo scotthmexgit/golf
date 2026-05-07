@@ -1,11 +1,13 @@
-// src/lib/nassauPressDetect.ts — Detects Nassau press offers for auto press modes.
+// src/lib/nassauPressDetect.ts — Detects Nassau press offers.
 //
-// Only fires for pressRule=auto-2-down or auto-1-down. Manual mode is player-
-// triggered (future NA-4 UI button); returns [] immediately for manual/undefined.
+// detectNassauPressOffers: auto modes only (auto-2-down, auto-1-down). Returns []
+// for manual/undefined. Called in handleSaveNext.
 //
-// Usage: call after scoring a hole, before persisting. If any PressOffer is
-// returned, show PressConfirmationModal. Accepted offers are written to
-// hd.presses via setPressConfirmation, then picked up by the bridge.
+// detectManualNassauPressOffers: manual mode only. Returns offers whenever any open
+// match has a down player. Called by the "Press?" button on the scorecard. (game_nassau.md §5)
+//
+// Accepted offers are written to hd.presses via setPressConfirmation, then picked
+// up by the bridge on proceedSave.
 
 import type { HoleData, PlayerSetup, GameInstance } from '../types'
 import type { MatchState } from '../games/nassau'
@@ -101,5 +103,89 @@ export function detectNassauPressOffers(
     }
   }
 
+  return offers
+}
+
+/**
+ * Returns press offers for Manual press mode. (game_nassau.md §5)
+ *
+ * Unlike detectNassauPressOffers (auto modes only), this fires for pressRule='manual'
+ * and returns an offer for every open match where any player is down. No threshold
+ * filter — the player's opt-in (tapping the "Press?" button) is the gate.
+ *
+ * Returns [] for auto modes — they use detectNassauPressOffers instead.
+ */
+export function detectManualNassauPressOffers(
+  currentHole: number,
+  holes: HoleData[],
+  players: PlayerSetup[],
+  game: GameInstance,
+): PressOffer[] {
+  if (game.pressRule !== 'manual') return []
+
+  const bettingPlayers = players.filter(p => game.playerIds.includes(p.id))
+  const cfg = buildNassauCfg(game)
+  const roundCfg = buildMinimalRoundCfg(cfg, 'nassau')
+
+  const sortedHoles = [...holes].sort((a, b) => a.number - b.number)
+  const holesUpToCurrent = sortedHoles.filter(h => h.number <= currentHole)
+
+  let matches: MatchState[] = initialMatches(cfg)
+
+  for (const hd of holesUpToCurrent) {
+    const state = buildHoleState(hd, bettingPlayers)
+    const { matches: updatedMatches } = settleNassauHole(state, cfg, roundCfg, matches)
+    matches = updatedMatches
+
+    const priorGamePresses = hd.number < currentHole ? (hd.presses?.[cfg.id] ?? []) : []
+    if (priorGamePresses.length > 0) {
+      for (const parentMatchId of priorGamePresses) {
+        const parent = matches.find(m => m.id === parentMatchId)
+        if (!parent || parent.closed) continue
+        const [playerA, playerB] = parent.pair
+        const openingPlayer = parent.holesWonA < parent.holesWonB ? playerA : playerB
+        const { matches: pressedMatches } = openPress(
+          { hole: hd.number, parentMatchId, openingPlayer },
+          cfg,
+          roundCfg,
+          matches,
+        )
+        matches = pressedMatches
+      }
+    }
+
+    if (hd.number < currentHole && hd.withdrew && hd.withdrew.length > 0) {
+      for (const withdrawingPlayer of hd.withdrew) {
+        if (!cfg.playerIds.includes(withdrawingPlayer)) continue
+        const { matches: newMatches } = settleNassauWithdrawal(
+          hd.number, withdrawingPlayer, cfg, roundCfg, matches,
+        )
+        matches = newMatches
+      }
+    }
+  }
+
+  // Idempotency guard: do not re-offer a press for a match that was already pressed on the
+  // current hole. Prevents duplicate press matches if the user re-opens the modal after a
+  // failed save PUT (save-retry scenario). The auto-press path has the same exposure, but
+  // manual press is uniquely susceptible because the button is always visible when a match
+  // is down — not gated by the save-button flow.
+  const currentHoleHd = holesUpToCurrent.find(h => h.number === currentHole)
+  const alreadyPressedIds = new Set(currentHoleHd?.presses?.[cfg.id] ?? [])
+
+  const offers: PressOffer[] = []
+  for (const match of matches) {
+    if (match.closed) continue
+    if (currentHole < match.startHole || currentHole > match.endHole) continue
+    if (alreadyPressedIds.has(match.id)) continue
+
+    const [playerA, playerB] = match.pair
+    let downPlayer: string | null = null
+    if (match.holesWonA < match.holesWonB) downPlayer = playerA
+    else if (match.holesWonB < match.holesWonA) downPlayer = playerB
+    if (!downPlayer) continue
+
+    offers.push({ gameId: game.id, matchId: match.id, downPlayer, pair: [playerA, playerB] })
+  }
   return offers
 }

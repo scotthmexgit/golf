@@ -25,12 +25,6 @@ export function parColor(diff: number): string {
   return 'var(--red-card)'
 }
 
-export function formatMoney(amount: number): string {
-  if (amount === 0) return '—'
-  const sign = amount > 0 ? '+' : '-'
-  return `${sign}$${Math.abs(amount).toFixed(0)}`
-}
-
 export function formatMoneyDecimal(amount: number): string {
   if (amount === 0) return '—'
   const sign = amount > 0 ? '+' : '-'

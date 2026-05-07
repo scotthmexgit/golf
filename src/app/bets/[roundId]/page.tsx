@@ -3,8 +3,9 @@
 import { useParams } from 'next/navigation'
 import { useRoundStore } from '@/store/roundStore'
 import Header from '@/components/layout/Header'
-import { vsPar, parLabel, parColor, formatMoney } from '@/lib/scoring'
+import { vsPar, parLabel, parColor, formatMoneyDecimal } from '@/lib/scoring'
 import { computeAllPayouts } from '@/lib/payouts'
+import { computePerHoleDeltas } from '@/lib/perHoleDeltas'
 
 export default function BetsPage() {
   const params = useParams()
@@ -13,6 +14,9 @@ export default function BetsPage() {
 
   const payouts = computeAllPayouts(holes, players, games)
   const scoredHoles = holes.filter(h => players.every(p => (h.scores[p.id] || 0) > 0))
+  // Per-hole net delta across all games, keyed by hole number then player id.
+  // Per-game expandable rows deferred — UX decision pending on bets-page vs BetDetailsSheet roles.
+  const { totals } = computePerHoleDeltas(holes, players, games)
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -24,7 +28,7 @@ export default function BetsPage() {
             style={{ background: 'var(--green-mid)', color: 'var(--sand-light)' }}>
             {(p.name || 'Golfer').split(' ')[0]}{' '}
             <span className="font-bold" style={{ color: payouts[p.id] > 0 ? '#22c55e' : payouts[p.id] < 0 ? 'var(--red-card)' : 'var(--sand-light)' }}>
-              {formatMoney(payouts[p.id] || 0)}
+              {formatMoneyDecimal(payouts[p.id] || 0)}
             </span>
           </div>
         ))}
@@ -47,12 +51,19 @@ export default function BetsPage() {
                 {players.map(p => {
                   const score = h.scores[p.id] || 0
                   const diff = vsPar(score, h.par)
+                  const holeDelta = totals[h.number]?.[p.id] ?? 0
                   return (
                     <div key={p.id} className="flex items-center justify-between text-xs">
                       <span style={{ color: 'var(--ink)' }}>{(p.name || 'Golfer').split(' ')[0]}</span>
                       <div className="flex items-center gap-2">
                         <span className="font-mono">{score}</span>
                         <span className="font-mono w-12 text-right" style={{ color: parColor(diff) }}>{parLabel(diff)}</span>
+                        {games.length > 0 && (
+                          <span className="font-mono w-14 text-right font-semibold"
+                            style={{ color: holeDelta > 0 ? '#22c55e' : holeDelta < 0 ? 'var(--red-card)' : 'var(--muted)' }}>
+                            {formatMoneyDecimal(holeDelta)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   )

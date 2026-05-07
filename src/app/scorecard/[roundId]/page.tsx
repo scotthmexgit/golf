@@ -18,7 +18,7 @@ import { vsPar } from '@/lib/scoring'
 import { patchRoundComplete } from '@/lib/roundApi'
 import { computePerHoleDeltas } from '@/lib/perHoleDeltas'
 import { buildHoleDecisions } from '@/lib/holeDecisions'
-import { detectNassauPressOffers } from '@/lib/nassauPressDetect'
+import { detectNassauPressOffers, detectManualNassauPressOffers } from '@/lib/nassauPressDetect'
 import type { PressOffer } from '@/lib/nassauPressDetect'
 import type { GameType } from '@/types'
 
@@ -65,6 +65,16 @@ export default function ScorecardPage() {
   const activeGameIds = games.map(g => g.id)
   const showJunkDots = games.some(g => activeGameIds.includes(g.id) && hasAnyJunk(g.junk))
   const wolfGame = games.find(g => g.type === 'wolf')
+
+  // Manual Nassau press offers — recomputed reactively on each score change.
+  // Renders the "Press?" button when any open match has a down player under manual mode.
+  const manualPressOffers = useMemo(() => {
+    if (!holeData) return []
+    const manualGames = games.filter(g => g.type === 'nassau' && g.pressRule === 'manual')
+    return manualGames.flatMap(g =>
+      detectManualNassauPressOffers(currentHole, holes, players, g)
+    )
+  }, [currentHole, holes, players, games, holeData])
 
   // Per-hole monetary deltas across all active games. Recomputes whenever
   // any score changes (holes dep). Memoized to avoid re-running bridges on
@@ -132,6 +142,17 @@ export default function ScorecardPage() {
     }
     setNotices(n)
   }
+
+  // B4: Show wolf notice proactively when all players are scored but no declaration made.
+  // Pairs with the disabled save button so the user understands why they're blocked. (game_wolf.md §9)
+  useEffect(() => {
+    if (wolfGame && allScored && holeData && !holeData.wolfPick) {
+      setNotices(prev => {
+        const filtered = prev.filter(n => !n.startsWith('Wolf:'))
+        return [...filtered, 'Wolf: captain must declare before saving this hole.']
+      })
+    }
+  }, [wolfGame, allScored, holeData?.wolfPick, holeData])
 
   // Wraps setCurrentHole for navigation-triggered hole changes. Suppresses the
   // Bet-row delta (SKINS-2) until the user makes an intentional score edit on
@@ -202,8 +223,24 @@ export default function ScorecardPage() {
     }
   }
 
+  // B5: Manual press — tapping "Press?" opens the modal via the existing auto-press path.
+  const handleManualPress = () => {
+    if (manualPressOffers.length > 0) {
+      setPendingPressOffers(manualPressOffers)
+    }
+  }
+
   const handleSaveNext = async () => {
     if (!allScored || !holeData) return
+
+    // B4: Wolf declaration guard — belt-and-suspenders if disabled state is bypassed. (game_wolf.md §9)
+    if (wolfGame && !holeData.wolfPick) {
+      setNotices(prev => {
+        const filtered = prev.filter(n => !n.startsWith('Wolf:'))
+        return [...filtered, 'Wolf: captain must declare before saving this hole.']
+      })
+      return
+    }
 
     detectNotices()
 
@@ -237,6 +274,15 @@ export default function ScorecardPage() {
   const confirmFinish = async () => {
     setShowFinishConfirm(false)
     setFinishError(null)
+    // B4: Belt-and-suspenders — block finish if any scored hole is missing Wolf declaration. (game_wolf.md §9)
+    if (wolfGame) {
+      const missing = holes.filter(h => scoredHoles.has(h.number) && !h.wolfPick)
+      if (missing.length > 0) {
+        setShowFinishConfirm(true)
+        setFinishError(`${missing.length} hole(s) missing Wolf declaration. Declare before finishing.`)
+        return
+      }
+    }
     if (roundId) {
       const { ok } = await patchRoundComplete(roundId)
       if (ok) {
@@ -320,6 +366,21 @@ export default function ScorecardPage() {
           <WolfDeclare wolfGame={wolfGame} currentHole={currentHole} />
         )}
 
+        {/* B5: Manual Nassau press button — only shown when a player is down in an open match. */}
+        {manualPressOffers.length > 0 && (
+          <button
+            type="button"
+            onClick={handleManualPress}
+            className="w-full py-2.5 rounded-xl text-sm font-semibold"
+            style={{ background: 'var(--green-mid)', color: 'var(--sand)' }}
+            data-testid="manual-press-button"
+          >
+            Press?{' '}{manualPressOffers.map(o =>
+              `(${players.find(p => p.id === o.downPlayer)?.name?.split(' ')[0] ?? o.downPlayer} is down)`
+            ).join(', ')}
+          </button>
+        )}
+
         {players.map(p => (
           <ScoreRow key={`${p.id}-${currentHole}`} player={p} hole={currentHole} par={holeData.par} holeIndex={holeData.index}
             score={holeData.scores[p.id] || 0}
@@ -348,7 +409,9 @@ export default function ScorecardPage() {
       {saveError && (
         <p className="text-center text-sm font-medium text-red-500 px-4 pb-1">{saveError}</p>
       )}
-      <BottomCta label={isLastHole ? 'Finish Round →' : 'Save & Next Hole →'} onClick={handleSaveNext} disabled={!allScored} />
+      {/* B4: button disabled when Wolf is active and no declaration has been made. */}
+      <BottomCta label={isLastHole ? 'Finish Round →' : 'Save & Next Hole →'} onClick={handleSaveNext}
+        disabled={!allScored || (!!wolfGame && !(holeData?.wolfPick))} />
 
       {/* Bet details bottom sheet */}
       <BetDetailsSheet open={sheetOpen} onClose={closeSheet} onExit={handleExit} />

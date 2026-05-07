@@ -41,6 +41,10 @@ export default function ResultsPage() {
   }
 
   const payouts = computeAllPayouts(holes, players, games)
+  const gamePayouts = games.map(g => ({
+    game: g,
+    perPlayer: computeAllPayouts(holes, players, [g]),
+  }))
 
   const sorted = [...players].filter(p => p.betting).sort((a, b) => (payouts[b.id] || 0) - (payouts[a.id] || 0))
   const winner = sorted[0]
@@ -90,10 +94,24 @@ export default function ResultsPage() {
         {games.length > 0 && (
           <div className="rounded-xl border p-4" style={{ borderColor: 'var(--line)', background: 'white' }}>
             <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--green-soft)' }}>Game Breakdown</h3>
-            {games.map(g => (
-              <div key={g.id} className="flex items-center justify-between py-1.5 border-b last:border-0 text-sm" style={{ borderColor: 'var(--line)' }}>
-                <span>{g.label}</span>
-                <span className="font-mono text-xs" style={{ color: 'var(--muted)' }}>{formatMoneyDecimal(g.stake)}{stakeUnitLabel(g.type)}</span>
+            {gamePayouts.map(({ game: g, perPlayer }) => (
+              <div key={g.id} className="py-1.5 border-b last:border-0" style={{ borderColor: 'var(--line)' }}>
+                <div className="flex items-center justify-between text-sm">
+                  <span>{g.label}</span>
+                  <span className="font-mono text-xs" style={{ color: 'var(--muted)' }}>{formatMoneyDecimal(g.stake)}{stakeUnitLabel(g.type)}</span>
+                </div>
+                {sorted.map(p => {
+                  const amt = perPlayer[p.id] ?? 0
+                  return (
+                    <div key={p.id} className="flex items-center justify-between text-xs pl-3 mt-0.5">
+                      <span style={{ color: 'var(--muted)' }}>{(p.name || 'Golfer').split(' ')[0]}</span>
+                      <span className="font-mono font-semibold"
+                        style={{ color: amt > 0 ? '#22c55e' : amt < 0 ? 'var(--red-card)' : 'var(--muted)' }}>
+                        {formatMoneyDecimal(amt)}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             ))}
           </div>

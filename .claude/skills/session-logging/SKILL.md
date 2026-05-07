@@ -122,8 +122,8 @@ Ahead / on / behind. If behind: <how much, why>.
 
 ## Edge cases
 
-- **Midnight rollover**: new `YYYY-MM-DD/` dir, new `EOD_*.md`. Do not backfill across days; a task that spans days carries the same checklist item # in both files.
-- **Re-running the same prompt**: increment `NNN` and add `supersedes: NNN` to frontmatter. Do not overwrite.
+- **Midnight rollover**: new `docs/yyyy-mm-dd/` dir, new `eod.md` (in that folder). Do not backfill across days; a task that spans days carries the same checklist item # in both files.
+- **Re-running the same prompt**: increment `NN` and add `supersedes: NN` to frontmatter. Do not overwrite.
 - **User says "update prior entry"**: edit the existing file in place; append a `## Edit YYYY-MM-DDTHH:MMZ` section describing what changed and why. Do not silently rewrite.
 - **Multi-day task**: same `checklist_item_ref` on each day's per-prompt file; EOD-FINAL notes "carried over" in "Checklist items still open".
 - **Multiple prompts in rapid succession on the same narrow topic**: each gets its own NNN; do not batch.

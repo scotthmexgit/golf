@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# DevFlow filesystem backups
+.devflow-backup/
+
+# DevFlow audit/scan artifacts (local Codex-generated, not project source)
+devflow-audit.md
+devflow-auditold.md
+devflow-scan.md
+devflow-scanold.md
+
+# Playwright test results
+test-results/

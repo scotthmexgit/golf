@@ -2,7 +2,7 @@
 
 Single source of truth for scope. Read the **Active item** before any work. Tangents → Parking Lot. Closed items → Done (append-only).
 
-**Wolf phase COMPLETE.** Plan: `docs/plans/WOLF_PLAN.md`. WF-0–WF-7 all closed 2026-04-30; Cowork 7/7 PASS. Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history. **Active phase: Nassau. NA-pre-1–NA-4 CLOSED. F11-PRESS-GAME-SCOPE CLOSED. Active item: NA-5 (Cowork visual verification).**
+**Wolf phase COMPLETE.** Plan: `docs/plans/WOLF_PLAN.md`. WF-0–WF-7 all closed 2026-04-30; Cowork 7/7 PASS. Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history. Nassau phase: NA-pre-1–NA-4 CLOSED. F11-PRESS-GAME-SCOPE CLOSED. **NA-5 (Cowork visual verification) OPEN — pending scheduling.** **Active phase: Phase 7 — Full multi-bet cutover (#11). Wolf pilot: WF7-0–WF7-3 CLOSED 2026-05-07. Active item: WF7-4 (Cowork verification). Plan: `docs/2026-05-07/03-wolf-plan.md`.**
 
 ## Project Scope Summary
 

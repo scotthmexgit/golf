@@ -195,6 +195,11 @@ node "/home/seadmin/.claude/plugins/cache/openai-codex/codex/1.0.4/scripts/codex
 ```
 For background runs, add `run_in_background: true` to the Bash call.
 
+**CWD discipline — always run from `/home/seadmin/golf`:** The home directory (`/home/seadmin`) is itself a git repo with hundreds of cache files and dotfile modifications. Running codex-companion.mjs from there pulls all of those into the working-tree diff and quickly trips the 1 MiB input cap. The golf project has its own `.git` at `/home/seadmin/golf` — always `cd /home/seadmin/golf` before invoking, so Codex sees only golf's working tree.
+
+- For small diffs (< 50 changed files, well under 500 KB): `--scope working-tree` keeps the input tightly scoped to uncommitted changes.
+- For large or noisy working trees: commit to a clean baseline first, then use `--base <prior-commit>` to scope the review to just that commit's diff.
+
 **Variants of the command:**
 - Default: `/codex:adversarial-review` — review uncommitted changes or focus text
 - Branch-vs-base for merge gates: `/codex:adversarial-review --base main`
@@ -227,7 +232,7 @@ chromium --headless --disable-gpu --screenshot=/tmp/devflow-after.png --window-s
 Save screenshots to `/tmp/devflow-<slug>-<phase>.png`. Reference the path in the report's Develop section. Do not commit screenshots.
 
 **Playwright — for actual UI verification flows.**
-This project has Playwright configured (`playwright.config.ts`) with specs under `tests/playwright/` (currently `stroke-play-finish-flow.spec.ts`, `skins-flow.spec.ts`, `wolf-flow.spec.ts`). Run via `npm run test:e2e` or `npx playwright test`. **Playwright targets the PM2 production build at `http://localhost:3000/golf`** — it will fail if PM2 is not running. To rebuild PM2 after a code change: `pm2 stop golf && npm run build && pm2 start golf`.
+This project has Playwright configured (`playwright.config.ts`) with specs under `tests/playwright/` (currently 6: `nassau-flow.spec.ts`, `nassau-manual-press-flow.spec.ts`, `skins-flow.spec.ts`, `stroke-play-finish-flow.spec.ts`, `wolf-flow.spec.ts`, `wolf-skins-multibet-flow.spec.ts`). Run via `npm run test:e2e` or `npx playwright test`. **Playwright targets the PM2 production build at `http://localhost:3000/golf`** — it will fail if PM2 is not running. To rebuild PM2 after a code change: `pm2 stop golf && npm run build && pm2 start golf`.
 
 For development iteration, point Playwright at `http://localhost:3000/golf` after `npm run dev` if the spec doesn't require production-build behavior — but full verification runs against the PM2 build.
 
@@ -306,7 +311,7 @@ Keep this section current. Edit it as the project evolves.
 
 - **Stack:** Next.js 16.2 (App Router), React 19.2 with React Compiler, TypeScript strict, Prisma 7.5 + PostgreSQL, Tailwind 4, Zustand 5, Vitest 4.1, Playwright 1.59. Node runtime on Linux. PM2 for production.
 - **Test command:** `npm run test:run` (vitest run, one-shot — the AC gate). `npm run test` for watch mode. Test scope: `src/games/**/*.test.ts`, `src/bridge/**/*.test.ts`, `src/lib/**/*.test.ts`. Currently 22 Vitest test files (count was stale at 16; corrected at 2026-05-06 re-onboard).
-- **E2E command:** `npm run test:e2e` (or `npx playwright test`). Targets `http://localhost:3000/golf` (PM2 production). Will fail if PM2 is not running. Specs under `tests/playwright/` (currently 3: `stroke-play-finish-flow.spec.ts`, `skins-flow.spec.ts`, `wolf-flow.spec.ts`).
+- **E2E command:** `npm run test:e2e` (or `npx playwright test`). Targets `http://localhost:3000/golf` (PM2 production). Will fail if PM2 is not running. Specs under `tests/playwright/` (currently 6: `nassau-flow.spec.ts`, `nassau-manual-press-flow.spec.ts`, `skins-flow.spec.ts`, `stroke-play-finish-flow.spec.ts`, `wolf-flow.spec.ts`, `wolf-skins-multibet-flow.spec.ts`).
 - **Lint command:** `npm run lint` (eslint).
 - **Format command:** none — no Prettier configured. Match surrounding style in each file.
 - **Typecheck:** `npx tsc --noEmit` — run manually before commit.
@@ -333,7 +338,7 @@ golf/
 │   ├── store/                  roundStore.ts (Zustand)
 │   └── types/                  index.ts (incl. GAME_DEFS w/ disabled flag)
 ├── prisma/                     schema.prisma, prisma.config.ts, migrations/ (4 migrations)
-├── tests/playwright/           skins-flow.spec.ts, stroke-play-finish-flow.spec.ts, wolf-flow.spec.ts (no nassau-flow.spec.ts yet — gap)
+├── tests/playwright/           nassau-flow.spec.ts, nassau-manual-press-flow.spec.ts, skins-flow.spec.ts, stroke-play-finish-flow.spec.ts, wolf-flow.spec.ts, wolf-skins-multibet-flow.spec.ts
 ├── docs/
 │   ├── yyyy-mm-dd/             DevFlow daily prompt reports + sod.md + eod.md
 │   ├── templates/              report.md, sod.md, eod.md, prompt.md

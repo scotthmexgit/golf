@@ -1,23 +1,31 @@
 # Roadmap: golf
-Refreshed at: 2026-05-08 (SOD Day 2 Phase 7)
+Refreshed at: 2026-05-09 (SOD Day 3 Phase 7)
 Source: IMPLEMENTATION_CHECKLIST.md
 
 ## Active phase: Phase 7 — Full multi-bet cutover (#11)
 
-**Wolf pilot complete (WF7-0–WF7-3 CLOSED 2026-05-07). Active item: WF7-4 (Cowork).**
+**Main sweep complete (Skins + Nassau + Stroke Play CLOSED 2026-05-08). Remaining: perHoleDeltas.ts cutover + WF7-4 Cowork.**
+
+### Wolf pilot
 
 | Item | Status |
 |---|---|
-| WF7-0 — Plan doc | CLOSED 2026-05-07 (`docs/2026-05-07/03-wolf-plan.md`) |
-| WF7-1 — wolfTieRule wizard config + GR1 correction | CLOSED 2026-05-07 (commit 94ddeb5) |
-| WF7-2 — aggregateRound cutover, Wolf-pilot | CLOSED 2026-05-07 (commit 5a88052) |
-| WF7-3 — multi-bet E2E spec (Wolf+Skins) | CLOSED 2026-05-07 (commit 4fbc72a) |
+| WF7-0 — Plan doc | CLOSED 2026-05-07 |
+| WF7-1 — wolfTieRule wizard config | CLOSED 2026-05-07 (commit 94ddeb5) |
+| WF7-2 — aggregateRound cutover (Wolf) | CLOSED 2026-05-07 (commit 5a88052) |
+| WF7-3 — multi-bet E2E spec | CLOSED 2026-05-07 (commit 4fbc72a) |
 | **WF7-4 — Cowork visual verification** | **OPEN — pending GM scheduling** |
-| Phase 7 sweep: Skins cutover | Not started — pending GM direction + WF7-4 gate |
-| Phase 7 sweep: Nassau cutover | Not started — pending |
-| Phase 7 sweep: Stroke Play cutover | Not started — pending |
 
-## Nassau phase (parallel)
+### Phase 7 sweep (payouts.ts aggregateRound cutover)
+
+| Item | Status |
+|---|---|
+| Skins cutover | CLOSED 2026-05-08 (commit effb63d; SP1–SP10; 677 tests) |
+| Nassau cutover | CLOSED 2026-05-08 (commit b528b52; NP1–NP10; 718 tests; netByPlayer) |
+| Stroke Play cutover | CLOSED 2026-05-08 (commit 3a09d79; STP1–STP11+STP5b; 762 tests; F1 guard) |
+| **perHoleDeltas.ts cutover** | **OPEN — Phase 7 #11 final code slice (deferred WF7-2)** |
+
+### Nassau phase (parallel)
 
 | Item | Status |
 |---|---|
@@ -26,23 +34,32 @@ Source: IMPLEMENTATION_CHECKLIST.md
 
 ## High priority
 
-1. **WF7-4** — Cowork visual verification (Wolf wizard + multi-bet UI). GM schedules; Code files closure report when findings arrive.
-2. **NA-5** — Nassau Cowork. Same hand-off; can run same Cowork session.
-3. **Phase 7 sweep — Skins cutover** — `payouts.ts` Skins case → aggregateRound (Wolf pattern). Independent; can proceed if GM approves Skins as next.
-4. **SCORECARD-DECISIONS-WIRING close** — Appears implemented at scorecard page:166–169 (`buildHoleDecisions` called, `decisions` in PUT body). Verify and formally close parking-lot item.
+1. **perHoleDeltas.ts cutover** — sole remaining Phase 7 #11 code work. Single session (S).
+2. **WF7-4** — Cowork visual verification. GM schedules; Code files closure report when findings arrive.
+3. **NA-5** — Nassau Cowork. Can share WF7-4 session. GM schedules.
 
-## Medium priority
+## Medium priority (backlog)
 
-- **perHoleDeltas.ts aggregateRound cutover** — deferred from WF7-2. Per-hole scorecard display still on per-bet dispatch. Phase 7 follow-on.
-- **F12-TIED-WITHDRAWAL-EVENT** — pre-existing; deferred to engine pass post-Phase-7.
-- **D4** — Nassau §7 press Junk annotation (XS, backlog).
-- **D1 sub-task B** — Nassau §9 N35 tied-withdrawal documentation (on hold).
+- Nassau buildHoleState 0-vs-undefined gap (parking-lot; filed 2026-05-08 doc 09)
+- CLAUDE.md / AGENTS.md instruction-health sweep (Codex CWD discipline, stale refs)
+- Phase 7 #11 closure declaration (after perHoleDeltas + WF7-4 close)
+- Nassau phase closure declaration (after NA-5 closes)
+- D4 — Nassau §7 press Junk annotation (docs, XS)
+- F12-TIED-WITHDRAWAL-EVENT (engine, deferred)
+- D1 sub-task B — Nassau §9 N35 (on hold)
 
 ## Low priority / backlog
 
-- Match Play unpark (engine exists; no bridge, UI, still `disabled: true`)
-- Junk Phase 3 (Sandy/Barkie/Polie/Arnie stubs)
 - PUT-HANDLER-400-ON-MISSING-FIELDS
 - TEES constant (hardcoded; deferred to course integration)
+
+## Post-Phase-7 candidates (GM to decide)
+
+| Option | Size |
+|---|---|
+| Match Play unpark | L |
+| Junk Phase 3 (Sandy/Barkie/Polie/Arnie) | M |
+| F12 engine fix (tied-withdrawal NassauWithdrawalSettled) | XS-S |
+| Round-state verifier (parking-lot) | M |
 
 See IMPLEMENTATION_CHECKLIST.md for full backlog and parking lot.

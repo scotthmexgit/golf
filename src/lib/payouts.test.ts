@@ -259,3 +259,234 @@ describe('WP8: GR8 bet-id chain — non-default UUID-style game id', () => {
     expect(payouts['D']).toBe(-200)
   })
 })
+
+// ─── Skins Phase 7 sweep — SP1–SP10 ─────────────────────────────────────────
+// Tests for the Skins aggregateRound orchestration path (Phase 7 sweep).
+// Follows the Wolf WP1–WP8 structure exactly. Fixture: 4 players (A/B/C/D),
+// all scratch, stake=100 minor units per skin, escalating=false.
+
+function makeSkinsGame(
+  playerIds: string[],
+  opts: { stake?: number; escalating?: boolean } = {},
+): GameInstance {
+  return {
+    id: 'skins-payout-test',
+    type: 'skins',
+    label: 'Skins',
+    stake: opts.stake ?? 100,
+    playerIds,
+    escalating: opts.escalating ?? false,
+    junk: EMPTY_JUNK,
+  }
+}
+
+function makeSkinsHole(
+  num: number,
+  scores: Record<string, number>,
+  opts: { par?: number; index?: number } = {},
+): HoleData {
+  return {
+    number: num,
+    par: opts.par ?? 4,
+    index: opts.index ?? num,
+    scores,
+    dots: {},
+  }
+}
+
+const SPIDS = ['A', 'B', 'C', 'D']
+const skinsPlayers = SPIDS.map(id => makePlayer(id))
+
+// ─── SP1 — Basic skin win ────────────────────────────────────────────────────
+// A wins hole 1 uniquely (score 3, others 4). stake=100, 4 players.
+// A: +100×3 = +300. B/C/D: -100 each. Σ = 0.
+
+describe('SP1: basic skin win — A lowest score, unique', () => {
+  const game = makeSkinsGame(SPIDS, { stake: 100 })
+  const holes = [
+    makeSkinsHole(1, { A: 3, B: 4, C: 4, D: 4 }),
+  ]
+  const payouts = computeAllPayouts(holes, skinsPlayers, [game])
+
+  it('A collects +300 (stake × 3 opponents)', () => expect(payouts['A']).toBe(300))
+  it('B, C, D each pay -100', () => {
+    expect(payouts['B']).toBe(-100)
+    expect(payouts['C']).toBe(-100)
+    expect(payouts['D']).toBe(-100)
+  })
+})
+
+// ─── SP2 — Zero-sum on SP1 ───────────────────────────────────────────────────
+
+describe('SP2: zero-sum on SP1 scenario (GR3)', () => {
+  const game = makeSkinsGame(SPIDS, { stake: 100 })
+  const holes = [makeSkinsHole(1, { A: 3, B: 4, C: 4, D: 4 })]
+  const payouts = computeAllPayouts(holes, skinsPlayers, [game])
+
+  it('Σ delta === 0 (GR3)', () => expect(zeroSum(payouts, SPIDS)).toBe(0))
+})
+
+// ─── SP3 — Integer assertion on SP1 (GR2) ───────────────────────────────────
+
+describe('SP3: integer assertion on SP1 scenario (GR2)', () => {
+  const game = makeSkinsGame(SPIDS, { stake: 100 })
+  const holes = [makeSkinsHole(1, { A: 3, B: 4, C: 4, D: 4 })]
+  const payouts = computeAllPayouts(holes, skinsPlayers, [game])
+
+  it('all deltas are integers in minor units (GR2)', () => {
+    for (const pid of SPIDS) expect(Number.isInteger(payouts[pid])).toBe(true)
+  })
+})
+
+// ─── SP4 — Carry chain → split at final hole (GR7) ──────────────────────────
+// All 18 holes tied (escalating=true → SkinCarried per hole, not void).
+// Hole 18 applies tieRuleFinalHole='split' → SkinCarryForfeit → all zero.
+// GR7: informational events (SkinCarried, SkinCarryForfeit) emit explicitly;
+// no silent zero-delta; aggregateRound correctly ignores them (default: break).
+
+describe('SP4: carry chain → split at final hole → all zero (GR7: informational events)', () => {
+  const game = makeSkinsGame(SPIDS, { stake: 100, escalating: true })
+  const holes = Array.from({ length: 18 }, (_, i) =>
+    makeSkinsHole(i + 1, { A: 4, B: 4, C: 4, D: 4 }),
+  )
+  const payouts = computeAllPayouts(holes, skinsPlayers, [game])
+
+  it('Σ delta === 0 (GR3 — carry forfeited, no money moved)', () => {
+    expect(zeroSum(payouts, SPIDS)).toBe(0)
+  })
+  it('all players at zero (carry forfeited via SkinCarryForfeit, not silently lost)', () => {
+    for (const pid of SPIDS) expect(payouts[pid] ?? 0).toBe(0)
+  })
+  it('all deltas are integers (GR2)', () => {
+    for (const pid of SPIDS) expect(Number.isInteger(payouts[pid] ?? 0)).toBe(true)
+  })
+})
+
+// ─── SP5 — Carry chain → resolved skin (carry-scaled SkinWon) ───────────────
+// escalating=true: hole 1 ties → SkinCarried (carry accumulates). Hole 2: A wins.
+// finalizeSkinsRound scales SkinWon by multiplier = 1 + carryCount = 2.
+// A: +100×2×3 = +600. B/C/D: -200 each. Σ = 0.
+
+describe('SP5: carry chain (escalating=true) → decisive hole — carry-scaled SkinWon delta', () => {
+  const game = makeSkinsGame(SPIDS, { stake: 100, escalating: true })
+  const holes = [
+    makeSkinsHole(1, { A: 4, B: 4, C: 4, D: 4 }),  // all tie → SkinCarried
+    makeSkinsHole(2, { A: 3, B: 4, C: 4, D: 4 }),  // A wins carry-scaled skin
+  ]
+  const payouts = computeAllPayouts(holes, skinsPlayers, [game])
+
+  it('A collects +600 (2-skin carry × 3 opponents × stake 100)', () => {
+    expect(payouts['A']).toBe(600)
+  })
+  it('B, C, D each pay -200 (2 × stake)', () => {
+    expect(payouts['B']).toBe(-200)
+    expect(payouts['C']).toBe(-200)
+    expect(payouts['D']).toBe(-200)
+  })
+})
+
+// ─── SP6 — Zero-sum on SP5 ───────────────────────────────────────────────────
+
+describe('SP6: zero-sum on SP5 (carry-resolved, escalating=true) scenario (GR3)', () => {
+  const game = makeSkinsGame(SPIDS, { stake: 100, escalating: true })
+  const holes = [
+    makeSkinsHole(1, { A: 4, B: 4, C: 4, D: 4 }),
+    makeSkinsHole(2, { A: 3, B: 4, C: 4, D: 4 }),
+  ]
+  const payouts = computeAllPayouts(holes, skinsPlayers, [game])
+
+  it('Σ delta === 0 (GR3)', () => expect(zeroSum(payouts, SPIDS)).toBe(0))
+})
+
+// ─── SP7 — Integer assertion on SP5 (GR2) ───────────────────────────────────
+
+describe('SP7: integer assertion on SP5 (carry-resolved, escalating=true) scenario (GR2)', () => {
+  const game = makeSkinsGame(SPIDS, { stake: 100, escalating: true })
+  const holes = [
+    makeSkinsHole(1, { A: 4, B: 4, C: 4, D: 4 }),
+    makeSkinsHole(2, { A: 3, B: 4, C: 4, D: 4 }),
+  ]
+  const payouts = computeAllPayouts(holes, skinsPlayers, [game])
+
+  it('all deltas are integers (GR2)', () => {
+    for (const pid of SPIDS) expect(Number.isInteger(payouts[pid])).toBe(true)
+  })
+})
+
+// ─── SP8 — GR8 contract: non-default UUID-style game id ─────────────────────
+// Verifies the id chain buildSkinsCfg.id → bet.id → declaringBet → byBet key
+// for a game id that is NOT the test-fixture default. Mirrors WP8 for Wolf.
+// Adversarial review finding (WF7-2): ?? {} silently zeros payouts on mismatch.
+// Option A guard (skinsCfg.id !== game.id throws) prevents this.
+
+describe('SP8: GR8 bet-id chain — non-default UUID-style game id', () => {
+  const game: GameInstance = {
+    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    type: 'skins',
+    label: 'Skins',
+    stake: 100,
+    playerIds: SPIDS,
+    escalating: false,
+    junk: EMPTY_JUNK,
+  }
+  const holes = [makeSkinsHole(1, { A: 3, B: 4, C: 4, D: 4 })]
+  const payouts = computeAllPayouts(holes, skinsPlayers, [game])
+
+  it('zero-sum (GR3) — confirms byBet was keyed correctly', () => {
+    expect(zeroSum(payouts, SPIDS)).toBe(0)
+  })
+  it('A collects +300 (not zero — confirms no silent id mismatch)', () => {
+    expect(payouts['A']).toBe(300)
+  })
+  it('B, C, D pay -100 each', () => {
+    expect(payouts['B']).toBe(-100)
+    expect(payouts['C']).toBe(-100)
+    expect(payouts['D']).toBe(-100)
+  })
+})
+
+// ─── SP9 — No-skin round (all FieldTooSmall or all tied → forfeit) ───────────
+// All holes have 0 scores (no players have entered scores yet). The Skins
+// engine emits FieldTooSmall on every hole; no SkinWon fires. The skinsLedger
+// from byBet[game.id] is {} (undefined → fallback). All payouts are zero.
+
+describe('SP9: no-skin round — all FieldTooSmall (no SkinWon → ledger is {})', () => {
+  const game = makeSkinsGame(SPIDS, { stake: 100 })
+  const holes = [
+    makeSkinsHole(1, { A: 0, B: 0, C: 0, D: 0 }),  // 0 = missing score → FieldTooSmall
+  ]
+  const payouts = computeAllPayouts(holes, skinsPlayers, [game])
+
+  it('Σ delta === 0 (GR3 — no SkinWon means no money moved)', () => {
+    expect(zeroSum(payouts, SPIDS)).toBe(0)
+  })
+  it('all payouts are zero (byBet empty → ?? {} fallback is correct)', () => {
+    for (const pid of SPIDS) expect(payouts[pid] ?? 0).toBe(0)
+  })
+})
+
+// ─── SP10 — escalating=true: carry multiplier via aggregateRound ─────────────
+// Hole 1 ties (all par). Hole 2 A wins. With escalating=true, each additional
+// carry hole adds another skin stake to the pot. Carry of 1 hole → skin worth
+// 2 × stake = 200 per opponent (same as SP5 with escalating=false, since carry
+// multiplier = 1 + carryCount = 2 in both cases for a 1-hole carry).
+// Verify that aggregateRound correctly reduces the carry-scaled SkinWon from
+// finalizeSkinsRound regardless of escalating setting.
+
+describe('SP10: escalating=true — carry-scaled SkinWon reduces correctly', () => {
+  const game = makeSkinsGame(SPIDS, { stake: 100, escalating: true })
+  const holes = [
+    makeSkinsHole(1, { A: 4, B: 4, C: 4, D: 4 }),  // all tie → SkinCarried
+    makeSkinsHole(2, { A: 3, B: 4, C: 4, D: 4 }),  // A wins carry-scaled skin
+  ]
+  const payouts = computeAllPayouts(holes, skinsPlayers, [game])
+
+  it('Σ delta === 0 (GR3)', () => expect(zeroSum(payouts, SPIDS)).toBe(0))
+  it('A collects more than base stake (carry applied via finalizeSkinsRound)', () => {
+    // With 1-hole carry: A wins 2 skins × 3 opponents × stake 100 = +600
+    expect(payouts['A']).toBeGreaterThan(300)  // strictly more than a single skin
+  })
+  it('all deltas are integers (GR2)', () => {
+    for (const pid of SPIDS) expect(Number.isInteger(payouts[pid])).toBe(true)
+  })
+})

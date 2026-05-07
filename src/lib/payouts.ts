@@ -3,7 +3,7 @@ import { strokesOnHole } from './handicap'
 import { vsPar } from './scoring'
 import { computeJunkPayouts, hasAnyJunk } from './junk'
 import { settleStrokePlayBet } from '../bridge/stroke_play_bridge'
-import { settleSkinsBet } from '../bridge/skins_bridge'
+import { settleSkinsBet, buildSkinsCfg } from '../bridge/skins_bridge'
 import { settleWolfBet, buildWolfCfg } from '../bridge/wolf_bridge'
 import { settleNassauBet } from '../bridge/nassau_bridge'
 import { payoutMapFromLedger, buildMinimalRoundCfg } from '../bridge/shared'
@@ -118,10 +118,26 @@ function computeGamePayouts(holes: HoleData[], players: PlayerSetup[], game: Gam
     case 'matchPlay': return computeMatchPlay(holes, players, game)
     case 'nassau': return settleNassauBet(holes, players, game).payouts
     case 'stableford': return computeStableford(holes, players, game)
-    case 'skins': return payoutMapFromLedger(
-      settleSkinsBet(holes, players, game).ledger,
-      game.playerIds,
-    )
+    case 'skins': {
+      // Phase 7 sweep: orchestrate through aggregateRound (Skins, Wolf-pilot pattern).
+      // Bridge produces finalized events (finalizeSkinsRound runs inside settleSkinsBet);
+      // log is assembled here; aggregateRound reduces to RunningLedger;
+      // Skins ledger extracted from byBet[game.id].
+      // Ref: docs/games/game_skins.md; docs/2026-05-08/03-skins-plan.md
+      const skinsCfg = buildSkinsCfg(game)
+      // Guard: buildSkinsCfg must preserve game.id so byBet keying is correct
+      // (GR8 — string-equality bet-id chain). If this throws, the bridge contract broke.
+      if (skinsCfg.id !== game.id) {
+        throw new Error(`Skins bridge id contract violation: skinsCfg.id="${skinsCfg.id}" !== game.id="${game.id}"`)
+      }
+      const { events } = settleSkinsBet(holes, players, game)
+      const log: ScoringEventLog = { events, supersessions: {} }
+      const roundCfg = buildMinimalRoundCfg(skinsCfg, 'skins')
+      const result = aggregateRound(log, roundCfg)
+      // byBet[game.id] is undefined only when no SkinWon events fired (all holes tied/forfeited).
+      const skinsLedger = result.byBet[game.id] ?? {}
+      return payoutMapFromLedger(skinsLedger, game.playerIds)
+    }
     case 'wolf': {
       // WF7-2: orchestrate through aggregateRound (Wolf-pilot cutover).
       // Bridge produces finalized events; log is assembled here; aggregateRound

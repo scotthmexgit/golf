@@ -20,7 +20,7 @@ import { buildHoleState, buildMinimalRoundCfg } from './shared'
 // id, and escalating (optional); Skins-specific engine fields not present on
 // GameInstance are filled with locked v1 defaults.
 
-function buildSkinsCfg(game: GameInstance): SkinsCfg {
+export function buildSkinsCfg(game: GameInstance): SkinsCfg {
   return {
     id: game.id,
     stake: game.stake,

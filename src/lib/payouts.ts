@@ -4,9 +4,11 @@ import { vsPar } from './scoring'
 import { computeJunkPayouts, hasAnyJunk } from './junk'
 import { settleStrokePlayBet } from '../bridge/stroke_play_bridge'
 import { settleSkinsBet } from '../bridge/skins_bridge'
-import { settleWolfBet } from '../bridge/wolf_bridge'
+import { settleWolfBet, buildWolfCfg } from '../bridge/wolf_bridge'
 import { settleNassauBet } from '../bridge/nassau_bridge'
-import { payoutMapFromLedger } from '../bridge/shared'
+import { payoutMapFromLedger, buildMinimalRoundCfg } from '../bridge/shared'
+import { aggregateRound } from '../games/aggregate'
+import type { ScoringEventLog } from '../games/types'
 
 function emptyPayouts(playerIds: string[]): PayoutMap {
   const m: PayoutMap = {}
@@ -120,10 +122,25 @@ function computeGamePayouts(holes: HoleData[], players: PlayerSetup[], game: Gam
       settleSkinsBet(holes, players, game).ledger,
       game.playerIds,
     )
-    case 'wolf': return payoutMapFromLedger(
-      settleWolfBet(holes, players, game).ledger,
-      game.playerIds,
-    )
+    case 'wolf': {
+      // WF7-2: orchestrate through aggregateRound (Wolf-pilot cutover).
+      // Bridge produces finalized events; log is assembled here; aggregateRound
+      // reduces to RunningLedger; Wolf ledger extracted from byBet[game.id].
+      // Ref: docs/2026-05-07/04-wolf-plan-codex-review.md (corrected WF7-2 description).
+      const wolfCfg = buildWolfCfg(game)
+      // Guard: buildWolfCfg must preserve game.id so byBet keying is correct
+      // (GR8 — string-equality bet-id chain). If this throws, the bridge contract broke.
+      if (wolfCfg.id !== game.id) {
+        throw new Error(`Wolf bridge id contract violation: wolfCfg.id="${wolfCfg.id}" !== game.id="${game.id}"`)
+      }
+      const { events } = settleWolfBet(holes, players, game)
+      const log: ScoringEventLog = { events, supersessions: {} }
+      const roundCfg = buildMinimalRoundCfg(wolfCfg, 'wolf')
+      const result = aggregateRound(log, roundCfg)
+      // byBet[game.id] is undefined only when no monetary events fired (all WolfDecisionMissing).
+      const wolfLedger = result.byBet[game.id] ?? {}
+      return payoutMapFromLedger(wolfLedger, game.playerIds)
+    }
     default: return emptyPayouts(game.playerIds)
   }
 }

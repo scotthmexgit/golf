@@ -1,45 +1,48 @@
 # Roadmap: golf
-Refreshed at: 2026-05-06 (SOD Session 1)
+Refreshed at: 2026-05-08 (SOD Day 2 Phase 7)
 Source: IMPLEMENTATION_CHECKLIST.md
 
-## Active phase: Nassau (NA-0–NA-5)
+## Active phase: Phase 7 — Full multi-bet cutover (#11)
+
+**Wolf pilot complete (WF7-0–WF7-3 CLOSED 2026-05-07). Active item: WF7-4 (Cowork).**
 
 | Item | Status |
 |---|---|
-| NA-0 — Plan doc | CLOSED 2026-05-01 |
-| NA-pre-1 — RoundingAdjustment emission | CLOSED 2026-05-01 (commit 572dc32) |
-| NA-1 — Nassau bridge + cutover | CLOSED 2026-05-01 (commit 95e7c41) |
-| NA-2 — Nassau wizard UI | CLOSED 2026-05-01 (commit 7509f24) |
-| NA-3 — Press offer UI + decisions wiring | CLOSED 2026-05-01 (commit ac9d38b) |
-| **NA-4 — Playwright spec** | **ACTIVE — unblocked** |
-| NA-5 — Cowork visual verification | Blocked on NA-4 |
+| WF7-0 — Plan doc | CLOSED 2026-05-07 (`docs/2026-05-07/03-wolf-plan.md`) |
+| WF7-1 — wolfTieRule wizard config + GR1 correction | CLOSED 2026-05-07 (commit 94ddeb5) |
+| WF7-2 — aggregateRound cutover, Wolf-pilot | CLOSED 2026-05-07 (commit 5a88052) |
+| WF7-3 — multi-bet E2E spec (Wolf+Skins) | CLOSED 2026-05-07 (commit 4fbc72a) |
+| **WF7-4 — Cowork visual verification** | **OPEN — pending GM scheduling** |
+| Phase 7 sweep: Skins cutover | Not started — pending GM direction + WF7-4 gate |
+| Phase 7 sweep: Nassau cutover | Not started — pending |
+| Phase 7 sweep: Stroke Play cutover | Not started — pending |
+
+## Nassau phase (parallel)
+
+| Item | Status |
+|---|---|
+| NA-0 through NA-4, F11-PRESS-GAME-SCOPE | CLOSED 2026-05-01–2026-05-06 |
+| **NA-5 — Cowork visual verification** | **OPEN — pending GM scheduling** |
 
 ## High priority
-1. **NA-4 — Nassau Playwright spec** (`tests/playwright/nassau-flow.spec.ts`) — 8 assertion groups per NASSAU_PLAN.md §NA-4. Dependencies met; no blockers. **Today #1.**
-2. **IMPLEMENTATION_CHECKLIST.md grooming** — mark NA-3 CLOSED with commit hash, set NA-4 as active item, file F11/F12 deferred items. XS. **Today #2 (folds into NA-4 commit or stands alone).**
+
+1. **WF7-4** — Cowork visual verification (Wolf wizard + multi-bet UI). GM schedules; Code files closure report when findings arrive.
+2. **NA-5** — Nassau Cowork. Same hand-off; can run same Cowork session.
+3. **Phase 7 sweep — Skins cutover** — `payouts.ts` Skins case → aggregateRound (Wolf pattern). Independent; can proceed if GM approves Skins as next.
+4. **SCORECARD-DECISIONS-WIRING close** — Appears implemented at scorecard page:166–169 (`buildHoleDecisions` called, `decisions` in PUT body). Verify and formally close parking-lot item.
 
 ## Medium priority
-- **F11-PRESS-GAME-SCOPE** — Press decisions not scoped to Nassau game instance; deferred follow-up from Codex NA-3 review. Low probability in production (typical rounds have 1 Nassau game). File and schedule; do not fold into NA-4.
-- **F12-TIED-WITHDRAWAL-EVENT** — Tied withdrawal closes match without replayable event; pre-existing engine behavior. Deferred to engine pass post-NA-5.
-- **Manual press button ("Request press")** — Stretch goal from NA-3; no UI for `pressRule='manual'` presses. Parking-lot item.
-- **D4** — Nassau §7 press Junk annotation (docs) (XS)
-- **WOLF_PLAN.md stepper-affordance stale note** (XS) — still open from prior session
 
-## Low priority
-- **PUT-HANDLER-400-ON-MISSING-FIELDS** — 500 on missing fields; backlog hardening (XS)
-- **D1 sub-task B** — Nassau §9 N35 tied-withdrawal back-propagation; gated on two open questions
-- **D2** — Junk game_junk.md §5 superseded-pseudocode annotation; blocked on #7b Phase 3
-- **PARKING-LOT-SKINS-1** — bet-row tap target <44px height
-- **PARKING-LOT-SKINS-2** — hole-1 shows non-zero deltas before input
-- **Stepper par-default affordance** — stepper shows 0 while Zustand has par
+- **perHoleDeltas.ts aggregateRound cutover** — deferred from WF7-2. Per-hole scorecard display still on per-bet dispatch. Phase 7 follow-on.
+- **F12-TIED-WITHDRAWAL-EVENT** — pre-existing; deferred to engine pass post-Phase-7.
+- **D4** — Nassau §7 press Junk annotation (XS, backlog).
+- **D1 sub-task B** — Nassau §9 N35 tied-withdrawal documentation (on hold).
 
-## Closed phases
-- **Wolf phase (WF-0–WF-7):** COMPLETE 2026-04-30
-- **Skins phase (SK-0–SK-5):** COMPLETE 2026-04-30
-- **Stroke Play phase (SP-1–SP-6, PF-1/PF-2):** COMPLETE 2026-04-29
+## Low priority / backlog
 
-## Notes
-- **598/598 vitest tests passing as of NA-3 close. tsc clean.**
-- **PM2 last rebuilt at NA-2/NA-3 — may need rebuild if NA-3 UI changes were not picked up.**
-- **Nassau is live (GAME_DEFS disabled flag removed in NA-1).** Press confirmation modal live for auto modes. Manual press UI pending (NA-3 stretch goal not implemented).
-- **Phase 7** (full multi-bet cutover) requires one more bet after Nassau. Match Play is the natural next candidate.
+- Match Play unpark (engine exists; no bridge, UI, still `disabled: true`)
+- Junk Phase 3 (Sandy/Barkie/Polie/Arnie stubs)
+- PUT-HANDLER-400-ON-MISSING-FIELDS
+- TEES constant (hardcoded; deferred to course integration)
+
+See IMPLEMENTATION_CHECKLIST.md for full backlog and parking lot.

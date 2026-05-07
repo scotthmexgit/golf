@@ -2,7 +2,7 @@
 
 Single source of truth for scope. Read the **Active item** before any work. Tangents → Parking Lot. Closed items → Done (append-only).
 
-**Wolf phase COMPLETE.** Plan: `docs/plans/WOLF_PLAN.md`. WF-0–WF-7 all closed 2026-04-30; Cowork 7/7 PASS. Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history. **Active phase: Nassau — awaiting GM approval of `docs/plans/NASSAU_PLAN.md`. Current item: NA-0 (plan approval gate — no engineering until plan approved).**
+**Wolf phase COMPLETE.** Plan: `docs/plans/WOLF_PLAN.md`. WF-0–WF-7 all closed 2026-04-30; Cowork 7/7 PASS. Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history. **Active phase: Nassau. NA-pre-1–NA-4 CLOSED. F11-PRESS-GAME-SCOPE CLOSED. Active item: NA-5 (Cowork visual verification).**
 
 ## Project Scope Summary
 
@@ -26,7 +26,15 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-**Nassau phase — APPROVED 2026-05-01. Plan: `docs/plans/NASSAU_PLAN.md`. Decisions A (allPairs v1) + B (post-save modal) + Sequencing Option A LOCKED. NA-1 CLOSED. NA-2 CLOSED. NA-3 CLOSED. Active item: NA-4 (Playwright spec — `tests/playwright/nassau-flow.spec.ts`).**
+**Nassau phase — APPROVED 2026-05-01. Plan: `docs/plans/NASSAU_PLAN.md`. Decisions A (allPairs v1) + B (post-save modal) + Sequencing Option A LOCKED. NA-1 CLOSED. NA-2 CLOSED. NA-3 CLOSED. NA-4 CLOSED. F11-PRESS-GAME-SCOPE CLOSED. Active item: NA-5 (Cowork visual verification).**
+
+**NA-4 — CLOSED 2026-05-06. Commit: `d53079a`.**
+- Deliverable: `tests/playwright/nassau-flow.spec.ts` (8 assertion groups: setup, front-9 result, overall after h18, final settlement, press rule display, press modal accept-front/decline-overall, zero-sum invariant, parked-engine fence). Stale Nassau-fence assertions removed from skins/wolf/stroke-play specs (Nassau unparked in NA-1). 4/4 E2E pass.
+- Tests: 602/602 vitest + 4/4 E2E. tsc clean. Reviewer: APPROVED.
+
+**F11-PRESS-GAME-SCOPE — CLOSED 2026-05-06. Commits: `b1f76ec` (core), `b124916` (compat shim).**
+- Deliverable: `HoleData.presses` → `Record<gameId,string[]>`; `PressOffer.gameId` added; `nassauPressDetect.ts` scoped per game; `nassau_bridge.ts` filters by `cfg.id`; `setPressConfirmation(hole,gameId,matchId)`; `buildHoleDecisions`/`validateHoleDecisions`/`hydrateHoleDecisions` updated. Compat shim in `hydrateRound` migrates pre-F11 flat-array presses (single-Nassau) or drops with warn (multi-Nassau). +14 vitest tests (606 total).
+- Tests: 606/606 pass. tsc clean. Reviewer (core): APPROVED 2nd pass. Codex (shim): clean.
 
 **NA-pre-1 — CLOSED 2026-05-01. Commit: `572dc32`.**
 - Deliverable: `stroke_play.ts` emits `RoundingAdjustment.points={absorbingPlayer:remainder}` instead of silent absorb; `aggregate.ts` stale comments removed; 4 new tests (AC 1–5). `match_play.ts` confirmed already correct (unchanged).
@@ -208,7 +216,7 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 
 - [x] **BRIDGE-WITHDRAWAL-DETECTION-FOLD** — Folded into NA-3. `HoleData.withdrew` + bridge-level `settleNassauWithdrawal` wiring landed in NA-3 (commit ac9d38b). — 2026-05-01 — NA-2 scope maintenance / NA-3 close
 
-- [ ] **F11-PRESS-GAME-SCOPE** — Press decisions not scoped to Nassau game instance: `hd.presses` is a flat `string[]` shared across all Nassau games in a round; `nassauPressDetect.ts` carries only `matchId/downPlayer/pair` (no `gameId`), and the bridge consumes any matching matchId regardless of which game it belongs to. In a round with two Nassau instances on the same player pair, accepting a 'front' press for game A would also open 'front' in game B. Fix: add `gameId` to `PressOffer`; scope `hd.presses` to `Record<gameId, string[]>`; update bridge to filter by `cfg.id`; add 2-Nassau-instance regression test. **Low probability in production** — typical rounds have 1 Nassau game; allPairs generates pair-suffixed IDs ('front-Alice-Bob') that are naturally unique. Accepted/deferred in Codex NA-3 retroactive review. — 2026-05-01 — docs/2026-05-01/14-codex-na3-retroactive.md §3 H1
+- [x] **F11-PRESS-GAME-SCOPE** — CLOSED 2026-05-06. `hd.presses` scoped to `Record<gameId,string[]>`; bridge + pressDetect + store all updated. Compat shim in hydrateRound for pre-F11 DB rows. See Active item section above. — 2026-05-01 — docs/2026-05-01/14-codex-na3-retroactive.md §3 H1
 
 - [ ] **F12-TIED-WITHDRAWAL-EVENT** — Tied withdrawal closes Nassau matches without a replayable event: `settleNassauWithdrawal` in `nassau.ts:456-468` emits `NassauWithdrawalSettled` only for non-tied matches but closes all participant matches silently when the match is exactly tied. `buildMatchStates(events)` cannot replay the silent closure → bridge's final MatchState can diverge after page reload and replay, and may produce extra zero-value finalization events. Payout is correct; event trace diverges. Pre-existing engine behavior (not introduced by NA-3). Fix: emit explicit zero-delta event (e.g. `NassauWithdrawalMatchTied`) for tied withdrawal matches in `settleNassauWithdrawal`; update `buildMatchStates` handler; add bridge test for tied-withdrawal PUT→GET→hydrateRound replay. — 2026-05-01 — docs/2026-05-01/14-codex-na3-retroactive.md §3 M1
 

@@ -48,7 +48,7 @@ export default function PressConfirmationModal({ hole, offers, onComplete }: Pre
   }
 
   const handleAccept = () => {
-    setPressConfirmation(hole, current.matchId)
+    setPressConfirmation(hole, current.gameId, current.matchId)
     advance()
   }
 

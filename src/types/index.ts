@@ -114,7 +114,7 @@ export interface HoleData {
   scores: Record<string, number>
   dots: Record<string, HoleDots>
   wolfPick?: 'solo' | 'blind' | string
-  presses?: string[]
+  presses?: Record<string, string[]>   // keyed by GameInstance.id (UUID)
   withdrew?: string[]
   greenieWinners?: Record<string, string | null>  // keyed by gameInstance.id
   bangoWinner?: string | null

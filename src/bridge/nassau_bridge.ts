@@ -7,7 +7,8 @@
 // Design:
 //   Nassau threads MatchState[] explicitly across holes — unlike stateless Skins/Wolf,
 //   Nassau presses add new MatchState entries mid-round. Each hole's holeData.presses
-//   (array of match IDs) drives press opening after the hole is scored. openingPlayer
+//   (Record<gameInstanceId, string[]> — match IDs keyed by GameInstance.id) drives
+//   press opening for THIS game instance after the hole is scored. openingPlayer
 //   is derived from the current MatchState (the down player).
 //
 // Portability: imports from src/types and src/games/* only.
@@ -84,9 +85,10 @@ export function settleNassauBet(
     allEvents.push(...holeEvents)
     matches = updatedMatches
 
-    // Press confirmations: holeData.presses contains match IDs confirmed at this hole.
-    if (hd.presses && hd.presses.length > 0) {
-      for (const parentMatchId of hd.presses) {
+    // Press confirmations: read only presses confirmed for THIS game instance.
+    const gamePresses = hd.presses?.[cfg.id] ?? []
+    if (gamePresses.length > 0) {
+      for (const parentMatchId of gamePresses) {
         const parent = matches.find(m => m.id === parentMatchId)
         if (!parent || parent.closed) continue
 

@@ -98,9 +98,7 @@ export interface RoundStore {
   setScore: (playerId: string, hole: number, score: number) => void
   setDot: (playerId: string, hole: number, dot: keyof HoleDots, value: boolean) => void
   setWolfPick: (hole: number, pick: 'solo' | 'blind' | string) => void
-  /** @deprecated Use setPressConfirmation(hole, matchId) — stores MatchState IDs, not game UUIDs. */
-  setPress: (hole: number, gameKey: string) => void
-  setPressConfirmation: (hole: number, matchId: string) => void
+  setPressConfirmation: (hole: number, gameId: string, matchId: string) => void
   setWithdrawn: (hole: number, playerIds: string[]) => void
   setGreenieWinner: (hole: number, gameId: string, playerId: string | null) => void
   setBangoWinner: (hole: number, playerId: string | null) => void
@@ -350,16 +348,13 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
     holes: state.holes.map(h => h.number === hole ? { ...h, wolfPick: pick } : h),
   })),
 
-  setPress: (hole, gameKey) => set((state) => ({
-    holes: state.holes.map(h =>
-      h.number === hole ? { ...h, presses: [...(h.presses || []), gameKey] } : h
-    ),
-  })),
-
-  setPressConfirmation: (hole, matchId) => set((state) => ({
-    holes: state.holes.map(h =>
-      h.number === hole ? { ...h, presses: [...(h.presses || []), matchId] } : h
-    ),
+  setPressConfirmation: (hole, gameId, matchId) => set((state) => ({
+    holes: state.holes.map(h => {
+      if (h.number !== hole) return h
+      const existing = h.presses ?? {}
+      const arr = existing[gameId] ?? []
+      return { ...h, presses: { ...existing, [gameId]: [...arr, matchId] } }
+    }),
   })),
 
   setWithdrawn: (hole, playerIds) => set((state) => ({

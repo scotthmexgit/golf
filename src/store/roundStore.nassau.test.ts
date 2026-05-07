@@ -109,7 +109,7 @@ describe('updateGame — Nassau config fields round-trip through store', () => {
 
 // ── setPressConfirmation ───────────────────────────────────────────────────────
 
-describe('setPressConfirmation — adds matchId to hd.presses', () => {
+describe('setPressConfirmation — adds matchId to hd.presses[gameId]', () => {
   beforeEach(() => {
     useRoundStore.getState().reset()
     // Set up a minimal hole list so holes[0].number === 1 exists
@@ -119,15 +119,22 @@ describe('setPressConfirmation — adds matchId to hd.presses', () => {
     }))
   })
 
-  it('adds a matchId to presses on the correct hole', () => {
-    useRoundStore.getState().setPressConfirmation(1, 'front')
-    expect(useRoundStore.getState().holes[0]!.presses).toEqual(['front'])
+  it('adds matchId into presses[gameId] on the correct hole', () => {
+    useRoundStore.getState().setPressConfirmation(1, 'game-a', 'front')
+    expect(useRoundStore.getState().holes[0]!.presses).toEqual({ 'game-a': ['front'] })
   })
 
-  it('appends second matchId without replacing', () => {
-    useRoundStore.getState().setPressConfirmation(1, 'front')
-    useRoundStore.getState().setPressConfirmation(1, 'overall')
-    expect(useRoundStore.getState().holes[0]!.presses).toEqual(['front', 'overall'])
+  it('appends second matchId for same gameId without replacing', () => {
+    useRoundStore.getState().setPressConfirmation(1, 'game-a', 'front')
+    useRoundStore.getState().setPressConfirmation(1, 'game-a', 'overall')
+    expect(useRoundStore.getState().holes[0]!.presses).toEqual({ 'game-a': ['front', 'overall'] })
+  })
+
+  it('two gameIds on same hole stored independently (no cross-game bleed)', () => {
+    useRoundStore.getState().setPressConfirmation(1, 'game-a', 'front')
+    useRoundStore.getState().setPressConfirmation(1, 'game-b', 'front')
+    const presses = useRoundStore.getState().holes[0]!.presses
+    expect(presses).toEqual({ 'game-a': ['front'], 'game-b': ['front'] })
   })
 
   it('does not affect other holes', () => {
@@ -138,7 +145,7 @@ describe('setPressConfirmation — adds matchId to hd.presses', () => {
         { number: 2, par: 4, index: 2, scores: {}, dots: {} },
       ],
     }))
-    useRoundStore.getState().setPressConfirmation(1, 'front')
+    useRoundStore.getState().setPressConfirmation(1, 'game-a', 'front')
     expect(useRoundStore.getState().holes[1]!.presses).toBeUndefined()
   })
 })

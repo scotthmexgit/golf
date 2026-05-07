@@ -55,7 +55,7 @@ function makePlayer(id: string, courseHcp = 0): PlayerSetup {
 }
 
 /** 18 holes, all par 4, index 1-18. */
-function makeHoles(scores: Record<string, number[]>, presses?: Record<number, string[]>): HoleData[] {
+function makeHoles(scores: Record<string, number[]>, presses?: Record<number, Record<string, string[]>>): HoleData[] {
   return Array.from({ length: 18 }, (_, i) => {
     const hole = i + 1
     const holeScores: Record<string, number> = {}
@@ -137,7 +137,7 @@ describe('F6 invariant — buildMatchStates replay matches bridge final MatchSta
     const bobScores   = [4, 4, 4, 4, 4, 4, 4, 4, 4,  4, 4, 4, 4, 4, 4, 4, 4, 4]
 
     // Press confirmed on hole 2 — match ID for front-9 in singles is 'front'
-    const holes = makeHoles({ Alice: aliceScores, Bob: bobScores }, { 2: ['front'] })
+    const holes = makeHoles({ Alice: aliceScores, Bob: bobScores }, { 2: { 'nassau-1': ['front'] } })
 
     const { events } = settleNassauBet(holes, players, game)
 
@@ -229,8 +229,8 @@ describe('T2 — singles with manual press, F6 invariant holds', () => {
     const alice = [3,3,3,4,4,4,4,4,4, 4,4,4,4,4,4,4,4,4]
     const bob   = [4,4,4,3,3,3,3,3,3, 4,4,4,4,4,4,4,4,4]
 
-    // Press confirmed on hole 3 for front match.
-    const holes = makeHoles({ Alice: alice, Bob: bob }, { 3: ['front'] })
+    // Press confirmed on hole 3 for front match (game-scoped to 'nassau-1').
+    const holes = makeHoles({ Alice: alice, Bob: bob }, { 3: { 'nassau-1': ['front'] } })
 
     const { events, payouts } = settleNassauBet(holes, players, game)
 
@@ -322,9 +322,9 @@ describe('T4 — allPairs 4-player with one press, F6 invariant', () => {
     }
     scores['Alice'][0] = 3; scores['Alice'][1] = 3
 
-    // Press on hole 2 for the Alice-Bob front match.
+    // Press on hole 2 for the Alice-Bob front match (game-scoped to 'nassau-1').
     // In allPairs, Alice-Bob front match ID = 'front-Alice-Bob'
-    const holes = makeHoles(scores, { 2: ['front-Alice-Bob'] })
+    const holes = makeHoles(scores, { 2: { 'nassau-1': ['front-Alice-Bob'] } })
 
     const { events, payouts } = settleNassauBet(holes, players, game)
 
@@ -478,7 +478,7 @@ describe('T5b — bridge-level withdrawal detection via hd.withdrew', () => {
     const alice = Array.from({ length: 18 }, (_, i) => i < 3 ? 3 : 4)
     const bob   = Array.from({ length: 18 }, () => 4)
 
-    const holes: HoleData[] = makeHoles({ Alice: alice, Bob: bob }, { 3: ['front'] })
+    const holes: HoleData[] = makeHoles({ Alice: alice, Bob: bob }, { 3: { 'nassau-1': ['front'] } })
     holes[5] = { ...holes[5]!, withdrew: ['Bob'] }
 
     const { events } = settleNassauBet(holes, players, game)
@@ -501,5 +501,44 @@ describe('T7 — Nassau GAME_DEFS disabled flag is false after cutover', () => {
     const nassauDef = GAME_DEFS.find(d => d.key === 'nassau')
     expect(nassauDef).toBeDefined()
     expect(nassauDef?.disabled).toBeFalsy()
+  })
+})
+
+// ─── T8 — Two Nassau games, same pair: presses are game-scoped ────────────────
+//
+// Failure scenario for F11: two Nassau bets on Alice/Bob (singles). A press
+// confirmed for game A's 'front' match must NOT open a press in game B.
+// Before the fix, both games would read hd.presses (flat array) and both would
+// find 'front' in their matches array → ghost press in game B.
+// After the fix, each game reads hd.presses[cfg.id] (its own UUID) → isolated.
+
+describe('T8 — two Nassau games same player pair: presses do not bleed across games', () => {
+  it('game A press does not open a press in game B; both games settle zero-sum', () => {
+    const gameA = makeGame({ id: 'game-a', pressRule: 'manual', stake: 100 })
+    const gameB = makeGame({ id: 'game-b', pressRule: 'manual', stake: 100 })
+    const players = [makePlayer('Alice'), makePlayer('Bob')]
+
+    // Alice wins holes 1-2 (birdie 3); holes 3-18 tied (par 4).
+    const alice = [3,3,4,4,4,4,4,4,4, 4,4,4,4,4,4,4,4,4]
+    const bob   = [4,4,4,4,4,4,4,4,4, 4,4,4,4,4,4,4,4,4]
+
+    // Only game A has a press confirmed on hole 2 for the 'front' match.
+    // Game B's presses entry is absent (not provided for 'game-b').
+    const holes = makeHoles({ Alice: alice, Bob: bob }, {
+      2: { 'game-a': ['front'] },
+    })
+
+    const { events: eventsA } = settleNassauBet(holes, players, gameA)
+    const { events: eventsB } = settleNassauBet(holes, players, gameB)
+
+    // Game A must have opened a press (hd.presses['game-a'] = ['front']).
+    expect(eventsA.filter(e => e.kind === 'PressOpened')).toHaveLength(1)
+
+    // Game B must NOT have opened a press — F11 regression gate.
+    expect(eventsB.filter(e => e.kind === 'PressOpened')).toHaveLength(0)
+
+    // Zero-sum holds per game (no phantom delta from cross-game bleed).
+    zeroSum(eventsA, ['Alice', 'Bob'])
+    zeroSum(eventsB, ['Alice', 'Bob'])
   })
 })

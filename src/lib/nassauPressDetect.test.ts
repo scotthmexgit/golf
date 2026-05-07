@@ -45,7 +45,7 @@ function makePlayer(id: string): PlayerSetup {
 /** Build HoleData[1..18] with given scores. All par 4, index = hole number. */
 function makeHoles(
   scoresByPlayer: Record<string, number[]>,
-  pressesMap: Record<number, string[]> = {},
+  pressesMap: Record<number, Record<string, string[]>> = {},
 ): HoleData[] {
   return Array.from({ length: 18 }, (_, i) => {
     const hole = i + 1
@@ -95,7 +95,7 @@ describe('detectNassauPressOffers — auto-2-down', () => {
     expect(detectNassauPressOffers(1, holes, players, game)).toEqual([])
   })
 
-  it('returns offer when exactly 2-down on front match', () => {
+  it('returns offer when exactly 2-down on front match — includes gameId', () => {
     const game = makeGame({ pressRule: 'auto-2-down' })
     // Alice wins holes 1-2 → Bob is 2-down in front + overall
     const holes = makeHoles({
@@ -107,6 +107,8 @@ describe('detectNassauPressOffers — auto-2-down', () => {
     expect(offers.length).toBeGreaterThanOrEqual(1)
     expect(offers.some(o => o.matchId === 'front')).toBe(true)
     expect(offers.every(o => o.downPlayer === 'Bob')).toBe(true)
+    // Every offer must carry the game's UUID
+    expect(offers.every(o => o.gameId === 'nassau-1')).toBe(true)
   })
 
   it('returns [] when 3-down (threshold exceeded, not exactly 2)', () => {
@@ -187,7 +189,7 @@ describe('detectNassauPressOffers — prior presses respected in state threading
         Alice: [3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
         Bob:   [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
       },
-      { 2: ['front'] }, // press on hole 2 already confirmed
+      { 2: { 'nassau-1': ['front'] } }, // press on hole 2 already confirmed (game-scoped)
     )
     // On hole 3: front is still open (press started h3). Alice won h3 → press-1 is 1-down.
     // auto-2-down → no offer for press-1 (only 1-down).

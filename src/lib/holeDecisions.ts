@@ -15,7 +15,7 @@ export type ValidationResult = { ok: true } | { ok: false; reason: string }
 // Known decision keys — superset of all game types + junk.
 const KNOWN_DECISION_KEYS = new Set([
   'wolfPick',        // wolf: 'solo' | 'blind' | playerId
-  'presses',         // nassau: string[] of confirmed match IDs
+  'presses',         // nassau: Record<gameInstanceId, string[]> of confirmed match IDs per game
   'withdrew',        // nassau: string[] of player IDs who withdrew on this hole
   'greenieWinners',  // junk greenie: Record<gameInstanceId, playerId | null>
   'bangoWinner',     // junk bingo: playerId | null
@@ -37,7 +37,7 @@ export function buildHoleDecisions(
   if (gameTypes.has('wolf') && holeData.wolfPick !== undefined) {
     out.wolfPick = holeData.wolfPick
   }
-  if (gameTypes.has('nassau') && Array.isArray(holeData.presses) && holeData.presses.length > 0) {
+  if (gameTypes.has('nassau') && holeData.presses && Object.keys(holeData.presses).length > 0) {
     out.presses = holeData.presses
   }
   if (gameTypes.has('nassau') && Array.isArray(holeData.withdrew) && holeData.withdrew.length > 0) {
@@ -98,8 +98,13 @@ export function validateHoleDecisions(
     return { ok: false, reason: 'decisions: wolfPick must be a string' }
   }
   if ('presses' in obj) {
-    if (!Array.isArray(obj.presses) || !obj.presses.every(p => typeof p === 'string')) {
-      return { ok: false, reason: 'decisions: presses must be string[]' }
+    if (typeof obj.presses !== 'object' || Array.isArray(obj.presses) || obj.presses === null) {
+      return { ok: false, reason: 'decisions: presses must be a plain object (Record<gameId, string[]>)' }
+    }
+    for (const v of Object.values(obj.presses as Record<string, unknown>)) {
+      if (!Array.isArray(v) || !v.every(p => typeof p === 'string')) {
+        return { ok: false, reason: 'decisions: presses values must be string[]' }
+      }
     }
   }
   if ('withdrew' in obj) {
@@ -130,8 +135,16 @@ export function hydrateHoleDecisions(decisions: unknown): Partial<HoleData> {
   if (typeof obj.wolfPick === 'string') {
     result.wolfPick = obj.wolfPick
   }
-  if (Array.isArray(obj.presses) && obj.presses.every(p => typeof p === 'string')) {
-    result.presses = obj.presses as string[]
+  if (typeof obj.presses === 'object' && !Array.isArray(obj.presses) && obj.presses !== null) {
+    const pressRecord: Record<string, string[]> = {}
+    for (const [gid, matchIds] of Object.entries(obj.presses as Record<string, unknown>)) {
+      if (Array.isArray(matchIds) && matchIds.every(p => typeof p === 'string')) {
+        pressRecord[gid] = matchIds as string[]
+      }
+    }
+    if (Object.keys(pressRecord).length > 0) result.presses = pressRecord
+  } else if (Array.isArray(obj.presses)) {
+    console.debug('[hydrateHoleDecisions] presses: flat array (old shape) — discarded')
   }
   if (Array.isArray(obj.withdrew) && obj.withdrew.every(p => typeof p === 'string')) {
     result.withdrew = obj.withdrew as string[]

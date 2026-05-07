@@ -14,6 +14,7 @@ import { buildHoleState, buildMinimalRoundCfg } from '../bridge/shared'
 import { buildNassauCfg } from '../bridge/nassau_bridge'
 
 export interface PressOffer {
+  gameId: string
   matchId: string
   downPlayer: string
   pair: [string, string]
@@ -52,8 +53,9 @@ export function detectNassauPressOffers(
 
     // Apply confirmed presses from PRIOR holes only — current hole's presses are
     // what we're computing now (not yet confirmed by the user).
-    if (hd.number < currentHole && hd.presses && hd.presses.length > 0) {
-      for (const parentMatchId of hd.presses) {
+    const priorGamePresses = hd.number < currentHole ? (hd.presses?.[cfg.id] ?? []) : []
+    if (priorGamePresses.length > 0) {
+      for (const parentMatchId of priorGamePresses) {
         const parent = matches.find(m => m.id === parentMatchId)
         if (!parent || parent.closed) continue
         const [playerA, playerB] = parent.pair
@@ -95,7 +97,7 @@ export function detectNassauPressOffers(
 
     const events = offerPress(currentHole, match, cfg, downPlayer)
     if (events.length > 0) {
-      offers.push({ matchId: match.id, downPlayer, pair: [playerA, playerB] })
+      offers.push({ gameId: game.id, matchId: match.id, downPlayer, pair: [playerA, playerB] })
     }
   }
 

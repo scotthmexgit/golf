@@ -10,3 +10,4 @@
 | SOD | 05-wf71-plan | WF7-1 | Architecture finding: wolfTieRule in config blob (no migration); codex P2 tieRule default must be no-points per rule doc | ⏸ |
 | SOD | 06-wf71-develop | WF7-1 | wolfTieRule wizard live; GR1 violation fixed (carryover→no-points default); 625 tests; reviewer APPROVED | ✓ |
 | SOD | 07-wf72-develop | WF7-2 | Wolf payouts.ts → aggregateRound; GR8 guard added; adversarial review addressed; 658 tests; reviewer APPROVED | ✓ |
+| SOD | 08-wf73-develop | WF7-3 | Wolf+Skins multi-bet E2E spec; span-filter assertion fix; post-save loop guard; 5/5 E2E; reviewer APPROVED | ✓ |

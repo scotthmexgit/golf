@@ -143,9 +143,9 @@ export function hydrateHoleDecisions(decisions: unknown): Partial<HoleData> {
       }
     }
     if (Object.keys(pressRecord).length > 0) result.presses = pressRecord
-  } else if (Array.isArray(obj.presses)) {
-    console.debug('[hydrateHoleDecisions] presses: flat array (old shape) — discarded')
   }
+  // Flat-array presses (pre-F11 shape) are rejected by validateHoleDecisions above
+  // and never reach this branch. Migration lives in hydrateRound (has game context).
   if (Array.isArray(obj.withdrew) && obj.withdrew.every(p => typeof p === 'string')) {
     result.withdrew = obj.withdrew as string[]
   }

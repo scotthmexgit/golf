@@ -139,11 +139,15 @@ describe('hydrateHoleDecisions — round-trip fidelity', () => {
     const result = hydrateHoleDecisions(blob)
     expect(result.presses).toEqual({ 'game-a': ['front'] })
   })
-  it('presses flat array (old shape) silently discarded by hydrator', () => {
-    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
+  it('presses flat array (old shape) discarded by hydrator — validateHoleDecisions fires console.warn', () => {
+    // validateHoleDecisions rejects flat-array presses ("must be a plain object")
+    // before the presses branch; hydrateHoleDecisions returns {} with console.warn.
+    // Legacy migration lives in hydrateRound (game context available there).
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const result = hydrateHoleDecisions({ presses: ['front'] })
     expect(result.presses).toBeUndefined()
-    debugSpy.mockRestore()
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
   })
   it('null input returns empty partial', () => {
     expect(hydrateHoleDecisions(null)).toEqual({})

@@ -5,7 +5,7 @@
 //   pairingMode derivation from player count
 //   updateGame writes config fields back to store
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useRoundStore } from './roundStore'
 
 // Reset store before each test — Zustand store is a singleton
@@ -175,5 +175,84 @@ describe('setWithdrawn — sets withdrew array on a hole', () => {
   it('multiple players can withdraw on the same hole', () => {
     useRoundStore.getState().setWithdrawn(5, ['p1', 'p3'])
     expect(useRoundStore.getState().holes[0]!.withdrew).toEqual(['p1', 'p3'])
+  })
+})
+
+// ── hydrateRound legacy press migration ───────────────────────────────────────
+//
+// The pre-F11 DB shape stored presses as a flat string[] at the HoleDecision
+// level. hydrateRound now migrates flat arrays to the Record<gameId,string[]>
+// shape when exactly one Nassau game is in the round.
+
+// Minimal API response fixture for hydrateRound tests.
+function makeApiResponse(overrides: {
+  nassauGameIds?: number[]
+  holeDecisions?: { hole: number; decisions: Record<string, unknown> | null }[]
+} = {}) {
+  const nassauGameIds = overrides.nassauGameIds ?? [42]
+  const nassauGames = nassauGameIds.map(id => ({
+    id, type: 'nassau', stake: 500, playerIds: ['1'], config: null,
+  }))
+  return {
+    round: { id: 1, holesCount: 18, tee: 'blue', status: 'In Progress' },
+    course: {
+      name: 'Test', location: 'Nowhere',
+      holes: [{ hole: 1, par: 4, index: 1 }],
+    },
+    players: [{ id: 1, playerId: 1, name: 'Alice', handicapIdx: 0, courseHcp: 0, betting: true, tee: 'blue' }],
+    games: nassauGames,
+    scores: [],
+    holeDecisions: overrides.holeDecisions ?? [],
+  }
+}
+
+describe('hydrateRound — legacy flat-array presses migration', () => {
+  beforeEach(() => { useRoundStore.getState().reset() })
+
+  it('single Nassau game: flat-array presses migrated to Record<gameId,string[]>', () => {
+    // Game ID 42 → String key '42' in presses record
+    useRoundStore.getState().hydrateRound(makeApiResponse({
+      nassauGameIds: [42],
+      holeDecisions: [{ hole: 1, decisions: { presses: ['front', 'overall'] } }],
+    }))
+    const hole = useRoundStore.getState().holes.find(h => h.number === 1)
+    expect(hole?.presses).toEqual({ '42': ['front', 'overall'] })
+  })
+
+  it('two Nassau games: flat-array presses dropped with console.warn (ambiguous migration)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    useRoundStore.getState().hydrateRound(makeApiResponse({
+      nassauGameIds: [42, 43],
+      holeDecisions: [{ hole: 1, decisions: { presses: ['front'] } }],
+    }))
+    const hole = useRoundStore.getState().holes.find(h => h.number === 1)
+    expect(hole?.presses).toBeUndefined()
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ambiguous'))
+    warnSpy.mockRestore()
+  })
+
+  it('Record-shape presses (current shape) pass through unchanged — no warn fired', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    useRoundStore.getState().hydrateRound(makeApiResponse({
+      nassauGameIds: [42],
+      holeDecisions: [{ hole: 1, decisions: { presses: { '42': ['front'] } } }],
+    }))
+    const hole = useRoundStore.getState().holes.find(h => h.number === 1)
+    expect(hole?.presses).toEqual({ '42': ['front'] })
+    expect(warnSpy).not.toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it('zero Nassau games: flat-array presses silently dropped — no warn fired', () => {
+    // No Nassau game in the round; old flat presses cannot be attributed → drop without warn.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    useRoundStore.getState().hydrateRound(makeApiResponse({
+      nassauGameIds: [],          // no Nassau game
+      holeDecisions: [{ hole: 1, decisions: { presses: ['front'] } }],
+    }))
+    const hole = useRoundStore.getState().holes.find(h => h.number === 1)
+    expect(hole?.presses).toBeUndefined()
+    expect(warnSpy).not.toHaveBeenCalled()
+    warnSpy.mockRestore()
   })
 })

@@ -245,11 +245,38 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
     // Build a hole range from apiCourse.holes
     const holeNums = apiCourse.holes.map(h => h.hole)
 
-    // Build a decisions lookup: hole number → parsed decisions partial
+    // Compute Nassau game IDs now — needed for legacy press migration below.
+    const nassauGameIds = apiGames
+      .filter(g => g.type === 'nassau')
+      .map(g => String(g.id))
+
+    // Build a decisions lookup: hole number → parsed decisions partial.
+    // Legacy backward-compat: if a hole has presses stored as a flat string[]
+    // (the pre-F11 shape), migrate to Record<gameId, string[]> using the single
+    // Nassau game ID. Ambiguous multi-Nassau cases are warned and dropped.
     const decisionsMap = new Map<number, Partial<HoleData>>()
     for (const hd of (holeDecisions ?? [])) {
       if (hd.decisions !== null && hd.decisions !== undefined) {
-        decisionsMap.set(hd.hole, hydrateHoleDecisions(hd.decisions))
+        let rawDecisions = hd.decisions as Record<string, unknown>
+        if (Array.isArray(rawDecisions.presses)) {
+          const flatPresses = (rawDecisions.presses as unknown[])
+            .filter(p => typeof p === 'string') as string[]
+          if (nassauGameIds.length === 1 && flatPresses.length > 0) {
+            // Single Nassau game — safe to migrate
+            rawDecisions = { ...rawDecisions, presses: { [nassauGameIds[0]]: flatPresses } }
+          } else {
+            if (nassauGameIds.length > 1) {
+              console.warn(
+                `[hydrateRound] legacy flat-array presses on hole ${hd.hole}: ` +
+                `${nassauGameIds.length} Nassau games — ambiguous migration, presses dropped`,
+              )
+            }
+            // Remove the presses key entirely so validateHoleDecisions skips it.
+            const { presses: _dropped, ...rest } = rawDecisions
+            rawDecisions = rest
+          }
+        }
+        decisionsMap.set(hd.hole, hydrateHoleDecisions(rawDecisions))
       }
     }
 

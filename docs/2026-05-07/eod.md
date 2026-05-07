@@ -9,3 +9,4 @@
 | SOD | 04-wolf-plan-codex-review | Phase 7 #11 | Codex P2: aggregateRound is a reducer not generator; WF7-2 corrected; perHoleDeltas scope question added | ✓ |
 | SOD | 05-wf71-plan | WF7-1 | Architecture finding: wolfTieRule in config blob (no migration); codex P2 tieRule default must be no-points per rule doc | ⏸ |
 | SOD | 06-wf71-develop | WF7-1 | wolfTieRule wizard live; GR1 violation fixed (carryover→no-points default); 625 tests; reviewer APPROVED | ✓ |
+| SOD | 07-wf72-develop | WF7-2 | Wolf payouts.ts → aggregateRound; GR8 guard added; adversarial review addressed; 658 tests; reviewer APPROVED | ✓ |

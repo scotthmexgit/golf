@@ -62,13 +62,12 @@ test('wolf flow: WF-6 §1–§6 closure spec', async ({ page }) => {
     await page.locator('input[placeholder="Golfer 4"]').fill('Dave')
     await page.getByRole('button', { name: 'Continue →' }).click()
 
-    // §6 FENCE: Nassau and Match Play must be absent (disabled: true in GAME_DEFS)
+    // §6 FENCE: Match Play must be absent (still disabled: true); Nassau unparked NA-1
     const pickerSection = page.locator('div').filter({ hasText: /Add a game/ }).first()
     const pickerText = await pickerSection.textContent() ?? ''
-    for (const token of ['Nassau', 'Match Play']) {
-      expect(pickerText, `Parked game "${token}" must not appear in Wolf-round picker`).not.toContain(token)
-    }
+    expect(pickerText, 'Match Play must not appear in Wolf-round picker (still parked)').not.toContain('Match Play')
     expect(pickerText, 'Wolf must appear in picker (unparked WF-1)').toContain('Wolf')
+    expect(pickerText, 'Nassau must appear in picker (unparked NA-1)').toContain('Nassau')
 
     // Add Wolf — stake=$5 (500 minor units) and loneWolfMultiplier=2× are store defaults; no edits needed
     await page.getByRole('button', { name: 'Wolf' }).click()

@@ -85,15 +85,14 @@ test('stroke play finish flow: SP-UI-7 + SP-4 §4 closure', async ({ page }) => 
 
   // ── STEP 4: Games — add Stroke Play + FENCE CHECK ─────────────────────────
   // Fence assertion: still-parked game names must not appear as picker pills.
-  // Skins unparked SK-2; Wolf unparked WF-1; Nassau/Match Play remain parked.
+  // Skins unparked SK-2; Wolf unparked WF-1; Nassau unparked NA-1; Match Play still parked.
   const gamePickerSection = page.locator('div').filter({ hasText: /^\+ Add a game/ }).first()
   const pickerText = await gamePickerSection.textContent() ?? ''
-  for (const token of ['Nassau', 'Match Play']) {
-    expect(pickerText, `Parked game "${token}" should not appear in picker`).not.toContain(token)
-  }
-  // Skins live after SK-2; Wolf live after WF-1.
+  expect(pickerText, 'Parked game "Match Play" should not appear in picker').not.toContain('Match Play')
+  // Skins live after SK-2; Wolf live after WF-1; Nassau live after NA-1.
   expect(pickerText, 'Skins should appear in picker').toContain('Skins')
   expect(pickerText, 'Wolf should appear in picker (unparked WF-1)').toContain('Wolf')
+  expect(pickerText, 'Nassau should appear in picker (unparked NA-1)').toContain('Nassau')
 
   // Add Stroke Play (the only enabled pill)
   await page.getByRole('button', { name: 'Stroke Play' }).click()

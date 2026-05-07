@@ -118,13 +118,12 @@ test('skins flow: SK-4 §1–§8 closure spec', async ({ page }) => {
   // §8 FENCE CHECK: still-parked engines absent from picker; live bets present
   const pickerSection = page.locator('div').filter({ hasText: /Add a game/ }).first()
   const pickerText = await pickerSection.textContent() ?? ''
-  // Nassau and Match Play remain parked (disabled: true in GAME_DEFS)
-  for (const token of ['Nassau', 'Match Play']) {
-    expect(pickerText, `Parked game "${token}" must not appear in picker`).not.toContain(token)
-  }
-  // Skins live after SK-2; Wolf live after WF-1
+  // Match Play remains parked (disabled: true in GAME_DEFS); Nassau unparked NA-1
+  expect(pickerText, 'Match Play must not appear in picker (still parked)').not.toContain('Match Play')
+  // Skins live after SK-2; Wolf live after WF-1; Nassau live after NA-1
   expect(pickerText, 'Skins must appear in picker').toContain('Skins')
   expect(pickerText, 'Wolf must appear in picker (unparked WF-1)').toContain('Wolf')
+  expect(pickerText, 'Nassau must appear in picker (unparked NA-1)').toContain('Nassau')
 
   // Add Skins — enable escalating (store default is false; toggle to true)
   await page.getByRole('button', { name: 'Skins' }).click()

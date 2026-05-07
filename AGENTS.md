@@ -19,7 +19,7 @@ Skins, Wolf, Nassau, Match Play, Stroke Play. Junk is the side-bet engine (not a
 Current status (live scope in `IMPLEMENTATION_CHECKLIST.md`):
 - All five engines (Skins, Wolf, Nassau, Match Play, Stroke Play) landed under `src/games/` (#3–#8 closed 2026-04-24). Junk Phase 1–2 landed; Phase 3 deferred.
 - Wolf phase COMPLETE as of 2026-04-30 (WF-0–WF-7 all closed; Cowork 7/7 PASS). Skins phase COMPLETE 2026-04-30 (SK-0–SK-5 all closed).
-- **Active phase: Nassau — awaiting GM approval of NASSAU_PLAN.md.** Current item: NA-0 (plan approval gate). Active plan: `docs/plans/NASSAU_PLAN.md`.
+- **Active phase: Nassau — APPROVED 2026-05-01.** Current item: NA-4 (Playwright spec — `tests/playwright/nassau-flow.spec.ts`). Active plan: `docs/plans/NASSAU_PLAN.md`.
 - Old scoring in `src/lib/*` remains live; Stroke Play cutover is SP-4; full multi-bet cutover deferred (phase 7).
 
 ## Source of truth

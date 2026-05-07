@@ -1,36 +1,35 @@
 # Pipeline: golf
-Last updated: 2026-04-30 (SOD Session 2)
+Last updated: 2026-05-06 (SOD Session 1)
 
 ## Today (Day 0)
 
 | # | Item | Source | Estimate | Scope notes |
 |---|---|---|---|---|
-| 1 | WF-6: Playwright wolf-flow.spec.ts | WOLF_PLAN.md WF-6 | S | New spec: Wolf declaration flows (partner, lone, blind); BetDetailsSheet Wolf totals; round completion. Reviewer gate. Per-prompt commit at APPROVED. |
-| 2 | WF-7: Cowork phase-end visual verification | WOLF_PLAN.md WF-7 | 1 session | WolfDeclare UI, declaration persistence, sheet 75vh, Exit Round. Wolf phase gate. |
+| 1 | NA-4 — Playwright spec (nassau-flow.spec.ts) | NASSAU_PLAN.md §NA-4; unblocked per report 14 | S | New test file only. 8 assertion groups. `npm run test:e2e` gate. |
+| 2 | IMPLEMENTATION_CHECKLIST.md grooming | Session close without EOD; NA-3 close not yet recorded | XS | Mark NA-3 CLOSED with commit hash; set NA-4 as active item; file F11/F12. Fold into NA-4 commit or standalone. |
 
 ## Day +1 to +2 — committed next
 
 | # | Item | Source | Estimate | Blocker if any |
 |---|---|---|---|---|
-| 1 | Session-logging skill update (XS) | EOD Session 1 instruction-health | XS | Independent; can fold into any next prompt |
-| 2 | WOLF_PLAN.md stepper-affordance note correction | EOD Session 1 | XS | One-line doc edit; independent |
+| 1 | NA-5 — Cowork visual verification | NASSAU_PLAN.md §NA-5 | 1 session | Blocked on NA-4 green |
+| 2 | F11-PRESS-GAME-SCOPE — game-scoped press decisions | Codex NA-3 review (report 14) | S | Independent; schedule post-NA-5 or parallel |
+| 3 | Manual press button in BetDetailsSheet | NA-3 stretch goal (parking lot) | S | Independent |
 
 ## Day +3 to +5 — planned
 
 | # | Item | Source | Estimate |
 |---|---|---|---|
-| 1 | Next phase planning (post-Wolf) | IMPLEMENTATION_CHECKLIST.md backlog | TBD — depends on what GM prioritizes |
-| 2 | PUT-HANDLER-400-ON-MISSING-FIELDS hardening | backlog | XS |
+| 1 | Nassau phase closure declaration (if NA-5 complete) | NASSAU_PLAN.md §7 | XS |
+| 2 | D4 — Nassau §7 press Junk annotation | IMPLEMENTATION_CHECKLIST.md backlog | XS |
+| 3 | F12-TIED-WITHDRAWAL-EVENT engine fix | Codex NA-3 review (report 14) | S |
+| 4 | Parking-lot sprint (SKINS-1, SKINS-2, Stepper affordance) | IMPLEMENTATION_CHECKLIST.md parking lot | S |
 
 ## Beyond +5
-See IMPLEMENTATION_CHECKLIST.md for active scope, parking lot, and backlog. Phase 7 (full multi-bet cutover, REBUILD_PLAN.md #11) deferred until third bet unparks.
+See IMPLEMENTATION_CHECKLIST.md for active scope, parking lot, and backlog. Last reviewed 2026-05-06 SOD.
 
-## Active phase: Wolf
-- WF-0 (plan): CLOSED 2026-04-30
-- WF-1 (bridge + cutover): CLOSED 2026-04-30
-- WF-2 (BetDetailsSheet + SKINS-1): CLOSED 2026-04-30
-- WF-3 (Skins accordion migration): CLOSED 2026-04-30
-- WF-4 (Exit Round): CLOSED 2026-04-30
-- WF-5 (Lone Wolf declaration + SKINS-2 + Stepper): CLOSED 2026-04-30
-- WF-6 (Playwright wolf-flow.spec.ts): **Today #1**
-- WF-7 (Cowork phase-end): **Today #2 (Cowork session)**
+## Active phase: Nassau (NA-4 active)
+- NA-0 through NA-3: COMPLETE 2026-05-01
+- NA-4 (Playwright spec): **TODAY**
+- NA-5 (Cowork): Day +1
+- Phase end: after NA-5 closes — Nassau live

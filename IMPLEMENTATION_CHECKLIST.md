@@ -26,7 +26,7 @@ Updated at EOD-FINAL.
 
 ## Active item
 
-**Nassau phase — APPROVED 2026-05-01. Plan: `docs/plans/NASSAU_PLAN.md`. Decisions A (allPairs v1) + B (post-save modal) + Sequencing Option A LOCKED. NA-1 CLOSED. NA-2 CLOSED. Active item: NA-3 (press confirmation UI) — pending GM go-ahead.**
+**Nassau phase — APPROVED 2026-05-01. Plan: `docs/plans/NASSAU_PLAN.md`. Decisions A (allPairs v1) + B (post-save modal) + Sequencing Option A LOCKED. NA-1 CLOSED. NA-2 CLOSED. NA-3 CLOSED. Active item: NA-4 (Playwright spec — `tests/playwright/nassau-flow.spec.ts`).**
 
 **NA-pre-1 — CLOSED 2026-05-01. Commit: `572dc32`.**
 - Deliverable: `stroke_play.ts` emits `RoundingAdjustment.points={absorbingPlayer:remainder}` instead of silent absorb; `aggregate.ts` stale comments removed; 4 new tests (AC 1–5). `match_play.ts` confirmed already correct (unchanged).
@@ -36,9 +36,13 @@ Updated at EOD-FINAL.
 - Deliverable: `src/bridge/nassau_bridge.ts` (buildNassauCfg + settleNassauBet); `nassau_bridge.test.ts` (F6 invariant, T1–T7); `aggregate.ts` MatchTied→closed in buildMatchStates; `payouts.ts` + `perHoleDeltas.ts` cut over from legacy computeNassau; Nassau unparked in GAME_DEFS. F7 atomic commit satisfied.
 - Tests: 454/454 pass. tsc clean. Reviewer: APPROVED.
 
-**NA-2 — CLOSED 2026-05-01. Commit: (pending)**
+**NA-2 — CLOSED 2026-05-01. Commit: `7509f24`.**
 - Deliverable: Nassau wizard UI (pressRule/pressScope/pairingMode/appliesHandicap pills + checkbox in GameInstanceCard); appliesHandicap added to GameInstance + bridge + validators; nassauTooFewPlayers + nassauAllPairsTooFewPlayers guards; addGame sets explicit defaults; vitest.config.ts adds @/ alias + store test scope; 30 new tests. F10 user-facing surface closed.
 - Tests: 454/454 pass. tsc clean. Reviewer: APPROVED.
+
+**NA-3 — CLOSED 2026-05-01. Commit: `ac9d38b`.**
+- Deliverable: `setPressConfirmation`/`setWithdrawn` Zustand actions; `withdrew` field in HoleData + holeDecisions.ts; bridge-level withdrawal via `hd.withdrew`; `nassauPressDetect.ts` (auto-mode press offer detection); `PressConfirmationModal` component (queuing modal for post-save offers); scorecard PUT wiring for full decisions blob (wolfPick, presses, withdrew, dots). Reviewer: 2 passes — APPROVED on second pass after 4 findings fixed. Codex retroactive review: H1 ACCEPT/DEFERRED (F11), H2 REJECT, M1 DEFER (F12). See docs/2026-05-01/13-nassau-press-wiring.md and 14-codex-na3-retroactive.md.
+- Tests: 598/598 pass. tsc clean. Reviewer: APPROVED.
 
 **Wolf phase closure evidence:**
 - WF-0 — CLOSED 2026-04-30. Deliverable: `docs/plans/WOLF_PLAN.md`. Report: `docs/2026-04-30/02-wolf-phase-plan.md`.
@@ -202,7 +206,11 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 
 - [ ] **CODEX-BROKER-LIFETIME** — Codex companion broker process binds auth state at process start; tokens issued by `codex login` after the broker has already started are not picked up. Symptom: `401 Unauthorized` on `/v1/responses` despite successful device-auth login. Fix: kill stale broker PIDs (`cat /tmp/cxc-*/broker.pid | xargs kill`) after `codex login`; subsequent broker spawns pick up the new token. Note in CLAUDE.md or operator notes when Codex usage becomes frequent. — 2026-05-01 — architecture audit session — Low priority (workaround known; document-only)
 
-- [ ] **BRIDGE-WITHDRAWAL-DETECTION-FOLD** — Should deferred bridge-level withdrawal detection (NA-1 Open question: `HoleData.withdrew` field + `settleNassauBet` auto-detect) be folded into NA-3 or dropped? Evaluation rule: in NA-3 Explore phase, check if NA-3's planned scope already touches `HoleData` data model changes. If yes, fold; if no, drop and revisit only when a UI consumer needs it. No code decision required before NA-3. — 2026-05-01 — NA-2 scope maintenance
+- [x] **BRIDGE-WITHDRAWAL-DETECTION-FOLD** — Folded into NA-3. `HoleData.withdrew` + bridge-level `settleNassauWithdrawal` wiring landed in NA-3 (commit ac9d38b). — 2026-05-01 — NA-2 scope maintenance / NA-3 close
+
+- [ ] **F11-PRESS-GAME-SCOPE** — Press decisions not scoped to Nassau game instance: `hd.presses` is a flat `string[]` shared across all Nassau games in a round; `nassauPressDetect.ts` carries only `matchId/downPlayer/pair` (no `gameId`), and the bridge consumes any matching matchId regardless of which game it belongs to. In a round with two Nassau instances on the same player pair, accepting a 'front' press for game A would also open 'front' in game B. Fix: add `gameId` to `PressOffer`; scope `hd.presses` to `Record<gameId, string[]>`; update bridge to filter by `cfg.id`; add 2-Nassau-instance regression test. **Low probability in production** — typical rounds have 1 Nassau game; allPairs generates pair-suffixed IDs ('front-Alice-Bob') that are naturally unique. Accepted/deferred in Codex NA-3 retroactive review. — 2026-05-01 — docs/2026-05-01/14-codex-na3-retroactive.md §3 H1
+
+- [ ] **F12-TIED-WITHDRAWAL-EVENT** — Tied withdrawal closes Nassau matches without a replayable event: `settleNassauWithdrawal` in `nassau.ts:456-468` emits `NassauWithdrawalSettled` only for non-tied matches but closes all participant matches silently when the match is exactly tied. `buildMatchStates(events)` cannot replay the silent closure → bridge's final MatchState can diverge after page reload and replay, and may produce extra zero-value finalization events. Payout is correct; event trace diverges. Pre-existing engine behavior (not introduced by NA-3). Fix: emit explicit zero-delta event (e.g. `NassauWithdrawalMatchTied`) for tied withdrawal matches in `settleNassauWithdrawal`; update `buildMatchStates` handler; add bridge test for tied-withdrawal PUT→GET→hydrateRound replay. — 2026-05-01 — docs/2026-05-01/14-codex-na3-retroactive.md §3 M1
 
 - [x] **GAME-CONFIG-JSON-MIGRATION** — CLOSED 2026-05-01, Prompt 10. Game.config Json? added to Prisma Game model; migration `add_config_and_decisions_json` applied; POST writes config; GET serializes config; hydrateRound deserializes via hydrateGameConfig. NA-2 F10 gate CLOSED.
 

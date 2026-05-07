@@ -49,6 +49,19 @@ describe('buildGameConfig — wolf', () => {
     const cfg = buildGameConfig(makeGame('wolf', { loneWolfMultiplier: 3, escalating: true }))
     expect(cfg).toEqual({ loneWolfMultiplier: 3, escalating: true })
   })
+  it('serializes wolfTieRule: no-points', () => {
+    const cfg = buildGameConfig(makeGame('wolf', { wolfTieRule: 'no-points' }))
+    expect(cfg).toEqual({ wolfTieRule: 'no-points' })
+  })
+  it('serializes wolfTieRule: carryover', () => {
+    const cfg = buildGameConfig(makeGame('wolf', { wolfTieRule: 'carryover' }))
+    expect(cfg).toEqual({ wolfTieRule: 'carryover' })
+  })
+  it('omits wolfTieRule when undefined', () => {
+    const cfg = buildGameConfig(makeGame('wolf', { loneWolfMultiplier: 2 }))
+    expect(cfg).toEqual({ loneWolfMultiplier: 2 })
+    expect(cfg).not.toHaveProperty('wolfTieRule')
+  })
 })
 
 describe('buildGameConfig — skins', () => {
@@ -84,6 +97,12 @@ describe('validateGameConfig — accepts valid inputs', () => {
   })
   it('Wolf valid config passes', () => {
     expect(validateGameConfig('wolf', { loneWolfMultiplier: 2, escalating: false }).ok).toBe(true)
+  })
+  it('Wolf wolfTieRule: no-points passes', () => {
+    expect(validateGameConfig('wolf', { wolfTieRule: 'no-points' }).ok).toBe(true)
+  })
+  it('Wolf wolfTieRule: carryover passes', () => {
+    expect(validateGameConfig('wolf', { wolfTieRule: 'carryover' }).ok).toBe(true)
   })
   it('Skins valid escalating passes', () => {
     expect(validateGameConfig('skins', { escalating: true }).ok).toBe(true)
@@ -131,6 +150,11 @@ describe('validateGameConfig — rejects invalid enum values', () => {
   it('float loneWolfMultiplier rejected (wolf engine requires integer)', () => {
     expect(validateGameConfig('wolf', { loneWolfMultiplier: 2.5 }).ok).toBe(false)
   })
+  it('invalid wolfTieRule rejected', () => {
+    expect(validateGameConfig('wolf', { wolfTieRule: 'split' }).ok).toBe(false)
+    expect(validateGameConfig('wolf', { wolfTieRule: 123 }).ok).toBe(false)
+    expect(validateGameConfig('wolf', { wolfTieRule: ['carryover'] }).ok).toBe(false)
+  })
   it('non-boolean escalating rejected for skins', () => {
     expect(validateGameConfig('skins', { escalating: 1 }).ok).toBe(false)
   })
@@ -162,6 +186,16 @@ describe('hydrateGameConfig — round-trip fidelity', () => {
     const hydrated = hydrateGameConfig('wolf', { loneWolfMultiplier: 3, escalating: true })
     expect(hydrated.loneWolfMultiplier).toBe(3)
     expect(hydrated.escalating).toBe(true)
+  })
+  it('wolf: round-trips wolfTieRule: no-points', () => {
+    expect(hydrateGameConfig('wolf', { wolfTieRule: 'no-points' }).wolfTieRule).toBe('no-points')
+  })
+  it('wolf: round-trips wolfTieRule: carryover', () => {
+    expect(hydrateGameConfig('wolf', { wolfTieRule: 'carryover' }).wolfTieRule).toBe('carryover')
+  })
+  it('wolf: absent wolfTieRule → undefined (bridge supplies no-points default)', () => {
+    const hydrated = hydrateGameConfig('wolf', { loneWolfMultiplier: 2 })
+    expect(hydrated.wolfTieRule).toBeUndefined()
   })
   it('skins: round-trips escalating=false', () => {
     expect(hydrateGameConfig('skins', { escalating: false }).escalating).toBe(false)
@@ -203,6 +237,20 @@ describe('buildGameConfig → validateGameConfig → hydrateGameConfig round-tri
     const hydrated = hydrateGameConfig('wolf', blob)
     expect(hydrated.loneWolfMultiplier).toBe(4)
     expect(hydrated.escalating).toBe(false)
+  })
+  it('Wolf wolfTieRule: carryover survives round-trip', () => {
+    const game = makeGame('wolf', { wolfTieRule: 'carryover' })
+    const blob = buildGameConfig(game)
+    expect(validateGameConfig('wolf', blob).ok).toBe(true)
+    const hydrated = hydrateGameConfig('wolf', blob)
+    expect(hydrated.wolfTieRule).toBe('carryover')
+  })
+  it('Wolf wolfTieRule: no-points survives round-trip', () => {
+    const game = makeGame('wolf', { wolfTieRule: 'no-points' })
+    const blob = buildGameConfig(game)
+    expect(validateGameConfig('wolf', blob).ok).toBe(true)
+    const hydrated = hydrateGameConfig('wolf', blob)
+    expect(hydrated.wolfTieRule).toBe('no-points')
   })
   it('Skins escalating=true survives round-trip', () => {
     const game = makeGame('skins', { escalating: true })

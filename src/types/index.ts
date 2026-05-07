@@ -67,6 +67,7 @@ export interface GameInstance {
   pressAmount?: number
   escalating?: boolean
   loneWolfMultiplier?: number
+  wolfTieRule?: 'no-points' | 'carryover'
   matchFormat?: 'singles' | 'best-ball'
   maxExposure?: number
   settlePer9?: boolean

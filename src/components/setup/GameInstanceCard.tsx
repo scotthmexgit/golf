@@ -105,6 +105,13 @@ export default function GameInstanceCard({ game }: GameInstanceCardProps) {
                 ))}
               </div>
             </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Tied hole</label>
+              <div className="flex gap-1.5 mt-1">
+                <Pill label="No pts" active={(game.wolfTieRule ?? 'no-points') === 'no-points'} onClick={() => updateGame(game.id, { wolfTieRule: 'no-points' })} />
+                <Pill label="Carry" active={game.wolfTieRule === 'carryover'} onClick={() => updateGame(game.id, { wolfTieRule: 'carryover' })} />
+              </div>
+            </div>
             <div className="text-[10px]" style={{ color: 'var(--muted)' }}>Wolf rotates in player order. Golfer 1 starts.</div>
           </>
         )}

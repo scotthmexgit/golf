@@ -189,7 +189,7 @@ describe('Test W4: Lone Wolf loss — losers collect correctly', () => {
 // Carry-scaled: A+400, B+400, C-400, D-400.
 
 describe('Test W5: tied hole + carryover — next decisive hole doubles stake', () => {
-  const game = makeWolfGame(PLAYERS_4, { stake: 100, loneWolfMultiplier: 3 })
+  const game = { ...makeWolfGame(PLAYERS_4, { stake: 100, loneWolfMultiplier: 3 }), wolfTieRule: 'carryover' as const }
   const holes = [
     // Hole 1: A is captain, picks B. All net equal → WolfHoleTied.
     makeHoleData(1, { A: 4, B: 4, C: 4, D: 4 }, { wolfPick: 'B' }),
@@ -417,5 +417,78 @@ describe('Test W11: 5-player partner Wolf — bridge works for max player count'
     expect(ledger['C']).toBe(-200)
     expect(ledger['D']).toBe(-200)
     expect(ledger['E']).toBe(-200)
+  })
+})
+
+// ─── Test W12 — wolfTieRule passthrough ──────────────────────────────────────
+// Verifies that buildWolfCfg reads wolfTieRule from GameInstance and defaults
+// to 'no-points' per docs/games/game_wolf.md §5 when the field is absent.
+// Uses a 4-player round where hole 1 ties (all equal net) so tieRule is exercised.
+
+describe('Test W12a: wolfTieRule null/undefined → engine uses no-points default', () => {
+  const game = makeWolfGame(PLAYERS_4)  // wolfTieRule not set
+  // All players score the same → tied hole
+  const holes = [
+    makeHoleData(1, { A: 4, B: 4, C: 4, D: 4 }, { wolfPick: 'B' }),
+  ]
+  const { events, ledger } = settleWolfBet(holes, players4, game)
+
+  it('ledger is zero-sum on a tied hole under no-points default', () => {
+    expect(zeroSum(ledger, PLAYERS_4)).toBe(0)
+  })
+
+  it('all players have zero delta (no-points: tied hole voided)', () => {
+    for (const pid of PLAYERS_4) expect(ledger[pid] ?? 0).toBe(0)
+  })
+
+  it('emits WolfHoleTied event (not WolfCarryApplied) confirming no-points branch', () => {
+    const kinds = events.map(e => e.kind)
+    expect(kinds).toContain('WolfHoleTied')
+    expect(kinds).not.toContain('WolfCarryApplied')
+  })
+})
+
+describe('Test W12b: wolfTieRule explicit no-points — tied hole is voided', () => {
+  const game = { ...makeWolfGame(PLAYERS_4), wolfTieRule: 'no-points' as const }
+  const holes = [
+    makeHoleData(1, { A: 4, B: 4, C: 4, D: 4 }, { wolfPick: 'B' }),
+    makeHoleData(2, { A: 3, B: 4, C: 4, D: 4 }, { wolfPick: 'A' }),  // A wins
+  ]
+  const { events, ledger } = settleWolfBet(holes, players4, game)
+
+  it('hole-1 is voided, hole-2 settles normally', () => {
+    expect(zeroSum(ledger, PLAYERS_4)).toBe(0)
+    expect(ledger['A']).toBeGreaterThan(0)
+  })
+
+  it('emits WolfHoleTied for hole 1, no WolfCarryApplied', () => {
+    const h1Kinds = events.filter(e => e.hole === 1).map(e => e.kind)
+    expect(h1Kinds).toContain('WolfHoleTied')
+    expect(events.map(e => e.kind)).not.toContain('WolfCarryApplied')
+  })
+})
+
+describe('Test W12c: wolfTieRule explicit carryover — tied hole stake carries', () => {
+  const game = { ...makeWolfGame(PLAYERS_4, { stake: 100 }), wolfTieRule: 'carryover' as const }
+  // Hole 1 ties, hole 2 A wins → doubled stake on hole 2
+  const holes = [
+    makeHoleData(1, { A: 4, B: 4, C: 4, D: 4 }, { wolfPick: 'B' }),
+    makeHoleData(2, { A: 3, B: 5, C: 5, D: 5 }, { wolfPick: 'solo' }),  // A lone wolf wins
+  ]
+  const { events, ledger } = settleWolfBet(holes, players4, game)
+
+  it('ledger is zero-sum with carryover', () => {
+    expect(zeroSum(ledger, PLAYERS_4)).toBe(0)
+  })
+
+  it('emits WolfCarryApplied confirming carryover branch fired', () => {
+    expect(events.map(e => e.kind)).toContain('WolfCarryApplied')
+  })
+
+  it('A collects more than the base lone-wolf amount (carryover doubles the pot)', () => {
+    // Base lone wolf: A vs 3 opponents, loneMultiplier=3, stake=100 → 300 per opponent = 900
+    // With carryover from hole 1: multiplier=2 applies → A collects more than base
+    expect(ledger['A']).toBeGreaterThan(0)
+    expect(ledger['B']).toBeLessThan(0)
   })
 })

@@ -168,7 +168,7 @@ export const useRoundStore = create<RoundStore>((set, get) => ({
       playerIds: bettingIds,
       junk: defaultJunk(500),
     }
-    if (type === 'wolf') inst.loneWolfMultiplier = 2
+    if (type === 'wolf') { inst.loneWolfMultiplier = 2; inst.wolfTieRule = 'no-points' }
     if (type === 'matchPlay') inst.matchFormat = 'singles'
     if (type === 'skins') inst.escalating = false
     if (type === 'vegas') inst.maxExposure = 50

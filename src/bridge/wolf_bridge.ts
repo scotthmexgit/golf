@@ -42,9 +42,8 @@ export function buildWolfCfg(game: GameInstance): WolfCfg {
     // HARDCODE: blindLoneMultiplier not on GameInstance; one above loneMultiplier,
     // minimum 3 per assertValidWolfCfg. Replace when GameInstance gains a field.
     blindLoneMultiplier: Math.max(loneMultiplier + 1, 3),
-    // HARDCODE: tieRule not on GameInstance; 'carryover' is the most common Wolf
-    // rule and doubles the pot on consecutive tied holes. Replace when surfaced.
-    tieRule: 'carryover',
+    // Default per docs/games/game_wolf.md §5: tieRule defaults to 'no-points'.
+    tieRule: game.wolfTieRule ?? 'no-points',
     // HARDCODE: appliesHandicap not on GameInstance; v1 Wolf always applies handicap.
     appliesHandicap: true,
     junkItems: [],

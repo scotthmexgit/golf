@@ -24,9 +24,10 @@ const NASSAU_PRESS_RULES  = new Set(['manual', 'auto-2-down', 'auto-1-down'])
 const NASSAU_PRESS_SCOPES = new Set(['nine', 'match'])
 const NASSAU_PAIRING_MODES = new Set(['singles', 'allPairs'])
 
-const NASSAU_KEYS = new Set(['pressRule', 'pressScope', 'pairingMode', 'appliesHandicap'])
-const WOLF_KEYS   = new Set(['loneWolfMultiplier', 'escalating'])
-const SKINS_KEYS  = new Set(['escalating'])
+const NASSAU_KEYS    = new Set(['pressRule', 'pressScope', 'pairingMode', 'appliesHandicap'])
+const WOLF_TIE_RULES = new Set(['no-points', 'carryover'])
+const WOLF_KEYS      = new Set(['loneWolfMultiplier', 'escalating', 'wolfTieRule'])
+const SKINS_KEYS     = new Set(['escalating'])
 
 // Union of all type-specific config keys across every game type.
 // Used by validateGameConfigInput to distinguish cross-type keys from truly unknown keys.
@@ -104,6 +105,7 @@ export function buildGameConfig(game: GameInstance): Record<string, unknown> | n
       const out: Record<string, unknown> = {}
       if (game.loneWolfMultiplier !== undefined) out.loneWolfMultiplier = game.loneWolfMultiplier
       if (game.escalating !== undefined) out.escalating = game.escalating
+      if (game.wolfTieRule !== undefined) out.wolfTieRule = game.wolfTieRule
       return Object.keys(out).length > 0 ? out : null
     }
     case 'skins': {
@@ -156,6 +158,9 @@ export function validateGameConfig(type: GameType, config: unknown): ValidationR
       }
       if (obj.escalating !== undefined && typeof obj.escalating !== 'boolean') {
         return { ok: false, reason: 'Wolf config: escalating must be a boolean' }
+      }
+      if (obj.wolfTieRule !== undefined && (typeof obj.wolfTieRule !== 'string' || !WOLF_TIE_RULES.has(obj.wolfTieRule))) {
+        return { ok: false, reason: `Wolf config: invalid wolfTieRule "${obj.wolfTieRule}"` }
       }
       return { ok: true }
     }
@@ -214,6 +219,7 @@ export function hydrateGameConfig(
       return {
         loneWolfMultiplier: typeof obj.loneWolfMultiplier === 'number' ? obj.loneWolfMultiplier : undefined,
         escalating:         typeof obj.escalating === 'boolean' ? obj.escalating : undefined,
+        wolfTieRule: (obj.wolfTieRule === 'no-points' || obj.wolfTieRule === 'carryover') ? obj.wolfTieRule : undefined,
       }
     case 'skins':
       return {

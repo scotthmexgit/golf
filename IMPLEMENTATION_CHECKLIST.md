@@ -228,7 +228,7 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 
 - [x] **POST-FAKE-ROUNDID-FALLBACK** — CLOSED 2026-05-01, Prompt 10. POST now returns HTTP 500 on Prisma failure; wizard displays inline error and stays on setup; no fabricated roundId on failure.
 
-- [ ] **SCORECARD-DECISIONS-WIRING** — Scorecard page PUT call does not yet include a `decisions` blob. Infrastructure (HoleDecision table, PUT handler, hydrateRound) is in place (Prompt 10). Wiring: (1) call `buildHoleDecisions(holeData, activeGameTypes)` in scorecard save handler, (2) include `decisions` in PUT body, (3) persist resolve-page changes before navigation. **Folds into NA-3 scope** (Nassau press confirmation + Wolf wolfPick wiring share the same scorecard-PUT code path — bundle them). — 2026-05-01 — Prompt 10 / Prompt 11 scope note
+- [x] **SCORECARD-DECISIONS-WIRING** — CLOSED 2026-05-08. Wiring confirmed implemented in NA-3: `scorecard/[roundId]/page.tsx:166-169` calls `buildHoleDecisions(latestHoleData, gameTypes)` and includes `decisions` in PUT body. wolfPick + presses bundled as originally planned. Verified by Explore pass 2026-05-08 (docs/2026-05-08/02-skins-explore.md §7). — 2026-05-01 (filed) / 2026-05-08 (closed)
 
 - [ ] **PL-1** — `setPress(hole, gameKey)` semantic mismatch: stores game-instance UUID, not Nassau match ID. Document or rename. — 2026-05-01 — architecture audit F3 — **Active: addressed by NA-3 F3 gate (new `setPressConfirmation` action + deprecation of `setPress` if unused)**
 

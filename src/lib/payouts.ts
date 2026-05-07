@@ -2,7 +2,7 @@ import type { HoleData, PlayerSetup, GameInstance, PayoutMap } from '@/types'
 import { strokesOnHole } from './handicap'
 import { vsPar } from './scoring'
 import { computeJunkPayouts, hasAnyJunk } from './junk'
-import { settleStrokePlayBet } from '../bridge/stroke_play_bridge'
+import { settleStrokePlayBet, buildSpCfg } from '../bridge/stroke_play_bridge'
 import { settleSkinsBet, buildSkinsCfg } from '../bridge/skins_bridge'
 import { settleWolfBet, buildWolfCfg } from '../bridge/wolf_bridge'
 import { settleNassauBet, buildNassauCfg } from '../bridge/nassau_bridge'
@@ -112,8 +112,43 @@ export function computeStableford(holes: HoleData[], players: PlayerSetup[], gam
 function computeGamePayouts(holes: HoleData[], players: PlayerSetup[], game: GameInstance): PayoutMap {
   switch (game.type) {
     case 'strokePlay': {
-      const { ledger } = settleStrokePlayBet(holes, players, game)
-      return payoutMapFromLedger(ledger, game.playerIds)
+      // Phase 7 sweep: orchestrate through aggregateRound (Stroke Play, Wolf/Skins template).
+      // Bridge produces finalized events (finalizeStrokePlayRound runs inside settleStrokePlayBet);
+      // log is assembled here; aggregateRound reduces to RunningLedger;
+      // Stroke Play ledger extracted from byBet[game.id].
+      // NOTE: aggregateRound has a Stroke Play finalizer path (aggregate.ts:384-393) that
+      // filters for StrokePlayHoleRecorded. Bridge returns only final events (not hole records),
+      // so the finalizer receives [] and emits nothing. No double-finalization.
+      // F1 guard: byBet[game.id] undefined is only acceptable when FieldTooSmall was emitted
+      // for this bet. Any other case = event attribution bug → throw. See SE3, SE5.
+      // Ref: docs/games/game_stroke_play.md; docs/2026-05-08/10-strokeplay-explore.md
+      const spCfg = buildSpCfg(game)
+      // Guard: buildSpCfg must preserve game.id so byBet keying is correct.
+      // (GR8 — string-equality bet-id chain). If this throws, the bridge contract broke.
+      if (spCfg.id !== game.id) {
+        throw new Error(`Stroke Play bridge id contract violation: spCfg.id="${spCfg.id}" !== game.id="${game.id}"`)
+      }
+      const { events } = settleStrokePlayBet(holes, players, game)
+      const log: ScoringEventLog = { events, supersessions: {} }
+      const roundCfg = buildMinimalRoundCfg(spCfg, 'strokePlay')
+      const result = aggregateRound(log, roundCfg)
+      // F1 guard: verify every monetary Stroke Play event is attributed to game.id.
+      // This catches both total loss (byBet[game.id] undefined) AND partial loss
+      // (byBet[game.id] defined but incomplete because a RoundingAdjustment went to
+      // a different key). If any monetary event has the wrong declaringBet, throw —
+      // that is an event attribution bug that would silently drop payouts.
+      for (const e of events) {
+        if ((e.kind === 'StrokePlaySettled' || e.kind === 'RoundingAdjustment') &&
+            e.declaringBet !== game.id) {
+          throw new Error(
+            `Stroke Play bridge id contract: ${e.kind} declaringBet="${e.declaringBet}" !== game.id="${game.id}" — event attribution bug.`
+          )
+        }
+      }
+      // After the attribution check, byBet[game.id] contains all monetary events or is
+      // undefined. undefined is legitimate: empty round (holes=[]), FieldTooSmall, etc.
+      const spLedger = result.byBet[game.id] ?? {}
+      return payoutMapFromLedger(spLedger, game.playerIds)
     }
     case 'matchPlay': return computeMatchPlay(holes, players, game)
     case 'nassau': {

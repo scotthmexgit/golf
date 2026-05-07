@@ -19,7 +19,7 @@ import { buildHoleState, buildMinimalRoundCfg } from './shared'
 // GameInstance carries stake, playerIds, and id; the engine fields not present
 // on GameInstance are filled with locked v1 defaults (Option α Minimal).
 
-function buildSpCfg(game: GameInstance): StrokePlayCfg {
+export function buildSpCfg(game: GameInstance): StrokePlayCfg {
   return {
     id: game.id,
     stake: game.stake,

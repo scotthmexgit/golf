@@ -435,6 +435,7 @@ After first SOD's grooming pass, update AGENTS.md line "Active phase: …" / "Cu
 - **hydrateRound label convention:** always resolve the human-readable label via `GAME_DEFS.find(d => d.key === g.type)?.label ?? g.type`. Never use `g.type` directly.
 - **Two-phase Skins settlement:** `settleSkinsHole` (per-hole, provisional) + `finalizeSkinsRound` (carry-scaling + tie resolution).
 - **Settlement is computed from Zustand state, not the DB.**
+- **`aggregateRound` is round-level only — do NOT migrate `perHoleDeltas.ts` to it.** `aggregateRound` returns `RunningLedger = { netByPlayer, byBet, lastRecomputeTs }` — no per-hole events, no per-hole attribution. `computePerHoleDeltas` requires raw event-filtered per-hole monetary events (filter: `event.hole != null && 'points' in event`). These return shapes are structurally incompatible. The "aggregateRound cutover" framing from Phase 7 EODs was wrong for `perHoleDeltas.ts`; the function was already correct and only needed test coverage and comment updates. Reference: `docs/2026-05-08/16-perholedeltas-explore.md`, `docs/2026-05-08/18-perholedeltas-develop.md`.
 
 ### Do-not-touch areas
 

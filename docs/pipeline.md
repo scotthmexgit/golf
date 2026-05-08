@@ -1,13 +1,13 @@
 # Pipeline: golf
-Last updated: 2026-05-08 (SOD Day 4 — date-correction: prior SOD Day 3 was misfiled to docs/2026-05-09/ but system date was 2026-05-08)
+Last updated: 2026-05-08 (EOD Day 4 — Phase 7 code work complete; Phase 8 direction set)
 
-## Today (Day 0, 2026-05-08 session 2)
+## Today (Day 0, 2026-05-08 session 2) — final status
 
-| # | Item | Source | Estimate | Scope notes |
-|---|---|---|---|---|
-| 1 | perHoleDeltas.ts cutover | Phase 7 #11 carry | S | Explore dispatch shape → Plan → STOP → Develop → adversarial. Approval gate before Develop. |
-| 2 | Post-bundle Cowork follow-ups (4 items) | Post-bundle Cowork findings | S total | B4 auto-advance, B5 label clarity, B3 $0.00 vs '—', legacy bets investigation. Bundle all four. |
-| 3 | Phase 8 direction discussion | GM | XS | After perHoleDeltas closes. Match Play? Junk Phase 3? F12? Nassau buildHoleState gap? |
+| # | Item | Source | Actual |
+|---|---|---|---|
+| 1 | perHoleDeltas.ts cutover | Phase 7 #11 carry | **COMPLETE** — NHC1-NHC6 + comment cleanup; Phase 7 #11 code closed |
+| 2 | Post-bundle Cowork follow-ups (4 items) | Post-bundle Cowork findings | **COMPLETE** — B3/B4/B5 shipped; (d) expected/won't fix |
+| 3 | Phase 8 direction discussion | GM | **COMPLETE** — F12 first, then Match Play unpark + close-the-matrix |
 
 ## Day +1 (2026-05-09) — committed next
 
@@ -36,14 +36,14 @@ Last updated: 2026-05-08 (SOD Day 4 — date-correction: prior SOD Day 3 was mis
 ## Beyond +5
 Post-Phase-7: Match Play unpark (L), Junk Phase 3 (M), Round-state verifier (M). GM decides ordering.
 
-## Active phase: Phase 7 — Full multi-bet cutover (#11)
+## Phase 7 status
 - WF7-0–WF7-3: COMPLETE 2026-05-07
-- WF7-4 (Cowork): OPEN — re-run session pending GM scheduling
-- Phase 7 sweep (Skins/Nassau/Stroke Play): COMPLETE 2026-05-08
-- B1–B6 Cowork bundle: COMPLETE 2026-05-08 (commit f679105)
-- perHoleDeltas.ts cutover: OPEN — today's primary
-- Post-bundle follow-ups: OPEN — today (4 items, XS–S each)
+- Phase 7 sweep (payouts.ts + perHoleDeltas.ts): COMPLETE 2026-05-08
+- B1–B6 Cowork bundle + follow-ups: COMPLETE 2026-05-08
+- WF7-4 (Cowork re-run): OPEN — GM-scheduled
+- NA-5 (Cowork re-run): OPEN — GM-scheduled
+- Phase 7 #11 code work: COMPLETE 2026-05-08
 
-### Nassau (parallel — pending Cowork re-run)
-- NA-0–NA-4, F11: CLOSED
-- NA-5 (Cowork): OPEN — re-run session pending GM scheduling
+## Phase 8 — Match Play unpark + close-the-matrix
+- F12 engine fix (Day 1 first slot): OPEN — `settleNassauWithdrawal` tied-match event gap
+- Match Play Explore (Day 1 second slot): OPEN — bridge/wizard/E2E scope checklist

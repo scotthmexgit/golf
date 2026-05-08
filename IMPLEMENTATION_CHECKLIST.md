@@ -2,7 +2,7 @@
 
 Single source of truth for scope. Read the **Active item** before any work. Tangents → Parking Lot. Closed items → Done (append-only).
 
-**Wolf phase COMPLETE.** Plan: `docs/plans/WOLF_PLAN.md`. WF-0–WF-7 all closed 2026-04-30; Cowork 7/7 PASS. Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history. Nassau phase: NA-pre-1–NA-4 CLOSED. F11-PRESS-GAME-SCOPE CLOSED. **NA-5 (Cowork visual verification) OPEN — pending scheduling.** **Active phase: Phase 7 — Full multi-bet cutover (#11). Phase 7 #11 CODE WORK COMPLETE 2026-05-08 (payouts.ts: Wolf/Skins/Nassau/Stroke Play; perHoleDeltas.ts: NHC1-NHC6 Nassau test coverage + comment cleanup). Active item: WF7-4 (Cowork re-run for formal closure). NA-5 (Cowork re-run) OPEN — pending scheduling.**
+**Wolf phase COMPLETE.** Plan: `docs/plans/WOLF_PLAN.md`. WF-0–WF-7 all closed 2026-04-30; Cowork 7/7 PASS. Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history. Nassau phase: NA-pre-1–NA-4 CLOSED. F11-PRESS-GAME-SCOPE CLOSED. **NA-5 (Cowork visual verification) OPEN — pending scheduling.** **Phase 7 #11 code work COMPLETE 2026-05-08 (payouts.ts: Wolf/Skins/Nassau/Stroke Play on aggregateRound; perHoleDeltas.ts: NHC1-NHC6 test coverage + comment cleanup). Phase 7 closure pending Cowork re-runs (WF7-4, NA-5 — GM-scheduled). Phase 8 next: Match Play unpark + close-the-matrix.**
 
 ## Project Scope Summary
 
@@ -237,6 +237,8 @@ Untriaged. Dated and sourced to a prompt. Triage at EOD-FINAL or on explicit req
 - [x] **PL-3** — Bridge test must assert `buildMatchStates(events, roundCfg).nassauMatches` matches bridge's final MatchState for round with at least one press. — 2026-05-01 — architecture audit F6 — **ABSORBED by NA-1 F6 gate** (explicit AC in NA-1)
 
 - [x] **PL-4** — `aggregate.ts:1-18` stale phase comments — update to reflect Phase 3 complete. — 2026-05-01 — architecture audit F8 — **ABSORBED by NA-pre-1 scope** (in-scope for that commit)
+
+- [ ] **NASSAU-STALE-PRESS-ON-SCORE-CHANGE** — If user accepts a manual press in `PressConfirmationModal`, then changes the hole score before tapping "Save & Next Hole →", the press persists in `hd.presses` and may be invalid at save time (the match may no longer be down given the new score). The Nassau bridge opens the press using the down player from the current `MatchState`, which is correct given the new scores — but the press was triggered by the old score. Edge case; atypical user flow. Won't fix unless real-world reports surface the issue. **Cure risk:** the staged-press approach (don't commit until save) was attempted during prompt 20 development (2026-05-08) and introduced two worse bugs: (1) wrong-hole press attribution on hole navigation, (2) idempotency bypass allowing duplicate presses. See `docs/2026-05-08/20-bundle-develop.md §B4` for full analysis. — 2026-05-08 — prompt 20 Codex iterations
 
 ## Done
 

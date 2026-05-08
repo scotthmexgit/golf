@@ -9,6 +9,7 @@ services:
     environment:
       DATABASE_URL: "postgresql://golfapp:changeme@host.docker.internal:5432/golfdb"
       NODE_ENV: "production"
+      HOSTNAME: "0.0.0.0"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

@@ -2,7 +2,7 @@
 
 Single source of truth for scope. Read the **Active item** before any work. Tangents → Parking Lot. Closed items → Done (append-only).
 
-**Wolf phase COMPLETE.** Plan: `docs/plans/WOLF_PLAN.md`. WF-0–WF-7 all closed 2026-04-30; Cowork 7/7 PASS. Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history. Nassau phase: NA-pre-1–NA-4 CLOSED. F11-PRESS-GAME-SCOPE CLOSED. **NA-5 (Cowork visual verification) OPEN — pending scheduling.** **Active phase: Phase 7 — Full multi-bet cutover (#11). Main payouts.ts sweep COMPLETE 2026-05-08 (Wolf, Skins, Nassau, Stroke Play all on aggregateRound). Active item: perHoleDeltas.ts cutover (Phase 7 #11 closure). WF7-4 (Cowork verification) OPEN — pending scheduling.**
+**Wolf phase COMPLETE.** Plan: `docs/plans/WOLF_PLAN.md`. WF-0–WF-7 all closed 2026-04-30; Cowork 7/7 PASS. Skins phase (SK-0–SK-5) COMPLETE as of 2026-04-30; `docs/plans/SKINS_PLAN.md` retained for history. Nassau phase: NA-pre-1–NA-4 CLOSED. F11-PRESS-GAME-SCOPE CLOSED. **NA-5 (Cowork visual verification) OPEN — pending scheduling.** **Active phase: Phase 7 — Full multi-bet cutover (#11). Phase 7 #11 CODE WORK COMPLETE 2026-05-08 (payouts.ts: Wolf/Skins/Nassau/Stroke Play; perHoleDeltas.ts: NHC1-NHC6 Nassau test coverage + comment cleanup). Active item: WF7-4 (Cowork re-run for formal closure). NA-5 (Cowork re-run) OPEN — pending scheduling.**
 
 ## Project Scope Summary
 

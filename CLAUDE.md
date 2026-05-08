@@ -318,7 +318,7 @@ Keep this section current. Edit it as the project evolves.
 - **Run/dev command:** `npm run dev` (next dev). Production: PM2 serving `next build` output at `http://localhost:3000/golf`.
 - **Build command:** `npm run build` (next build).
 - **PM2 rebuild:** `pm2 stop golf && npm run build && pm2 start golf`. Procedure originally documented only in commit 51660c4 message — acknowledged tech debt.
-- **Branch strategy:** local-only. `main` is active. `pre-rebuild-snapshot` is a historical checkpoint — don't merge to it, don't rebase it. No remote, no PRs, no CI.
+- **Branch strategy:** `main` is active. Remote: `git@github.com:scotthmexgit/golf.git` (added 2026-05-08). `pre-rebuild-snapshot` is a historical checkpoint — don't merge to it, don't rebase it. No PRs, no CI.
 - **Commit style:** ticket-code prefix when work-item-linked (e.g. `SK-2: …`, `SP-UI-7: …`, `PF-1-F6: …`); freeform descriptive otherwise. One to three commits per session is normal. Session-log/EOD-only commits are acceptable and routine.
 - **Issue tracker:** `IMPLEMENTATION_CHECKLIST.md` is the single source of truth for active scope. AGENTS.md "Current item" line is the active-item pointer. No external tracker.
 - **Code review:** sub-agent `reviewer.md` is the designated gate — must return `APPROVED` before any scoring, rule, or doc change is declared done. No human PR review.

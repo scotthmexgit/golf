@@ -17,10 +17,9 @@ interface BetDetailsSheetProps {
  *
  * Displays per-player gross scores and per-bet monetary deltas for all scored
  * holes. Generic shared primitive: accepts no game-type-specific props. Any bet
- * that populates computePerHoleDeltas (currently Skins and Wolf) surfaces here
- * automatically. Nassau and Match Play will appear when their perHoleDeltas.ts
- * cases land in their respective bridge sub-items — no changes to this component
- * will be required.
+ * that populates computePerHoleDeltas (Skins, Wolf, Nassau) surfaces here
+ * automatically. Nassau shows — on in-progress holes and $ on settlement holes
+ * (MatchClosedOut at end of each 9-hole leg). Match Play remains unparked.
  *
  * Sheet state (open/close) is driven by the caller via props. The component is
  * always rendered so CSS transitions animate correctly.

@@ -11,10 +11,12 @@
 //     hole: null, so SP contributes nothing to either map. The second row on
 //     the scorecard shows "—" for every hole in a SP-only round (Choice B,
 //     SKINS_PLAN.md §1 Decision B). The accordion shows "Stroke Play —".
-//   • Skins (SK-2): add case 'skins' → settleSkinsBet(...).events. SkinWon
-//     events carry hole + points and land in both maps immediately.
-//   • Parked games (wolf, nassau, matchPlay, etc.): default → [] until their
-//     bridges are wired.
+//   • Skins (SK-2): SkinWon carries hole + points; lands in both maps.
+//   • Wolf (WF-1): WolfHoleResolved carries hole + points; lands in both maps.
+//   • Nassau (NA-1): NassauHoleResolved has no points (filtered out); only
+//     MatchClosedOut (early closeout or end-of-leg finalizer) carries
+//     hole + points. Settlement holes show money; in-progress holes show —.
+//   • Match Play: default → [] (disabled in GAME_DEFS; no bridge wired).
 
 import type { HoleData, PlayerSetup, GameInstance } from '../types'
 import type { ScoringEvent } from '../games/types'

@@ -22,6 +22,18 @@ import { detectNassauPressOffers, detectManualNassauPressOffers } from '@/lib/na
 import type { PressOffer } from '@/lib/nassauPressDetect'
 import type { GameType } from '@/types'
 
+function matchLabel(matchId: string): string {
+  if (matchId === 'front') return 'Front 9'
+  if (matchId === 'back') return 'Back 9'
+  if (matchId === 'overall') return 'Overall'
+  const pm = matchId.match(/^press-(\d+)$/)
+  if (pm) return `Press #${pm[1]}`
+  if (matchId.startsWith('front-')) return 'Front 9'
+  if (matchId.startsWith('back-')) return 'Back 9'
+  if (matchId.startsWith('overall-')) return 'Overall'
+  return matchId
+}
+
 export default function ScorecardPage() {
   const router = useRouter()
   const params = useParams()
@@ -34,6 +46,7 @@ export default function ScorecardPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [finishError, setFinishError] = useState<string | null>(null)
   const [pendingPressOffers, setPendingPressOffers] = useState<PressOffer[]>([])
+  const [pendingPressIsManual, setPendingPressIsManual] = useState(false)
   // SKINS-2: suppress Bet-row delta on fresh hole navigation until user edits a score.
   // Starts false (page load / hydration should show deltas immediately).
   const [suppressBetDelta, setSuppressBetDelta] = useState(false)
@@ -223,9 +236,11 @@ export default function ScorecardPage() {
     }
   }
 
-  // B5: Manual press — tapping "Press?" opens the modal via the existing auto-press path.
+  // B5: Manual press — tapping "Press?" opens the modal. B4: marked manual so onComplete
+  // closes the modal without triggering save (user saves explicitly after resolving presses).
   const handleManualPress = () => {
     if (manualPressOffers.length > 0) {
+      setPendingPressIsManual(true)
       setPendingPressOffers(manualPressOffers)
     }
   }
@@ -251,6 +266,7 @@ export default function ScorecardPage() {
       detectNassauPressOffers(currentHole, holes, players, g)
     )
     if (allOffers.length > 0) {
+      setPendingPressIsManual(false)
       setPendingPressOffers(allOffers)
       return
     }
@@ -376,8 +392,8 @@ export default function ScorecardPage() {
             data-testid="manual-press-button"
           >
             Press?{' '}{manualPressOffers.map(o =>
-              `(${players.find(p => p.id === o.downPlayer)?.name?.split(' ')[0] ?? o.downPlayer} is down)`
-            ).join(', ')}
+              `${matchLabel(o.matchId)}: ${players.find(p => p.id === o.downPlayer)?.name?.split(' ')[0] ?? o.downPlayer} is down`
+            ).join(' · ')}
           </button>
         )}
 
@@ -421,7 +437,7 @@ export default function ScorecardPage() {
         <PressConfirmationModal
           hole={currentHole}
           offers={pendingPressOffers}
-          onComplete={proceedSave}
+          onComplete={pendingPressIsManual ? () => setPendingPressOffers([]) : proceedSave}
         />
       )}
 

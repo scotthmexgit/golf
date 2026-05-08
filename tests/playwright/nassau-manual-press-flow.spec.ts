@@ -130,16 +130,16 @@ test('nassau manual press flow: B5 §1–§6 closure spec', async ({ page }) => 
     await expect(page.locator('div').filter({ hasText: 'Hole 2' }).first()).toBeVisible()
   })
 
-  // ── §3 HOLE 2 — Alice wins, user accepts both presses ────────────────────────
+  // ── §3 HOLE 2 — Alice wins, user accepts both presses, then saves manually ─────
 
-  await test.step('§3 Hole 2: Alice wins; tap Press? → accept front + overall; save proceeds', async () => {
+  await test.step('§3 Hole 2: Alice wins; tap Press? → accept both; modal closes; user saves manually (B4)', async () => {
     await decrementBtn(page, 0).click()
     await page.waitForTimeout(100)
 
-    // Press? button visible — Bob now 2-down
+    // Press? button visible — Bob now 2-down (B5: label format "Front 9: Bob is down · Overall: Bob is down")
     await expect(page.locator('[data-testid="manual-press-button"]')).toBeVisible()
-    // Label should identify Bob as down
     await expect(page.locator('[data-testid="manual-press-button"]')).toContainText('Bob')
+    await expect(page.locator('[data-testid="manual-press-button"]')).toContainText('Front 9')
 
     // Tap Press? → modal opens; no PUT fires yet
     await page.locator('[data-testid="manual-press-button"]').click()
@@ -148,19 +148,20 @@ test('nassau manual press flow: B5 §1–§6 closure spec', async ({ page }) => 
     await expect(modal).toBeVisible()
     await expect(page.locator('[data-testid="press-down-player"]')).toContainText('Bob')
 
-    // Accept first offer (Front 9)
+    // Accept first offer (Front 9) — still in modal (second offer queued)
     await page.locator('[data-testid="press-accept"]').click()
     await page.waitForTimeout(150)
 
-    // Accept second offer (Overall) — last accept triggers onComplete → proceedSave → PUT
-    await Promise.all([
-      page.waitForResponse(
-        r => r.url().includes('/scores/hole/2') && r.request().method() === 'PUT',
-      ),
-      page.locator('[data-testid="press-accept"]').click(),
-    ])
+    // Accept second offer (Overall) — B4: onComplete closes modal WITHOUT triggering save.
+    // No PUT response expected here. User stays on hole 2.
+    await page.locator('[data-testid="press-accept"]').click()
+    await page.waitForTimeout(150)
 
+    // Modal closed; still on hole 2 (no hole advance yet).
     await expect(page.locator('[data-testid="press-confirmation-modal"]')).toHaveCount(0)
+
+    // User explicitly saves — PUT fires, advances to hole 3.
+    await saveHole(page, 2)
     await expect(page.locator('div').filter({ hasText: 'Hole 3' }).first()).toBeVisible()
   })
 

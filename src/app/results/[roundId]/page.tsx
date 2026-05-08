@@ -101,13 +101,14 @@ export default function ResultsPage() {
                   <span className="font-mono text-xs" style={{ color: 'var(--muted)' }}>{formatMoneyDecimal(g.stake)}{stakeUnitLabel(g.type)}</span>
                 </div>
                 {sorted.map(p => {
+                  const isParticipant = g.playerIds.includes(p.id)
                   const amt = perPlayer[p.id] ?? 0
                   return (
                     <div key={p.id} className="flex items-center justify-between text-xs pl-3 mt-0.5">
                       <span style={{ color: 'var(--muted)' }}>{(p.name || 'Golfer').split(' ')[0]}</span>
                       <span className="font-mono font-semibold"
                         style={{ color: amt > 0 ? '#22c55e' : amt < 0 ? 'var(--red-card)' : 'var(--muted)' }}>
-                        {formatMoneyDecimal(amt)}
+                        {isParticipant && amt === 0 ? '$0.00' : formatMoneyDecimal(amt)}
                       </span>
                     </div>
                   )
